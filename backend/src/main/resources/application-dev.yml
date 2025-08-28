@@ -1,0 +1,68 @@
+# 开发环境配置 - Spring Boot 3.x
+# 注意：Spring Boot 3.x中环境配置文件不能包含spring.profiles.active
+
+# 数据源配置 - 开发环境使用Docker
+spring:
+  # 明确配置ANSI输出，避免启动时的枚举转换错误
+  output:
+    ansi:
+      enabled: NEVER
+      console-available: false
+  datasource:
+    url: jdbc:mysql://localhost:3306/yibang_erp_dev?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: Pino542635
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+
+  # Redis配置 - 开发环境
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 2000ms
+
+# 日志配置
+logging:
+  level:
+    com.yibang.erp: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# JWT配置
+jwt:
+  secret: dev-yibang-erp-super-secure-jwt-secret-key-2024-with-512-bits-minimum-security-requirement
+  expiration: 86400000
+
+# 文件上传配置
+file:
+  upload:
+    path: ./uploads/dev/
+
+# 管理端点配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
