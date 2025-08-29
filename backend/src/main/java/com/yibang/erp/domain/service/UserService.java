@@ -1,7 +1,7 @@
 package com.yibang.erp.domain.service;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yibang.erp.common.response.PageResult;
+import com.yibang.erp.domain.dto.UserQueryRequest;
 import com.yibang.erp.domain.entity.User;
 
 import java.util.List;
@@ -17,13 +17,10 @@ public interface UserService {
     /**
      * 分页查询用户列表
      *
-     * @param page 分页参数
-     * @param username 用户名（可选）
-     * @param realName 真实姓名（可选）
-     * @param status 状态（可选）
+     * @param queryRequest 查询参数（包含分页信息）
      * @return 分页用户列表
      */
-    IPage<User> getUserPage(Page<User> page, String username, String realName, String status);
+    PageResult<User> getUserPage(UserQueryRequest queryRequest);
 
     /**
      * 根据ID获取用户

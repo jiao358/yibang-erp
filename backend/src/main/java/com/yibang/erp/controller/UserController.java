@@ -1,7 +1,7 @@
 package com.yibang.erp.controller;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yibang.erp.common.response.PageResult;
+import com.yibang.erp.domain.dto.UserQueryRequest;
 import com.yibang.erp.domain.entity.User;
 import com.yibang.erp.domain.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,15 +32,31 @@ public class UserController {
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> getUserPage(
-            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "20") Integer size,
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String realName,
-            @RequestParam(required = false) String status) {
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String sortField,
+            @RequestParam(required = false, defaultValue = "desc") String sortOrder) {
         
         try {
-            Page<User> pageParam = new Page<>(page, size);
-            IPage<User> userPage = userService.getUserPage(pageParam, username, realName, status);
+            // 构建查询请求
+            UserQueryRequest queryRequest = new UserQueryRequest(current, size);
+            queryRequest.setUsername(username);
+            queryRequest.setRealName(realName);
+            queryRequest.setStatus(status);
+            queryRequest.setDepartment(department);
+            queryRequest.setEmail(email);
+            queryRequest.setPhone(phone);
+            queryRequest.setSortField(sortField);
+            queryRequest.setSortOrder(sortOrder);
+            
+            // 查询用户列表
+            PageResult<User> userPage = userService.getUserPage(queryRequest);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);

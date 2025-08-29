@@ -1,8 +1,9 @@
 package com.yibang.erp.domain.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yibang.erp.common.response.PageResult;
+import com.yibang.erp.common.util.PageUtils;
+import com.yibang.erp.domain.dto.UserQueryRequest;
 import com.yibang.erp.domain.entity.User;
 import com.yibang.erp.domain.service.UserService;
 import com.yibang.erp.infrastructure.repository.UserRepository;
@@ -32,24 +33,52 @@ public class UserServiceImpl implements UserService {
     private PasswordEncoder passwordEncoder;
 
     @Override
-    public IPage<User> getUserPage(Page<User> page, String username, String realName, String status) {
+    public PageResult<User> getUserPage(UserQueryRequest queryRequest) {
+        // 验证分页参数
+        PageUtils.validatePageRequest(queryRequest);
+        
+        // 构建查询条件
         LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
         
         // 添加查询条件
-        if (StringUtils.hasText(username)) {
-            queryWrapper.like(User::getUsername, username);
+        if (StringUtils.hasText(queryRequest.getUsername())) {
+            queryWrapper.like(User::getUsername, queryRequest.getUsername());
         }
-        if (StringUtils.hasText(realName)) {
-            queryWrapper.like(User::getRealName, realName);
+        if (StringUtils.hasText(queryRequest.getRealName())) {
+            queryWrapper.like(User::getRealName, queryRequest.getRealName());
         }
-        if (StringUtils.hasText(status)) {
-            queryWrapper.eq(User::getStatus, status);
+        if (StringUtils.hasText(queryRequest.getStatus())) {
+            queryWrapper.eq(User::getStatus, queryRequest.getStatus());
+        }
+        if (StringUtils.hasText(queryRequest.getDepartment())) {
+            queryWrapper.eq(User::getDepartment, queryRequest.getDepartment());
+        }
+        if (StringUtils.hasText(queryRequest.getEmail())) {
+            queryWrapper.like(User::getEmail, queryRequest.getEmail());
+        }
+        if (StringUtils.hasText(queryRequest.getPhone())) {
+            queryWrapper.like(User::getPhone, queryRequest.getPhone());
         }
         
         // 按创建时间倒序排列
         queryWrapper.orderByDesc(User::getCreatedAt);
         
-        return userRepository.selectPage(page, queryWrapper);
+        // 获取总记录数
+        long total = userRepository.selectCount(queryWrapper);
+        
+        if (total == 0) {
+            return PageUtils.createEmptyPageResult(queryRequest);
+        }
+        
+        // 添加分页条件（手动实现分页）
+        queryWrapper.last(String.format("LIMIT %d, %d", 
+            queryRequest.getOffset(), queryRequest.getLimit()));
+        
+        // 查询数据
+        List<User> records = userRepository.selectList(queryWrapper);
+        
+        // 创建分页结果
+        return PageUtils.createPageResult(records, total, queryRequest);
     }
 
     @Override

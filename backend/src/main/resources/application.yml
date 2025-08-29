@@ -23,12 +23,26 @@ spring:
       port: 6379
       database: 0
       timeout: 2000ms
+      # Redis连接池配置
       lettuce:
         pool:
           max-active: 8
           max-wait: -1ms
           max-idle: 8
           min-idle: 0
+          # 连接池配置
+          time-between-eviction-runs: 30000ms
+          min-evictable-idle-time: 60000ms
+      # Redis键过期策略
+      keyspace-events: E
+      # Redis序列化配置
+      default-type: generic
+      # Redis重试配置
+      retry:
+        max-attempts: 3
+        initial-interval: 1000ms
+        multiplier: 2.0
+        max-interval: 10000ms
   servlet:
     multipart:
       max-file-size: 100MB
@@ -43,6 +57,7 @@ server:
 logging:
   level:
     com.yibang.erp: DEBUG
+    org.springframework.data.redis: DEBUG
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
@@ -71,3 +86,8 @@ management:
   endpoint:
     health:
       show-details: always
+  # Redis健康检查配置
+  health:
+    redis:
+      enabled: true
+      timeout: 3000ms

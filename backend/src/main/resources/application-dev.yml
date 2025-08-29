@@ -37,6 +37,16 @@ spring:
       port: 6379
       database: 0
       timeout: 2000ms
+      # 开发环境Redis连接池配置
+      lettuce:
+        pool:
+          max-active: 4
+          max-wait: 1000ms
+          max-idle: 4
+          min-idle: 1
+          # 开发环境连接池配置
+          time-between-eviction-runs: 60000ms
+          min-evictable-idle-time: 120000ms
 
 # 日志配置
 logging:
@@ -46,6 +56,7 @@ logging:
     org.springframework.web: DEBUG
     org.hibernate.SQL: DEBUG
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.data.redis: DEBUG
 
 # JWT配置
 jwt:
@@ -66,3 +77,8 @@ management:
   endpoint:
     health:
       show-details: always
+  # 开发环境Redis健康检查配置
+  health:
+    redis:
+      enabled: true
+      timeout: 2000ms
