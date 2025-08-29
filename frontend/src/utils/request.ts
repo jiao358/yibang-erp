@@ -4,7 +4,7 @@ import router from '@/router'
 
 // 创建axios实例
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:7102/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:7102',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json;charset=utf-8'
@@ -16,17 +16,23 @@ service.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     // 从localStorage获取token
     const token = localStorage.getItem('token')
+    console.log('请求拦截器 - Token:', token)
+    console.log('请求拦截器 - URL:', config.url)
+    
     if (token) {
       config.headers.set('Authorization', `Bearer ${token}`)
+      console.log('请求拦截器 - 已设置Authorization头:', `Bearer ${token}`)
+    } else {
+      console.log('请求拦截器 - 未找到token')
     }
     
-    // 添加时间戳防止缓存
-    if (config.method === 'get') {
-      config.params = {
-        ...config.params,
-        _t: Date.now()
-      }
-    }
+    // 暂时注释掉时间戳，避免无限请求循环
+    // if (config.method === 'get') {
+    //   config.params = {
+    //     ...config.params,
+    //     _t: Date.now()
+    //   }
+    // }
     
     return config
   },
@@ -41,12 +47,7 @@ service.interceptors.response.use(
   (response: AxiosResponse) => {
     const { data } = response
     
-    // 如果响应成功但业务逻辑失败
-    if (data && data.success === false) {
-      ElMessage.error(data.message || '操作失败')
-      return Promise.reject(new Error(data.message || '操作失败'))
-    }
-    
+    // 直接返回响应数据，让业务层处理业务逻辑
     return data
   },
   (error) => {
@@ -66,6 +67,7 @@ service.interceptors.response.use(
           // 清除token并跳转到登录页
           localStorage.removeItem('token')
           localStorage.removeItem('userInfo')
+          localStorage.removeItem('userRoles')
           router.push('/login')
           break
         case 403:

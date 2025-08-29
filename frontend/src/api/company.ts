@@ -1,91 +1,51 @@
 import request from '@/utils/request'
-import type { Company, CreateCompanyRequest, UpdateCompanyRequest, CompanyQueryParams } from '@/types/company'
+import type { Company, CompanyForm } from '@/types/company'
 
 // 公司管理API接口
 export const companyApi = {
-  // 分页获取公司列表
-  getCompanyList(params: CompanyQueryParams) {
-    return request({
-      url: '/api/companies',
-      method: 'get',
-      params
-    })
+  // 获取公司列表
+  getCompanyList() {
+    return request.get('/api/companies')
   },
 
   // 根据ID获取公司
   getCompanyById(id: number) {
-    return request({
-      url: `/api/companies/${id}`,
-      method: 'get'
-    })
+    return request.get(`/api/companies/${id}`)
   },
 
   // 创建公司
-  createCompany(data: CreateCompanyRequest) {
-    return request({
-      url: '/api/companies',
-      method: 'post',
-      data
-    })
+  createCompany(data: CompanyForm) {
+    return request.post('/api/companies', data)
   },
 
   // 更新公司
-  updateCompany(id: number, data: UpdateCompanyRequest) {
-    return request({
-      url: `/api/companies/${id}`,
-      method: 'put',
-      data
-    })
+  updateCompany(id: number, data: CompanyForm) {
+    return request.put(`/api/companies/${id}`, data)
   },
 
   // 删除公司
   deleteCompany(id: number) {
-    return request({
-      url: `/api/companies/${id}`,
-      method: 'delete'
-    })
+    return request.delete(`/api/companies/${id}`)
   },
 
   // 批量删除公司
   batchDeleteCompanies(ids: number[]) {
-    return request({
-      url: '/api/companies/batch',
-      method: 'delete',
-      data: ids
-    })
+    return request.delete('/api/companies/batch', { data: ids })
   },
 
   // 更新公司状态
   updateCompanyStatus(id: number, status: string) {
-    return request({
-      url: `/api/companies/${id}/status`,
-      method: 'patch',
-      params: { status }
-    })
+    return request.patch(`/api/companies/${id}/status`, null, { params: { status } })
   },
 
-  // 获取所有公司列表
+  // 获取所有公司
   getAllCompanies() {
-    return request({
-      url: '/api/companies/all',
-      method: 'get'
-    })
+    return request.get('/api/companies/all')
   },
 
-  // 根据业务类型获取公司列表
-  getCompaniesByType(type: string) {
-    return request({
-      url: `/api/companies/type/${type}`,
-      method: 'get'
-    })
-  },
-
-  // 获取激活状态的公司列表
+  // 获取活跃公司
   getActiveCompanies() {
-    return request({
-      url: '/api/companies/active',
-      method: 'get'
-    })
+    return request.get('/api/companies/active')
   }
 }
 
@@ -99,6 +59,5 @@ export const {
   batchDeleteCompanies,
   updateCompanyStatus,
   getAllCompanies,
-  getCompaniesByType,
   getActiveCompanies
 } = companyApi

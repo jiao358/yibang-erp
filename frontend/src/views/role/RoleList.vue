@@ -21,7 +21,7 @@
           />
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable style="width: 150px;">
             <el-option label="激活" value="ACTIVE" />
             <el-option label="未激活" value="INACTIVE" />
           </el-select>
@@ -71,13 +71,13 @@
               size="small" 
               type="primary" 
               @click="handleEdit(row)"
-              :disabled="row.isSystem"
+              :disabled="row.isSystem && !hasAdminPermission"
             >编辑</el-button>
             <el-button 
               size="small" 
               type="danger" 
               @click="handleDelete(row)"
-              :disabled="row.isSystem"
+              :disabled="row.isSystem && !hasAdminPermission"
             >删除</el-button>
           </template>
         </el-table-column>
@@ -101,13 +101,14 @@
     <RoleForm
       v-model:visible="formVisible"
       :role-data="currentRole"
+      :is-view-mode="isViewMode"
       @success="handleFormSuccess"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import RoleForm from './components/RoleForm.vue'
@@ -119,6 +120,7 @@ const loading = ref(false)
 const roleList = ref<Role[]>([])
 const formVisible = ref(false)
 const currentRole = ref<Role | null>(null)
+const isViewMode = ref(false)
 
 // 搜索表单
 const searchForm = reactive({
@@ -137,17 +139,49 @@ const pagination = reactive({
 const fetchRoleList = async () => {
   loading.value = true
   try {
-    const params = {
+    // 构建查询参数
+    const params: any = {
       page: pagination.current,
-      size: pagination.size,
-      ...searchForm
+      size: pagination.size
     }
+    
+    // 添加搜索条件
+    if (searchForm.name) {
+      params.name = searchForm.name
+    }
+    if (searchForm.status) {
+      params.status = searchForm.status
+    }
+    
     const response = await getRoleList(params)
-    roleList.value = response.data.records
-    pagination.total = response.data.total
+    console.log('角色列表响应:', response)
+    
+    // 处理响应数据
+    if (response && response.data) {
+      // 分页数据结构
+      if (response.data.records) {
+        roleList.value = response.data.records
+        pagination.total = response.data.total || 0
+        pagination.current = response.data.current || 1
+        pagination.size = response.data.size || 20
+      } else {
+        // 数组数据
+        roleList.value = response.data
+        pagination.total = response.data.length
+      }
+    } else if (Array.isArray(response)) {
+      // 直接返回数组
+      roleList.value = response
+      pagination.total = response.length
+    } else {
+      roleList.value = []
+      pagination.total = 0
+    }
   } catch (error) {
     ElMessage.error('获取角色列表失败')
     console.error('获取角色列表失败:', error)
+    roleList.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
@@ -172,18 +206,21 @@ const handleReset = () => {
 // 新增角色
 const handleAdd = () => {
   currentRole.value = null
+  isViewMode.value = false
   formVisible.value = true
 }
 
 // 查看角色
 const handleView = (row: Role) => {
   currentRole.value = { ...row }
+  isViewMode.value = true
   formVisible.value = true
 }
 
 // 编辑角色
 const handleEdit = (row: Role) => {
   currentRole.value = { ...row }
+  isViewMode.value = false
   formVisible.value = true
 }
 
@@ -247,6 +284,20 @@ const getStatusText = (status: string) => {
   }
   return statusMap[status] || status
 }
+
+// 检查是否有管理员权限
+const hasAdminPermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
 
 // 格式化日期时间
 const formatDateTime = (dateTime: string | null) => {

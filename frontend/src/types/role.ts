@@ -22,6 +22,7 @@ export interface Role {
   name: string
   description?: string
   permissions?: string
+  permissionsConfig?: string
   isSystem: boolean
   status: RoleStatus
   createdAt: string

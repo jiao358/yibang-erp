@@ -96,7 +96,7 @@ const handleLogin = async () => {
     
     const response = await login(loginForm)
     
-    if (response.success) {
+    if (response.data && response.data.success) {
       // 保存token和用户信息
       localStorage.setItem('token', response.data.token)
       localStorage.setItem('userInfo', JSON.stringify(response.data.user))
@@ -105,7 +105,17 @@ const handleLogin = async () => {
       ElMessage.success('登录成功')
       
       // 跳转到仪表盘
-      router.push('/dashboard')
+      router.push('/')
+    } else if (response.success) {
+      // 兼容直接返回success的情况
+      localStorage.setItem('token', response.token)
+      localStorage.setItem('userInfo', JSON.stringify(response.user))
+      localStorage.setItem('userRoles', JSON.stringify(response.roles))
+      
+      ElMessage.success('登录成功')
+      
+      // 跳转到仪表盘
+      router.push('/')
     } else {
       ElMessage.error(response.message || '登录失败')
     }
@@ -128,7 +138,7 @@ const handleLogin = async () => {
 const checkLoginStatus = () => {
   const token = localStorage.getItem('token')
   if (token) {
-    router.push('/dashboard')
+    router.push('/')
   }
 }
 

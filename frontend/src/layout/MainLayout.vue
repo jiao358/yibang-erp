@@ -26,7 +26,10 @@
               <el-icon><User /></el-icon>
               <span>用户管理</span>
             </el-menu-item>
-            <el-menu-item index="/role">
+            <el-menu-item 
+              v-if="hasSystemAdminPermission" 
+              index="/role"
+            >
               <el-icon><Lock /></el-icon>
               <span>角色管理</span>
             </el-menu-item>
@@ -53,6 +56,18 @@
               <el-icon><Box /></el-icon>
               <span>库存管理</span>
             </el-menu-item>
+            <el-menu-item index="/pricing">
+              <el-icon><TrendCharts /></el-icon>
+              <span>价格分层管理</span>
+            </el-menu-item>
+            <el-menu-item index="/price-strategy">
+              <el-icon><TrendCharts /></el-icon>
+              <span>价格策略管理</span>
+            </el-menu-item>
+            <el-menu-item index="/sales-target">
+              <el-icon><TrendCharts /></el-icon>
+              <span>销售目标管理</span>
+            </el-menu-item>
           </el-sub-menu>
           
           <el-menu-item index="/digital-screen">
@@ -60,7 +75,7 @@
             <span>数字大屏</span>
           </el-menu-item>
           
-          <el-menu-item index="/ai">
+          <el-menu-item index="/ai-management">
             <el-icon><Cpu /></el-icon>
             <span>AI管理</span>
           </el-menu-item>
@@ -142,6 +157,20 @@ const userInfo = ref({
 const userInitial = computed(() => {
   const name = userInfo.value.realName || userInfo.value.username
   return name.charAt(0).toUpperCase()
+})
+
+// 检查是否有系统管理员权限
+const hasSystemAdminPermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
 })
 
 // 方法

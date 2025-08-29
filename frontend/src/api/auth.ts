@@ -25,53 +25,32 @@ export interface LoginResponse {
 export const authApi = {
   // 用户登录
   login(data: LoginRequest) {
-    return request({
-      url: '/api/auth/login',
-      method: 'post',
-      data
-    })
+    return request.post('/api/auth/login', data)
   },
 
   // 用户登出
   logout() {
-    return request({
-      url: '/api/auth/logout',
-      method: 'post'
-    })
+    return request.post('/api/auth/logout')
   },
 
   // 刷新token
   refreshToken() {
-    return request({
-      url: '/api/auth/refresh',
-      method: 'post'
-    })
+    return request.post('/api/auth/refresh')
   },
 
   // 获取当前用户信息
   getCurrentUser() {
-    return request({
-      url: '/api/auth/current-user',
-      method: 'get'
-    })
+    return request.get('/api/auth/current-user')
   },
 
   // 修改密码
   changePassword(data: { oldPassword: string; newPassword: string }) {
-    return request({
-      url: '/api/auth/change-password',
-      method: 'post',
-      data
-    })
+    return request.post('/api/auth/change-password', data)
   },
 
   // 重置密码
   resetPassword(data: { username: string; email: string }) {
-    return request({
-      url: '/api/auth/reset-password',
-      method: 'post',
-      data
-    })
+    return request.post('/api/auth/reset-password', data)
   }
 }
 

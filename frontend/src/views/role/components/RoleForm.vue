@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="dialogVisible"
-    :title="isEdit ? '编辑角色' : '新增角色'"
+    :title="getDialogTitle()"
     width="500px"
     :close-on-click-modal="false"
     @close="handleClose"
@@ -17,7 +17,7 @@
         <el-input
           v-model="form.name"
           placeholder="请输入角色名称"
-          :disabled="isEdit && isSystemRole"
+          :disabled="isViewMode || (isEdit && isSystemRole && !hasAdminPermission)"
         />
       </el-form-item>
 
@@ -27,7 +27,7 @@
           type="textarea"
           :rows="3"
           placeholder="请输入角色描述"
-          :disabled="isEdit && isSystemRole"
+          :disabled="isViewMode || (isEdit && isSystemRole && !hasAdminPermission)"
         />
       </el-form-item>
 
@@ -36,7 +36,7 @@
           v-model="form.status"
           placeholder="请选择状态"
           style="width: 100%"
-          :disabled="isEdit && isSystemRole"
+          :disabled="isViewMode || (isEdit && isSystemRole && !hasAdminPermission)"
         >
           <el-option label="激活" value="ACTIVE" />
           <el-option label="未激活" value="INACTIVE" />
@@ -49,6 +49,7 @@
           type="textarea"
           :rows="4"
           placeholder="请输入权限配置（JSON格式）"
+          :disabled="isViewMode"
         />
         <div class="form-tip">
           <small>权限配置使用JSON格式，例如：{"menu": ["read", "write"], "user": ["read"]}</small>
@@ -58,8 +59,13 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
+        <el-button @click="handleClose">{{ isViewMode ? '关闭' : '取消' }}</el-button>
+        <el-button 
+          v-if="!isViewMode"
+          type="primary" 
+          @click="handleSubmit" 
+          :loading="submitting"
+        >
           {{ isEdit ? '更新' : '创建' }}
         </el-button>
       </div>
@@ -68,7 +74,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { createRole, updateRole } from '@/api/role'
 import type { Role } from '@/types/role'
@@ -77,11 +83,13 @@ import type { Role } from '@/types/role'
 interface Props {
   visible: boolean
   roleData?: Role | null
+  isViewMode?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   visible: false,
-  roleData: null
+  roleData: null,
+  isViewMode: false
 })
 
 // Emits
@@ -127,6 +135,28 @@ const isEdit = computed(() => !!props.roleData)
 
 const isSystemRole = computed(() => props.roleData?.isSystem || false)
 
+// 获取对话框标题
+const getDialogTitle = () => {
+  if (props.isViewMode) {
+    return '查看角色'
+  }
+  return isEdit.value ? '编辑角色' : '新增角色'
+}
+
+// 检查是否有管理员权限
+const hasAdminPermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
 // 重置表单
 const resetForm = () => {
   Object.assign(form, {
@@ -143,7 +173,7 @@ const fillFormData = (roleData: Role) => {
   Object.assign(form, {
     name: roleData.name || '',
     description: roleData.description || '',
-    permissions: roleData.permissions || '',
+    permissions: roleData.permissionsConfig || roleData.permissions || '',
     status: roleData.status || 'ACTIVE'
   })
 }
@@ -152,10 +182,24 @@ const fillFormData = (roleData: Role) => {
 watch(() => props.roleData, (newVal) => {
   if (newVal) {
     fillFormData(newVal)
+    console.log('RoleForm - 填充表单数据:', newVal)
+    console.log('RoleForm - 表单数据:', form)
   } else {
     resetForm()
   }
 }, { immediate: true })
+
+// 监听visible变化，确保数据正确填充
+watch(() => props.visible, (newVal) => {
+  if (newVal && props.roleData) {
+    // 延迟一下确保DOM已经渲染
+    nextTick(() => {
+      fillFormData(props.roleData!)
+      console.log('RoleForm - visible变化，重新填充数据:', props.roleData)
+      console.log('RoleForm - 表单数据:', form)
+    })
+  }
+})
 
 // 提交表单
 const handleSubmit = async () => {
@@ -167,17 +211,28 @@ const handleSubmit = async () => {
     
     if (isEdit.value && props.roleData) {
       // 编辑角色
-      const updateData = { ...form }
-      // 系统角色不允许修改名称和描述
-      if (props.roleData.isSystem) {
-        updateData.name = undefined
-        updateData.description = undefined
+      const updateData: any = { 
+        name: form.name,
+        description: form.description,
+        permissionsConfig: form.permissions, // 映射到后端期望的字段名
+        status: form.status
+      }
+      // 系统角色不允许修改名称和描述（除非是超级管理员）
+      if (props.roleData.isSystem && !hasAdminPermission.value) {
+        delete updateData.name
+        delete updateData.description
       }
       await updateRole(props.roleData.id, updateData)
       ElMessage.success('更新成功')
     } else {
       // 新增角色
-      await createRole(form)
+      const createData = {
+        name: form.name,
+        description: form.description,
+        permissionsConfig: form.permissions, // 映射到后端期望的字段名
+        status: form.status
+      }
+      await createRole(createData)
       ElMessage.success('创建成功')
     }
     

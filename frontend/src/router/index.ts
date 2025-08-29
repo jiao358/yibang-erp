@@ -5,10 +5,6 @@ import MainLayout from '@/layout/MainLayout.vue'
 // 路由配置
 const routes: RouteRecordRaw[] = [
   {
-    path: '/',
-    redirect: '/dashboard'
-  },
-  {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/auth/Login.vue'),
@@ -23,7 +19,7 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
     children: [
       {
-        path: 'dashboard',
+        path: '',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/Dashboard.vue'),
         meta: {
@@ -38,7 +34,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '用户管理',
           requiresAuth: true,
-          roles: ['ADMIN']
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN']
         }
       },
       {
@@ -48,7 +44,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '角色管理',
           requiresAuth: true,
-          roles: ['ADMIN']
+          roles: ['SYSTEM_ADMIN']
         }
       },
       {
@@ -58,7 +54,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '公司管理',
           requiresAuth: true,
-          roles: ['ADMIN']
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN']
         }
       },
       {
@@ -68,7 +64,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '产品管理',
           requiresAuth: true,
-          roles: ['ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN']
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN']
         }
       },
       {
@@ -78,7 +74,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '订单管理',
           requiresAuth: true,
-          roles: ['ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN', 'SUPPLIER_OPERATOR', 'SALES']
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN', 'SUPPLIER_OPERATOR', 'SALES']
         }
       },
       {
@@ -88,7 +84,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '数字大屏',
           requiresAuth: true,
-          roles: ['ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN', 'SUPPLIER_OPERATOR', 'SALES']
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN', 'SUPPLIER_OPERATOR', 'SALES']
         }
       },
       {
@@ -98,7 +94,37 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: 'AI管理',
           requiresAuth: true,
-          roles: ['ADMIN']
+          roles: ['SYSTEM_ADMIN']
+        }
+      },
+      {
+        path: 'pricing',
+        name: 'PricingManagement',
+        component: () => import('@/views/pricing/PriceTierList.vue'),
+        meta: {
+          title: '价格分层管理',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN']
+        }
+      },
+      {
+        path: 'price-strategy',
+        name: 'PriceStrategyManagement',
+        component: () => import('@/views/pricing/PriceStrategyList.vue'),
+        meta: {
+          title: '价格策略管理',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN']
+        }
+      },
+      {
+        path: 'sales-target',
+        name: 'SalesTargetManagement',
+        component: () => import('@/views/pricing/SalesTargetList.vue'),
+        meta: {
+          title: '销售目标管理',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN']
         }
       },
       {
@@ -108,7 +134,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '系统监控',
           requiresAuth: true,
-          roles: ['ADMIN']
+          roles: ['SYSTEM_ADMIN']
         }
       }
     ]
@@ -130,16 +156,11 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫
+// 路由守卫 - 恢复真实的登录验证
 router.beforeEach((to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - 易邦ERP系统` : '易邦ERP系统'
   
-  // 暂时禁用登录验证，直接进入系统
-  // TODO: 开发完成后恢复登录验证
-  next()
-  
-  /*
   // 检查是否需要认证
   if (to.meta.requiresAuth) {
     const token = localStorage.getItem('token')
@@ -165,7 +186,6 @@ router.beforeEach((to, from, next) => {
   }
   
   next()
-  */
 })
 
 export default router

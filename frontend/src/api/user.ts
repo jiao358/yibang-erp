@@ -11,80 +11,47 @@ export const userApi = {
     realName?: string
     status?: string
   }) {
-    return request({
-      url: '/api/users',
-      method: 'get',
-      params
-    })
+    return request.get('/api/users', { params })
   },
 
   // 根据ID获取用户
   getUserById(id: number) {
-    return request({
-      url: `/api/users/${id}`,
-      method: 'get'
-    })
+    return request.get(`/api/users/${id}`)
   },
 
   // 创建用户
   createUser(data: Partial<User>) {
-    return request({
-      url: '/api/users',
-      method: 'post',
-      data
-    })
+    return request.post('/api/users', data)
   },
 
   // 更新用户
   updateUser(id: number, data: Partial<User>) {
-    return request({
-      url: `/api/users/${id}`,
-      method: 'put',
-      data
-    })
+    return request.put(`/api/users/${id}`, data)
   },
 
   // 删除用户
   deleteUser(id: number) {
-    return request({
-      url: `/api/users/${id}`,
-      method: 'delete'
-    })
+    return request.delete(`/api/users/${id}`)
   },
 
   // 批量删除用户
   batchDeleteUsers(ids: number[]) {
-    return request({
-      url: '/api/users/batch',
-      method: 'delete',
-      data: ids
-    })
+    return request.delete('/api/users/batch', { data: ids })
   },
 
   // 更新用户状态
   updateUserStatus(id: number, status: string) {
-    return request({
-      url: `/api/users/${id}/status`,
-      method: 'patch',
-      params: { status }
-    })
+    return request.patch(`/api/users/${id}/status`, null, { params: { status } })
   },
 
   // 重置用户密码
   resetPassword(id: number, newPassword: string) {
-    return request({
-      url: `/api/users/${id}/password`,
-      method: 'patch',
-      params: { newPassword }
-    })
+    return request.patch(`/api/users/${id}/password`, null, { params: { newPassword } })
   },
 
   // 获取所有用户
   getAllUsers() {
-    return request({
-      url: '/api/users/all',
-      method: 'get'
-    })
+    return request.get('/api/users/all')
   }
 }
 
@@ -92,44 +59,47 @@ export const userApi = {
 export const roleApi = {
   // 获取角色列表
   getRoleList() {
-    return request({
-      url: '/api/roles',
-      method: 'get'
-    })
+    return request.get('/api/roles')
   },
 
   // 根据ID获取角色
   getRoleById(id: number) {
-    return request({
-      url: `/api/roles/${id}`,
-      method: 'get'
-    })
+    return request.get(`/api/roles/${id}`)
   },
 
   // 创建角色
   createRole(data: Partial<Role>) {
-    return request({
-      url: '/api/roles',
-      method: 'post',
-      data
-    })
+    return request.post('/api/roles', data)
   },
 
   // 更新角色
   updateRole(id: number, data: Partial<Role>) {
-    return request({
-      url: `/api/roles/${id}`,
-      method: 'put',
-      data
-    })
+    return request.put(`/api/roles/${id}`, data)
   },
 
   // 删除角色
   deleteRole(id: number) {
-    return request({
-      url: `/api/roles/${id}`,
-      method: 'delete'
-    })
+    return request.delete(`/api/roles/${id}`)
+  },
+
+  // 批量删除角色
+  batchDeleteRoles(ids: number[]) {
+    return request.delete('/api/roles/batch', { data: ids })
+  },
+
+  // 更新角色状态
+  updateRoleStatus(id: number, status: string) {
+    return request.patch(`/api/roles/${id}/status`, null, { params: { status } })
+  },
+
+  // 获取所有角色
+  getAllRoles() {
+    return request.get('/api/roles/all')
+  },
+
+  // 获取活跃角色
+  getActiveRoles() {
+    return request.get('/api/roles/active')
   }
 }
 
@@ -137,44 +107,27 @@ export const roleApi = {
 export const companyApi = {
   // 获取公司列表
   getCompanyList() {
-    return request({
-      url: '/api/companies',
-      method: 'get'
-    })
+    return request.get('/api/companies')
   },
 
   // 根据ID获取公司
   getCompanyById(id: number) {
-    return request({
-      url: `/api/companies/${id}`,
-      method: 'get'
-    })
+    return request.get(`/api/companies/${id}`)
   },
 
   // 创建公司
   createCompany(data: Partial<Company>) {
-    return request({
-      url: '/api/companies',
-      method: 'post',
-      data
-    })
+    return request.post('/api/companies', data)
   },
 
   // 更新公司
   updateCompany(id: number, data: Partial<Company>) {
-    return request({
-      url: `/api/companies/${id}`,
-      method: 'put',
-      data
-    })
+    return request.put(`/api/companies/${id}`, data)
   },
 
   // 删除公司
   deleteCompany(id: number) {
-    return request({
-      url: `/api/companies/${id}`,
-      method: 'delete'
-    })
+    return request.delete(`/api/companies/${id}`)
   }
 }
 
