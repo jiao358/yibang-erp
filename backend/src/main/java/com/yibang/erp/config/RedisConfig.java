@@ -8,7 +8,7 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
- * Redis配置类 - 暂时完全注释掉，避免Bean定义问题
+ * Redis配置类 - 简化配置，避免Bean定义问题
  *
  * @author yibang-erp
  * @since 2024-01-14
@@ -16,6 +16,9 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 public class RedisConfig {
 
+    /**
+     * Redis模板配置 - 简化配置，避免Spring Boot 3.x兼容性问题
+     */
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, Object> template = new RedisTemplate<>();
