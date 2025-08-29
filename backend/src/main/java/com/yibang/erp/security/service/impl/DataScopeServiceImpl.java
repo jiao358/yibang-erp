@@ -100,10 +100,10 @@ public class DataScopeServiceImpl implements DataScopeService {
             return false;
         }
         
-        // 检查部门权限
-        if (deptId != null && !deptId.equals(currentUser.getDeptId())) {
-            return false;
-        }
+        // 检查部门权限 - 暂时禁用，因为数据库中没有dept_id字段
+        // if (deptId != null && !deptId.equals(currentUser.getDeptId())) {
+        //     return false;
+        // }
         
         return true;
     }
@@ -131,13 +131,13 @@ public class DataScopeServiceImpl implements DataScopeService {
             return java.util.Collections.emptyList();
         }
         
-        // 超级管理员可以访问所有部门
+        // 超级管理员可以访问所有部门 - 暂时返回空列表，因为数据库中没有dept_id字段
         if (SecurityUtils.hasRole("SUPER_ADMIN")) {
-            return java.util.Collections.singletonList(currentUser.getDeptId());
+            return java.util.Collections.emptyList();
         }
         
-        // 普通用户只能访问自己的部门
-        return java.util.Collections.singletonList(currentUser.getDeptId());
+        // 普通用户只能访问自己的部门 - 暂时返回空列表，因为数据库中没有dept_id字段
+        return java.util.Collections.emptyList();
     }
     
     @Override
@@ -164,20 +164,22 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
     
     /**
-     * 构建部门条件
+     * 构建部门条件 - 暂时禁用，因为数据库中没有dept_id字段
      */
     private String buildDepartmentCondition(String alias, DataScope dataScope) {
-        return String.format(" AND %s%s = %d", 
-            alias, dataScope.deptField(), SecurityUtils.getCurrentUser().getDeptId());
+        // return String.format(" AND %s%s = %d", 
+        //     alias, dataScope.deptField(), SecurityUtils.getCurrentUser().getDeptId());
+        return ""; // 暂时返回空字符串
     }
     
     /**
-     * 构建部门条件（带参数）
+     * 构建部门条件（带参数） - 暂时禁用，因为数据库中没有dept_id字段
      */
     private DataScopeCondition buildDepartmentConditionWithParams(String alias, DataScope dataScope, Map<String, Object> parameters) {
-        String condition = String.format(" AND %s%s = :deptId", alias, dataScope.deptField());
-        parameters.put("deptId", SecurityUtils.getCurrentUser().getDeptId());
-        return new DataScopeCondition(condition, parameters);
+        // String condition = String.format(" AND %s%s = :deptId", alias, dataScope.deptField());
+        // parameters.put("deptId", SecurityUtils.getCurrentUser().getDeptId());
+        // return new DataScopeCondition(condition, parameters);
+        return new DataScopeCondition("", new HashMap<>()); // 暂时返回空条件
     }
     
     /**

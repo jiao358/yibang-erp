@@ -2,8 +2,10 @@ package com.yibang.erp.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yibang.erp.domain.dto.RoleUpdateRequest;
 import com.yibang.erp.domain.entity.Role;
 import com.yibang.erp.domain.service.RoleService;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,7 +23,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/roles")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('SYSTEM_ADMIN')")
 public class RoleController {
 
     @Autowired
@@ -119,9 +121,18 @@ public class RoleController {
      * 更新角色
      */
     @PutMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> updateRole(@PathVariable Long id, @RequestBody Role role) {
+    public ResponseEntity<Map<String, Object>> updateRole(@PathVariable Long id, @RequestBody RoleUpdateRequest request) {
         try {
+            // 创建Role对象并设置值
+            Role role = new Role();
             role.setId(id);
+            role.setName(request.getName());
+            role.setDescription(request.getDescription());
+            if(!StringUtils.isEmpty(request.getPermissionsConfig())){
+                role.setPermissionsConfig(request.getPermissionsConfig());
+            }
+            role.setStatus(request.getStatus());
+            
             Role updatedRole = roleService.updateRole(role);
             
             Map<String, Object> response = new HashMap<>();

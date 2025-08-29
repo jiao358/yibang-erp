@@ -78,11 +78,7 @@ public class User {
     @TableField("department")
     private String department;
     
-    /**
-     * 部门ID
-     */
-    @TableField("dept_id")
-    private Long deptId;
+
 
     /**
      * 职位

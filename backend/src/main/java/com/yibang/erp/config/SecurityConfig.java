@@ -13,9 +13,12 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import com.yibang.erp.security.JwtAuthenticationFilter;
+import com.yibang.erp.common.util.JwtUtil;
 
 import java.util.Arrays;
 import java.util.List;
@@ -66,10 +69,18 @@ public class SecurityConfig {
     }
 
     /**
+     * JWT认证过滤器
+     */
+    @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
+        return new JwtAuthenticationFilter(jwtUtil, userDetailsService);
+    }
+
+    /**
      * 安全过滤器链配置 - 优化版本
      */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, DaoAuthenticationProvider authenticationProvider) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, DaoAuthenticationProvider authenticationProvider, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         System.out.println("=== 配置安全过滤器链 ===");
         
         http
@@ -87,6 +98,9 @@ public class SecurityConfig {
             // 配置认证提供者
             .authenticationProvider(authenticationProvider)
             
+            // 添加JWT认证过滤器
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            
             // 配置授权规则 - 优化版本
             .authorizeHttpRequests(authz -> authz
                 // 公开接口
@@ -99,6 +113,9 @@ public class SecurityConfig {
                 // 需要认证的接口（排除已公开的）
                 .requestMatchers("/api/protected/**").authenticated()
                 .requestMatchers("/api/admin/**").authenticated()
+                
+                // API接口需要认证
+                .requestMatchers("/api/**").authenticated()
                 
                 // 其他所有请求需要认证
                 .anyRequest().authenticated()
@@ -124,9 +141,11 @@ public class SecurityConfig {
         // 允许的源 - 开发环境
         List<String> allowedOrigins = Arrays.asList(
             "http://localhost:3000",      // React开发服务器
+            "http://localhost:7101",      // 前端Vite开发服务器
             "http://localhost:8080",      // 本地后端
             "http://localhost:5173",      // Vite开发服务器
             "http://127.0.0.1:3000",
+            "http://127.0.0.1:7101",
             "http://127.0.0.1:8080",
             "http://127.0.0.1:5173"
         );

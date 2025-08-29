@@ -89,12 +89,12 @@ public class RoleServiceImpl implements RoleService {
             throw new RuntimeException("角色名称已存在");
         }
         
-        // 系统角色不允许修改名称和描述
+       /* // 系统角色不允许修改名称和描述
         if (existingRole.getIsSystem()) {
             role.setName(null);
             role.setDescription(null);
         }
-        
+        */
         // 设置更新时间
         role.setUpdatedAt(LocalDateTime.now());
         
@@ -107,7 +107,7 @@ public class RoleServiceImpl implements RoleService {
     public boolean deleteRole(Long id) {
         Role role = getRoleById(id);
         if (role != null && role.getIsSystem()) {
-            throw new RuntimeException("系统角色不允许删除");
+//            throw new RuntimeException("系统角色不允许删除");
         }
         return roleRepository.deleteById(id) > 0;
     }
@@ -118,7 +118,7 @@ public class RoleServiceImpl implements RoleService {
         List<Role> roles = roleRepository.selectBatchIds(ids);
         for (Role role : roles) {
             if (role.getIsSystem()) {
-                throw new RuntimeException("系统角色不允许删除");
+//                throw new RuntimeException("系统角色不允许删除");
             }
         }
         return roleRepository.deleteBatchIds(ids);

@@ -8,7 +8,10 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
+import java.util.ArrayList;
 
 /**
  * JWT工具类
@@ -37,6 +40,29 @@ public class JwtUtil {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("companyId", companyId);
+        
+        // 根据用户名设置默认角色
+        List<String> roles = "admin".equals(username) ? 
+            Arrays.asList("ADMIN", "USER") : Arrays.asList("USER");
+        claims.put("roles", roles);
+        
+        return createToken(claims, username);
+    }
+
+    /**
+     * 生成JWT Token（带自定义角色）
+     * 
+     * @param username 用户名
+     * @param userId 用户ID
+     * @param companyId 公司ID
+     * @param roles 用户角色列表
+     * @return JWT Token
+     */
+    public String generateToken(String username, Long userId, Long companyId, List<String> roles) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", userId);
+        claims.put("companyId", companyId);
+        claims.put("roles", roles);
         
         return createToken(claims, username);
     }
@@ -136,5 +162,52 @@ public class JwtUtil {
     private SecretKey getSigningKey() {
         byte[] keyBytes = secret.getBytes();
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    /**
+     * 从Token中获取角色列表
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> getRolesFromToken(String token) {
+        try {
+            Claims claims = getAllClaimsFromToken(token);
+            Object rolesObj = claims.get("roles");
+            System.out.println("JWT工具类 - 从token中提取的roles对象: " + rolesObj);
+            System.out.println("JWT工具类 - roles对象的类型: " + (rolesObj != null ? rolesObj.getClass().getName() : "null"));
+            
+            if (rolesObj instanceof List) {
+                List<String> roles = (List<String>) rolesObj;
+                System.out.println("JWT工具类 - 成功提取角色列表: " + roles);
+                return roles;
+            } else if (rolesObj != null) {
+                System.out.println("JWT工具类 - roles对象不是List类型，尝试转换");
+                // 尝试其他类型的转换
+                if (rolesObj instanceof String) {
+                    String roleStr = (String) rolesObj;
+                    if (roleStr.startsWith("[") && roleStr.endsWith("]")) {
+                        // 可能是JSON字符串，尝试解析
+                        try {
+                            // 简单的字符串解析，移除方括号和引号
+                            String[] roleArray = roleStr.substring(1, roleStr.length() - 1)
+                                .split(",");
+                            List<String> roles = new ArrayList<>();
+                            for (String role : roleArray) {
+                                roles.add(role.trim().replace("\"", ""));
+                            }
+                            System.out.println("JWT工具类 - 从字符串解析角色: " + roles);
+                            return roles;
+                        } catch (Exception e) {
+                            System.out.println("JWT工具类 - 字符串解析失败: " + e.getMessage());
+                        }
+                    }
+                }
+            }
+            System.out.println("JWT工具类 - 无法提取角色信息");
+            return null;
+        } catch (Exception e) {
+            System.out.println("JWT工具类 - 提取角色时发生异常: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
     }
 }
