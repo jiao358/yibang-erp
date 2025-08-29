@@ -91,3 +91,14 @@ management:
     redis:
       enabled: true
       timeout: 3000ms
+
+# AI配置
+ai:
+  deepseek:
+    base-url: https://api.deepseek.com
+    api-key: ${DEEPSEEK_API_KEY:}
+    default-model: deepseek-chat
+    max-tokens: 4096
+    temperature: 0.7
+    enabled: false
+    timeout: 30000

@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 /**
  * 用户实体类
@@ -76,6 +77,12 @@ public class User {
      */
     @TableField("department")
     private String department;
+    
+    /**
+     * 部门ID
+     */
+    @TableField("dept_id")
+    private Long deptId;
 
     /**
      * 职位
@@ -149,4 +156,16 @@ public class User {
     @TableLogic
     @TableField("deleted")
     private Boolean deleted;
+    
+    /**
+     * 用户角色列表
+     */
+    @TableField(exist = false)
+    private Set<Role> roles;
+    
+    /**
+     * 用户权限列表
+     */
+    @TableField(exist = false)
+    private Set<Permission> permissions;
 }

@@ -4,6 +4,8 @@ import com.yibang.erp.common.response.PageResult;
 import com.yibang.erp.domain.dto.UserQueryRequest;
 import com.yibang.erp.domain.entity.User;
 import com.yibang.erp.domain.service.UserService;
+import com.yibang.erp.security.annotation.RequiresPermission;
+import com.yibang.erp.security.annotation.DataScope;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +23,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/users")
+@RequiresPermission(value = "user:manage", description = "用户管理")
 @PreAuthorize("hasRole('ADMIN')")
 public class UserController {
 
@@ -31,6 +34,8 @@ public class UserController {
      * 分页查询用户列表
      */
     @GetMapping
+    @RequiresPermission(value = "user:read", description = "查询用户列表")
+    @DataScope(type = DataScope.ScopeType.COMPANY)
     public ResponseEntity<Map<String, Object>> getUserPage(
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "20") Integer size,
@@ -79,6 +84,8 @@ public class UserController {
      * 根据ID获取用户
      */
     @GetMapping("/{id}")
+    @RequiresPermission(value = "user:read", description = "查询用户详情")
+    @DataScope(type = DataScope.ScopeType.COMPANY)
     public ResponseEntity<Map<String, Object>> getUserById(@PathVariable Long id) {
         try {
             User user = userService.getUserById(id);

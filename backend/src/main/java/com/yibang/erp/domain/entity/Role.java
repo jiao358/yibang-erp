@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.util.Set;
 
 /**
  * 角色实体类
@@ -39,7 +40,7 @@ public class Role {
      * 权限配置（JSON格式）
      */
     @TableField("permissions")
-    private String permissions;
+    private String permissionsConfig;
 
     /**
      * 是否系统角色
@@ -83,4 +84,16 @@ public class Role {
     @TableLogic
     @TableField("deleted")
     private Boolean deleted;
+    
+    /**
+     * 角色代码
+     */
+    @TableField(exist = false)
+    private String roleCode;
+    
+    /**
+     * 权限列表
+     */
+    @TableField(exist = false)
+    private Set<Permission> permissions;
 }
