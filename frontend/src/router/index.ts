@@ -135,6 +135,11 @@ router.beforeEach((to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - 易邦ERP系统` : '易邦ERP系统'
   
+  // 暂时禁用登录验证，直接进入系统
+  // TODO: 开发完成后恢复登录验证
+  next()
+  
+  /*
   // 检查是否需要认证
   if (to.meta.requiresAuth) {
     const token = localStorage.getItem('token')
@@ -160,6 +165,7 @@ router.beforeEach((to, from, next) => {
   }
   
   next()
+  */
 })
 
 export default router

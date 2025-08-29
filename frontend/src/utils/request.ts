@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse } from 'axios'
+import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 
@@ -13,14 +13,11 @@ const service: AxiosInstance = axios.create({
 
 // 请求拦截器
 service.interceptors.request.use(
-  (config: AxiosRequestConfig) => {
+  (config: InternalAxiosRequestConfig) => {
     // 从localStorage获取token
     const token = localStorage.getItem('token')
     if (token) {
-      config.headers = {
-        ...config.headers,
-        Authorization: `Bearer ${token}`
-      }
+      config.headers.set('Authorization', `Bearer ${token}`)
     }
     
     // 添加时间戳防止缓存
