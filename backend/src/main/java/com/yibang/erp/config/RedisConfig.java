@@ -13,7 +13,6 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
  * @author yibang-erp
  * @since 2024-01-14
  */
-/*
 @Configuration
 public class RedisConfig {
 
@@ -34,4 +33,3 @@ public class RedisConfig {
         return template;
     }
 }
-*/

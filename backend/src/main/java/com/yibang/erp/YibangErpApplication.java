@@ -3,8 +3,11 @@ package com.yibang.erp;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration;
 
-@SpringBootApplication
+@SpringBootApplication(exclude = {
+    RedisRepositoriesAutoConfiguration.class
+})
 @MapperScan("com.yibang.erp.infrastructure.repository")
 public class YibangErpApplication {
 

@@ -24,7 +24,7 @@ public class MybatisPlusConfig {
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
 //        interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
-
+            // 这里可以添加其他内置拦截器，如乐观锁等
 
         return interceptor;
     }
