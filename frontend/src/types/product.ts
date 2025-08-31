@@ -33,6 +33,7 @@ export interface Product {
   costPrice: number
   sellingPrice: number
   marketPrice?: number
+  retailLimitPrice?: number
   weight?: number
   dimensions?: string
   barcode?: string
@@ -57,6 +58,7 @@ export interface Product {
   createdBy?: number
   updatedBy?: number
   deleted: boolean
+  priceTierConfigs?: ProductPriceTierConfig[] // 添加价格分层配置
 }
 
 // 商品创建请求类型
@@ -71,6 +73,7 @@ export interface ProductCreateRequest {
   costPrice: number
   sellingPrice: number
   marketPrice?: number
+  retailLimitPrice?: number
   weight?: number
   material?: string
   color?: string
@@ -81,6 +84,8 @@ export interface ProductCreateRequest {
   isFeatured?: boolean
   isHot?: boolean
   isNew?: boolean
+  companyId: number        // 添加公司ID（必填）
+  approvalStatus?: string  // 添加审核状态
 }
 
 // 商品更新请求类型
@@ -217,4 +222,51 @@ export interface ProductStatistics {
   featuredCount: number
   hotCount: number
   newCount: number
+}
+
+// 商品价格分层配置类型
+export interface ProductPriceTierConfig {
+  id: number
+  productId: number
+  priceTierId: number
+  priceTierName: string
+  priceTierType: string
+  dropshippingPrice: number // 一件代发价格
+  retailLimitPrice: number // 零售限价
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+// 商品价格分层配置请求类型
+export interface ProductPriceTierConfigRequest {
+  productId: number
+  priceTierId: number
+  dropshippingPrice: number
+  retailLimitPrice: number
+  isActive: boolean
+  companyId?: number    // 添加公司ID
+  createdBy?: number    // 添加创建人ID
+}
+
+// 商品价格分层配置响应类型
+export interface ProductPriceTierConfigResponse {
+  id: number
+  productId: number
+  priceTierId: number
+  priceTierName: string
+  priceTierType: string
+  dropshippingPrice: number
+  retailLimitPrice: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+// 商品价格配置查询请求类型
+export interface ProductPriceConfigQueryRequest {
+  productId: number
+  companyId?: number
+  priceTierId?: number
+  isActive?: boolean
 }

@@ -21,6 +21,12 @@ public class PriceTier {
     private Long id;
 
     /**
+     * 公司ID
+     */
+    @TableField("company_id")
+    private Long companyId;
+
+    /**
      * 分层名称
      */
     @TableField("tier_name")
@@ -33,64 +39,76 @@ public class PriceTier {
     private String tierCode;
 
     /**
+     * 分层类型：DEALER_LEVEL_1, DEALER_LEVEL_2, VIP_CUSTOMER等
+     */
+    @TableField("tier_type")
+    private String tierType;
+
+    /**
+     * 分层级别（数字越小级别越高）
+     */
+    @TableField("tier_level")
+    private Integer tierLevel;
+
+    /**
      * 分层描述
      */
     @TableField("description")
     private String description;
 
     /**
-     * 最低价格
-     */
-    @TableField("min_price")
-    private BigDecimal minPrice;
-
-    /**
-     * 最高价格
-     */
-    @TableField("max_price")
-    private BigDecimal maxPrice;
-
-    /**
-     * 折扣率
+     * 折扣率（1.00表示无折扣）
      */
     @TableField("discount_rate")
     private BigDecimal discountRate;
 
     /**
-     * 固定折扣金额
+     * 加价率（1.00表示无加价）
      */
-    @TableField("fixed_discount")
-    private BigDecimal fixedDiscount;
+    @TableField("markup_rate")
+    private BigDecimal markupRate;
 
     /**
-     * 分层类型：BASIC(基础), VIP(VIP), WHOLESALE(批发), CUSTOM(自定义)
+     * 最小订单金额
      */
-    @TableField("tier_type")
-    private String tierType;
+    @TableField("min_order_amount")
+    private BigDecimal minOrderAmount;
 
     /**
-     * 优先级
+     * 最大订单金额
      */
-    @TableField("priority")
-    private Integer priority;
+    @TableField("max_order_amount")
+    private BigDecimal maxOrderAmount;
 
     /**
-     * 是否启用
+     * 最小订单数量
      */
-    @TableField("is_active")
-    private Boolean isActive;
+    @TableField("min_order_quantity")
+    private Integer minOrderQuantity;
 
     /**
-     * 适用商品分类ID
+     * 最大订单数量
      */
-    @TableField("category_id")
-    private Long categoryId;
+    @TableField("max_order_quantity")
+    private Integer maxOrderQuantity;
 
     /**
-     * 适用客户类型
+     * 客户等级要求
      */
-    @TableField("customer_type")
-    private String customerType;
+    @TableField("customer_level_requirement")
+    private String customerLevelRequirement;
+
+    /**
+     * 付款条件
+     */
+    @TableField("payment_terms")
+    private String paymentTerms;
+
+    /**
+     * 信用额度
+     */
+    @TableField("credit_limit")
+    private BigDecimal creditLimit;
 
     /**
      * 生效开始时间
@@ -105,16 +123,16 @@ public class PriceTier {
     private LocalDateTime effectiveEnd;
 
     /**
-     * 公司ID
+     * 是否激活
      */
-    @TableField("company_id")
-    private Long companyId;
+    @TableField("is_active")
+    private Boolean isActive;
 
     /**
-     * 创建人ID
+     * 优先级（数字越大优先级越高）
      */
-    @TableField("created_by")
-    private Long createdBy;
+    @TableField("priority")
+    private Integer priority;
 
     /**
      * 创建时间
@@ -123,21 +141,27 @@ public class PriceTier {
     private LocalDateTime createdAt;
 
     /**
-     * 更新人ID
-     */
-    @TableField("updated_by")
-    private Long updatedBy;
-
-    /**
      * 更新时间
      */
     @TableField("updated_at")
     private LocalDateTime updatedAt;
 
     /**
+     * 创建人ID
+     */
+    @TableField("created_by")
+    private Long createdBy;
+
+    /**
+     * 更新人ID
+     */
+    @TableField("updated_by")
+    private Long updatedBy;
+
+    /**
      * 是否删除
      */
-    @TableField("is_deleted")
+    @TableField("deleted")
     @TableLogic
-    private Boolean isDeleted;
+    private Boolean deleted;
 }

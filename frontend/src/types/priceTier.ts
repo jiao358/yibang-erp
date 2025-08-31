@@ -1,68 +1,75 @@
 // 价格分层类型定义
 export interface PriceTier {
   id?: number
+  companyId: number
+  companyName?: string
   tierName: string
   tierCode: string
-  description?: string
-  minPrice?: number
-  maxPrice?: number
-  discountRate?: number
-  fixedDiscount?: number
   tierType: string
-  priority: number
-  isActive: boolean
-  categoryId?: number
-  customerType?: string
+  tierLevel: number
+  description?: string
+  discountRate?: number
+  markupRate?: number
+  minOrderAmount?: number
+  maxOrderAmount?: number
+  minOrderQuantity?: number
+  maxOrderQuantity?: number
+  customerLevelRequirement?: string
+  paymentTerms?: string
+  creditLimit?: number
   effectiveStart?: string
   effectiveEnd?: string
-  companyId: number
-  createdBy: number
+  isActive: boolean
+  priority: number
   createdAt?: string
-  updatedBy?: number
   updatedAt?: string
+  createdBy: number
+  createdByName?: string
+  updatedBy?: number
+  updatedByName?: string
 }
 
 export interface PriceTierResponse {
   id: number
-  tierName: string
-  tierCode: string
-  description?: string
-  minPrice?: number
-  maxPrice?: number
-  discountRate?: number
-  fixedDiscount?: number
-  tierType: string
-  tierTypeDescription: string
-  priority: number
-  isActive: boolean
-  categoryId?: number
-  categoryName?: string
-  customerType?: string
-  effectiveStart?: string
-  effectiveEnd?: string
   companyId: number
   companyName?: string
+  tierName: string
+  tierCode: string
+  tierType: string
+  tierLevel: number
+  description?: string
+  discountRate?: number
+  markupRate?: number
+  minOrderAmount?: number
+  maxOrderAmount?: number
+  minOrderQuantity?: number
+  maxOrderQuantity?: number
+  customerLevelRequirement?: string
+  paymentTerms?: string
+  creditLimit?: number
+  effectiveStart?: string
+  effectiveEnd?: string
+  isActive: boolean
+  priority: number
+  createdAt: string
+  updatedAt?: string
   createdBy: number
   createdByName?: string
-  createdAt: string
   updatedBy?: number
   updatedByName?: string
-  updatedAt?: string
 }
 
 export interface PriceTierQueryRequest {
   tierName?: string
   tierCode?: string
   tierType?: string
+  tierLevel?: number
   isActive?: boolean
-  categoryId?: number
-  customerType?: string
-  minPriceFrom?: number
-  minPriceTo?: number
-  maxPriceFrom?: number
-  maxPriceTo?: number
+  customerLevelRequirement?: string
   discountRateFrom?: number
   discountRateTo?: number
+  markupRateFrom?: number
+  markupRateTo?: number
   priorityFrom?: number
   priorityTo?: number
   effectiveStartFrom?: string
@@ -77,18 +84,24 @@ export interface PriceTierQueryRequest {
 export interface PriceTierForm {
   tierName: string
   tierCode: string
-  description: string
-  minPrice: number | null
-  maxPrice: number | null
-  discountRate: number | null
-  fixedDiscount: number | null
   tierType: string
-  priority: number
+  tierLevel: number
+  description: string
+  discountRate?: number
+  markupRate?: number
+  minOrderAmount?: number
+  maxOrderAmount?: number
+  minOrderQuantity?: number
+  maxOrderQuantity?: number
+  customerLevelRequirement?: string
+  paymentTerms?: string
+  creditLimit?: number
+  effectiveStart?: string
+  effectiveEnd?: string
   isActive: boolean
-  categoryId: number | null
-  customerType: string
-  effectiveStart: string
-  effectiveEnd: string
+  priority: number
+  companyId: number
+  createdBy: number
 }
 
 export interface PriceTierTypeOption {

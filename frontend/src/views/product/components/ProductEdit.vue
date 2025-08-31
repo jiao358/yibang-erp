@@ -39,6 +39,9 @@
                 :value="category.value"
               />
             </el-select>
+            <div style="font-size: 12px; color: #999; margin-top: 4px;">
+              已加载 {{ categoryCount }} 个分类选项
+            </div>
           </el-form-item>
           
           <el-form-item label="商品品牌" prop="brandId">
@@ -55,6 +58,9 @@
                 :value="brand.value"
               />
             </el-select>
+            <div style="font-size: 12px; color: #999; margin-top: 4px;">
+              已加载 {{ brandCount }} 个品牌选项
+            </div>
           </el-form-item>
           
           <el-form-item label="单位" prop="unit">
@@ -85,28 +91,6 @@
       <div class="form-section">
         <h3 class="section-title">价格信息</h3>
         <div class="form-grid">
-          <el-form-item label="成本价" prop="costPrice">
-            <el-input-number
-              v-model="form.costPrice"
-              :precision="2"
-              :min="0"
-              :step="0.01"
-              style="width: 100%"
-              placeholder="请输入成本价"
-            />
-          </el-form-item>
-          
-          <el-form-item label="销售价" prop="sellingPrice">
-            <el-input-number
-              v-model="form.sellingPrice"
-              :precision="2"
-              :min="0"
-              :step="0.01"
-              style="width: 100%"
-              placeholder="请输入销售价"
-            />
-          </el-form-item>
-          
           <el-form-item label="市场价" prop="marketPrice">
             <el-input-number
               v-model="form.marketPrice"
@@ -117,6 +101,158 @@
               placeholder="请输入市场价"
             />
           </el-form-item>
+        </div>
+        <div style="font-size: 12px; color: #999; margin-top: 8px;">
+          <p>注：成本价、销售价、零售限价将自动设置为1元</p>
+        </div>
+      </div>
+
+      <!-- 价格分层配置 -->
+      <div class="form-section">
+        <h3 class="section-title">价格分层配置</h3>
+        <div class="price-tier-config">
+          <div class="config-header">
+            <div class="header-left">
+              <span class="config-title">为不同客户等级配置价格</span>
+              <div class="config-status">
+                <el-tag v-if="availablePriceTiers.length === 0" type="warning" size="small">
+                  请先配置价格分层模板
+                </el-tag>
+                <el-tag v-else-if="priceTierConfigs.length === 0" type="info" size="small">
+                  暂无价格配置
+                </el-tag>
+                <el-tag v-else type="success" size="small">
+                  {{ configStatusText }}
+                </el-tag>
+              </div>
+            </div>
+            <div class="header-right">
+              <el-button 
+                type="primary" 
+                size="small" 
+                @click="addPriceTierConfig"
+                :disabled="!canAddMoreConfigs"
+              >
+                添加价格配置
+              </el-button>
+              <span v-if="!canAddMoreConfigs && availablePriceTiers.length > 0" class="limit-tip">
+                已达到最大配置数量
+              </span>
+            </div>
+          </div>
+          
+          <div v-if="priceTierConfigs.length === 0" class="empty-config">
+            <el-empty 
+              :description="availablePriceTiers.length === 0 ? '请先配置价格分层模板' : '暂无价格配置'" 
+              :image-size="60"
+            >
+              <el-button 
+                type="primary" 
+                size="small" 
+                @click="addPriceTierConfig"
+                :disabled="!canAddMoreConfigs"
+              >
+                {{ availablePriceTiers.length === 0 ? '配置价格分层模板' : '添加第一个价格配置' }}
+              </el-button>
+            </el-empty>
+          </div>
+          
+          <div v-else class="config-list">
+            <div
+              v-for="(config, index) in priceTierConfigs"
+              :key="index"
+              class="config-item"
+            >
+              <div class="config-header-row">
+                <span class="config-index">价格配置 {{ index + 1 }}</span>
+                <el-button
+                  type="danger"
+                  size="small"
+                  @click="removePriceTierConfig(index)"
+                  class="delete-btn"
+                >
+                  删除
+                </el-button>
+              </div>
+              
+              <el-row :gutter="20">
+                <el-col :span="8">
+                  <el-form-item label="价格分层" required>
+                    <el-select
+                      v-model="config.priceTierId"
+                      placeholder="选择价格分层"
+                      style="width: 100%"
+                      clearable
+                    >
+                      <el-option
+                        v-for="tier in availablePriceTierOptions"
+                        :key="tier.id"
+                        :label="`${tier.tierName} (${tier.tierType})`"
+                        :value="tier.id"
+                      />
+                      <el-option
+                        v-if="config.priceTierId && !availablePriceTierOptions.find(t => t.id === config.priceTierId)"
+                        :key="config.priceTierId"
+                        :label="`${availablePriceTiers.find(t => t.id === config.priceTierId)?.tierName || '未知分层'} (已选择)`"
+                        :value="config.priceTierId"
+                        disabled
+                      />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="一件代发价" required>
+                    <el-input-number
+                      v-model="config.dropshippingPrice"
+                      :precision="2"
+                      :min="0"
+                      :step="0.01"
+                      style="width: 100%"
+                      placeholder="请输入代发价格"
+                      controls-position="right"
+                    />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="零售限价" required>
+                    <el-input-number
+                      v-model="config.retailLimitPrice"
+                      :precision="2"
+                      :min="0"
+                      :step="0.01"
+                      style="width: 100%"
+                      placeholder="请输入零售限价"
+                      controls-position="right"
+                    />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              
+              <el-row :gutter="20">
+                <el-col :span="8">
+                  <el-form-item label="状态">
+                    <el-switch
+                      v-model="config.isActive"
+                      active-text="启用"
+                      inactive-text="禁用"
+                      active-color="#67c23a"
+                    />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="16">
+                  <div class="price-preview">
+                    <span class="preview-label">价格预览：</span>
+                    <el-tag v-if="config.dropshippingPrice" type="success" size="small">
+                      代发价: ¥{{ config.dropshippingPrice }}
+                    </el-tag>
+                    <el-tag v-if="config.retailLimitPrice" type="warning" size="small">
+                      零售限价: ¥{{ config.retailLimitPrice }}
+                    </el-tag>
+                  </div>
+                </el-col>
+              </el-row>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -254,10 +390,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { createProduct, updateProduct } from '@/api/product'
-import type { Product } from '@/types/product'
+import { createProduct, updateProduct, getProductCategories, getProductBrands } from '@/api/product'
+import { productPriceConfigApi } from '@/api/productPriceConfig'
+import { priceTierApi } from '@/api/priceTier'
+import type { Product, ProductPriceTierConfigRequest } from '@/types/product'
 
 // Props
 interface Props {
@@ -285,9 +423,10 @@ const form = reactive({
   description: '',
   shortDescription: '',
   unit: '',
-  costPrice: undefined as number | undefined,
-  sellingPrice: undefined as number | undefined,
+  costPrice: 1.00,
+  sellingPrice: 1.00,
   marketPrice: undefined as number | undefined,
+  retailLimitPrice: 1.00,
   weight: undefined as number | undefined,
   material: '',
   color: '',
@@ -295,6 +434,7 @@ const form = reactive({
   originCountry: '',
   hsCode: '',
   tags: '',
+  status: 'DRAFT',
   isFeatured: false,
   isHot: false,
   isNew: false
@@ -317,41 +457,105 @@ const rules: FormRules = {
     { required: true, message: '请输入单位', trigger: 'blur' }
   ],
   costPrice: [
-    { required: true, message: '请输入成本价', trigger: 'blur' },
+    { required: true, message: '成本价不能为空', trigger: 'blur' },
     { type: 'number', min: 0, message: '成本价必须大于等于0', trigger: 'blur' }
   ],
   sellingPrice: [
-    { required: true, message: '请输入销售价', trigger: 'blur' },
+    { required: true, message: '销售价不能为空', trigger: 'blur' },
     { type: 'number', min: 0, message: '销售价必须大于等于0', trigger: 'blur' }
   ]
 }
 
-// 选项数据
-const categoryOptions = ref([
-  { value: 1, label: '电子产品' },
-  { value: 2, label: '服装鞋帽' },
-  { value: 3, label: '食品饮料' },
-  { value: 4, label: '家居用品' }
-])
+// 选项数据 - 动态加载
+const categoryOptions = ref<any[]>([])
+const brandOptions = ref<any[]>([])
 
-const brandOptions = ref([
-  { value: 1, label: '苹果' },
-  { value: 2, label: '华为' },
-  { value: 3, label: '小米' },
-  { value: 4, label: '耐克' },
-  { value: 5, label: '阿迪达斯' }
-])
+// 调试信息
+console.log('ProductEdit组件初始化 - categoryOptions:', categoryOptions.value)
+console.log('ProductEdit组件初始化 - brandOptions:', brandOptions.value)
 
 const statusOptions = ref([
   { value: 'DRAFT', label: '草稿' },
-  { value: 'PENDING', label: '待审核' },
-  { value: 'ACTIVE', label: '已上架' },
-  { value: 'INACTIVE', label: '已下架' },
-  { value: 'DISCONTINUED', label: '已停售' }
+  { value: 'ACTIVE', label: '上架' }
 ])
+
+// 价格分层配置相关数据
+const priceTierConfigs = ref<any[]>([])
+const availablePriceTiers = ref<any[]>([])
+
+// 加载分类选项
+const loadCategoryOptions = async () => {
+  try {
+    const response = await getProductCategories()
+    console.log('分类API响应:', response)
+    if (response && response.data && Array.isArray(response.data)) {
+      categoryOptions.value = response.data.map((category: any) => ({
+        value: category.id,
+        label: category.name
+      }))
+      console.log('分类选项已加载:', categoryOptions.value)
+    } else {
+      console.warn('分类数据格式不正确:', response)
+      categoryOptions.value = []
+    }
+  } catch (error) {
+    console.error('获取分类列表失败:', error)
+    ElMessage.warning('获取分类列表失败')
+    categoryOptions.value = []
+  }
+}
+
+// 加载品牌选项
+const loadBrandOptions = async () => {
+  try {
+    const response = await getProductBrands()
+    console.log('品牌API响应:', response)
+    if (response && response.data && Array.isArray(response.data)) {
+      brandOptions.value = response.data.map((brand: any) => ({
+        value: brand.id,
+        label: brand.name
+      }))
+      console.log('品牌选项已加载:', brandOptions.value)
+    } else {
+      console.warn('品牌数据格式不正确:', response)
+      brandOptions.value = []
+    }
+  } catch (error) {
+    console.error('获取品牌列表失败:', error)
+    ElMessage.warning('获取品牌列表失败')
+    brandOptions.value = []
+  }
+}
 
 // 计算属性
 const isEdit = computed(() => !!props.product)
+
+// 调试计算属性
+const categoryCount = computed(() => categoryOptions.value.length)
+const brandCount = computed(() => brandOptions.value.length)
+
+// 价格分层配置相关计算属性
+const canAddMoreConfigs = computed(() => {
+  return priceTierConfigs.value.length < availablePriceTiers.value.length
+})
+
+const usedPriceTierIds = computed(() => {
+  return priceTierConfigs.value
+    .map(config => config.priceTierId)
+    .filter(id => id !== null)
+})
+
+const availablePriceTierOptions = computed(() => {
+  return availablePriceTiers.value.filter(tier => 
+    !usedPriceTierIds.value.includes(tier.id)
+  )
+})
+
+const configStatusText = computed(() => {
+  const total = availablePriceTiers.value.length
+  const used = priceTierConfigs.value.length
+  return `${used}/${total} 个价格分层已配置`
+})
 
 // 方法
 const initForm = () => {
@@ -365,8 +569,8 @@ const initForm = () => {
       description: props.product.description || '',
       shortDescription: props.product.shortDescription || '',
       unit: props.product.unit || '',
-      costPrice: props.product.costPrice,
-      sellingPrice: props.product.sellingPrice,
+      costPrice: props.product.costPrice || 1.00,
+      sellingPrice: props.product.sellingPrice || 1.00,
       marketPrice: props.product.marketPrice,
       weight: props.product.weight,
       material: props.product.material || '',
@@ -375,6 +579,8 @@ const initForm = () => {
       originCountry: props.product.originCountry || '',
       hsCode: props.product.hsCode || '',
       tags: props.product.tags || '',
+      retailLimitPrice: props.product.retailLimitPrice || 1.00,
+      status: props.product.status || 'DRAFT',
       isFeatured: props.product.isFeatured || false,
       isHot: props.product.isHot || false,
       isNew: props.product.isNew || false
@@ -389,8 +595,8 @@ const initForm = () => {
       description: '',
       shortDescription: '',
       unit: '',
-      costPrice: undefined,
-      sellingPrice: undefined,
+      costPrice: 1.00,
+      sellingPrice: 1.00,
       marketPrice: undefined,
       weight: undefined,
       material: '',
@@ -399,6 +605,8 @@ const initForm = () => {
       originCountry: '',
       hsCode: '',
       tags: '',
+      retailLimitPrice: 1.00,
+      status: 'DRAFT',
       isFeatured: false,
       isHot: false,
       isNew: false
@@ -413,19 +621,47 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     submitting.value = true
     
+    // 获取当前用户信息
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const currentCompanyId = userInfo.companyId || 1
+    
     const submitData = {
       ...form,
+      companyId: currentCompanyId, // 添加公司ID
+      approvalStatus: 'PENDING',   // 添加审核状态
       tags: form.tags ? JSON.stringify(form.tags.split(',').map(tag => tag.trim())) : '[]'
     }
     
+    console.log('提交的商品数据:', submitData)
+    console.log('当前用户公司ID:', currentCompanyId)
+    
+    let savedProductId: number
+    
     if (isEdit.value && props.product) {
       // 更新商品
-      await updateProduct(props.product.id, submitData)
+      const updatedProduct = await updateProduct(props.product.id, submitData)
+      savedProductId = props.product.id
       ElMessage.success('商品更新成功')
     } else {
       // 创建商品
-      await createProduct(submitData)
+      const createdProduct = await createProduct(submitData)
+      savedProductId = createdProduct.id || 0
       ElMessage.success('商品创建成功')
+    }
+    
+    // 保存价格分层配置
+    if (savedProductId && priceTierConfigs.value.length > 0) {
+      // 验证价格分层配置
+      if (!validatePriceTierConfigs()) {
+        return
+      }
+      
+      try {
+        await saveProductPriceConfigs(savedProductId)
+      } catch (error) {
+        // 价格配置保存失败不影响商品保存
+        console.warn('价格分层配置保存失败，但商品已保存:', error)
+      }
     }
     
     emit('success')
@@ -441,9 +677,154 @@ const handleCancel = () => {
   emit('cancel')
 }
 
+// 价格分层配置相关方法
+const addPriceTierConfig = () => {
+  // 检查是否还能添加更多配置
+  if (priceTierConfigs.value.length >= availablePriceTiers.value.length) {
+    ElMessage.warning('已达到最大配置数量限制')
+    return
+  }
+  
+  // 检查是否还有可用的价格分层
+  const usedTierIds = priceTierConfigs.value.map(config => config.priceTierId).filter(id => id !== null)
+  const availableTiers = availablePriceTiers.value.filter(tier => !usedTierIds.includes(tier.id))
+  
+  if (availableTiers.length === 0) {
+    ElMessage.warning('所有价格分层都已配置完成')
+    return
+  }
+  
+  priceTierConfigs.value.push({
+    priceTierId: null,
+    dropshippingPrice: 0,
+    retailLimitPrice: 0,
+    isActive: true
+  })
+}
+
+const removePriceTierConfig = (index: number) => {
+  priceTierConfigs.value.splice(index, 1)
+}
+
+// 验证价格分层配置
+const validatePriceTierConfigs = () => {
+  const usedTierIds = priceTierConfigs.value
+    .map(config => config.priceTierId)
+    .filter(id => id !== null)
+  
+  // 检查是否有重复选择
+  const uniqueIds = new Set(usedTierIds)
+  if (uniqueIds.size !== usedTierIds.length) {
+    ElMessage.error('存在重复的价格分层选择')
+    return false
+  }
+  
+  // 检查是否所有配置都选择了价格分层
+  const incompleteConfigs = priceTierConfigs.value.filter(config => 
+    !config.priceTierId || config.dropshippingPrice <= 0 || config.retailLimitPrice <= 0
+  )
+  
+  if (incompleteConfigs.length > 0) {
+    ElMessage.error('请完善所有价格配置信息')
+    return false
+  }
+  
+  return true
+}
+
+const loadAvailablePriceTiers = async () => {
+  try {
+    // 从用户信息获取当前公司ID
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const currentCompanyId = userInfo.companyId || 1
+    
+    console.log('当前用户公司ID:', currentCompanyId)
+    
+    // 调用价格分层API获取当前公司可用的选项
+    const response = await priceTierApi.getPriceTierList({ 
+      page: 1, 
+      size: 100,
+      companyId: currentCompanyId
+    })
+    
+    if (response && Array.isArray(response)) {
+      availablePriceTiers.value = response.map((tier: any) => ({
+        id: tier.id,
+        tierName: tier.tierName,
+        tierType: tier.tierType || 'RETAIL'
+      }))
+      console.log('加载到价格分层选项:', availablePriceTiers.value)
+    } else {
+      console.warn('价格分层API返回格式不正确:', response)
+      availablePriceTiers.value = []
+    }
+  } catch (error) {
+    console.error('获取价格分层失败:', error)
+    availablePriceTiers.value = []
+  }
+}
+
+const loadProductPriceConfigs = async (productId: number) => {
+  try {
+    const configs = await productPriceConfigApi.getConfigsByProductId(productId)
+    priceTierConfigs.value = configs.map(config => ({
+      id: config.id,
+      priceTierId: config.priceTierId,
+      dropshippingPrice: config.dropshippingPrice,
+      retailLimitPrice: config.retailLimitPrice,
+      isActive: config.isActive
+    }))
+  } catch (error) {
+    console.error('获取商品价格配置失败:', error)
+    priceTierConfigs.value = []
+  }
+}
+
+const saveProductPriceConfigs = async (productId: number) => {
+  try {
+    // 获取当前用户信息
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const currentCompanyId = userInfo.companyId || 1
+    const currentUserId = userInfo.id || 1
+    
+    const configs: ProductPriceTierConfigRequest[] = priceTierConfigs.value.map(config => ({
+      productId: productId,
+      priceTierId: config.priceTierId!,
+      dropshippingPrice: config.dropshippingPrice!,
+      retailLimitPrice: config.retailLimitPrice!,
+      isActive: config.isActive,
+      companyId: currentCompanyId, // 添加公司ID
+      createdBy: currentUserId      // 添加创建人ID
+    }))
+    
+    await productPriceConfigApi.batchSaveConfigs(productId, configs)
+    ElMessage.success('价格分层配置保存成功')
+  } catch (error) {
+    console.error('保存价格分层配置失败:', error)
+    ElMessage.error('保存价格分层配置失败')
+    throw error
+  }
+}
+
+// 监听商品数据变化
+watch(() => props.product, (newProduct) => {
+  if (newProduct) {
+    initForm()
+    // 如果是编辑模式，加载价格分层配置
+    if (newProduct.id) {
+      loadProductPriceConfigs(newProduct.id)
+    }
+  } else {
+    initForm()
+  }
+}, { immediate: true })
+
 // 生命周期
 onMounted(() => {
-  initForm()
+  // 加载分类和品牌选项
+  loadCategoryOptions()
+  loadBrandOptions()
+  loadAvailablePriceTiers()
 })
 </script>
 
@@ -489,6 +870,115 @@ onMounted(() => {
   gap: 16px;
   padding-top: 24px;
   border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+
+/* 价格分层配置样式 */
+.price-tier-config {
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: white;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.config-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.limit-tip {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  font-style: italic;
+}
+
+.empty-config {
+  text-align: center;
+  padding: 40px 20px;
+  background: #f8f9fa;
+  border: 2px dashed #d9d9d9;
+  border-radius: 8px;
+}
+
+.config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-item {
+  padding: 20px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: 8px;
+  background: var(--md-sys-color-surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.config-item:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.config-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.config-index {
+  font-weight: 600;
+  color: #409eff;
+  font-size: 14px;
+}
+
+.delete-btn {
+  border-radius: 6px;
+}
+
+.price-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.preview-label {
+  font-size: 12px;
+  color: #909399;
+  font-weight: 500;
 }
 
 /* 响应式设计 */

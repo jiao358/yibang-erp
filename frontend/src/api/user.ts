@@ -8,8 +8,12 @@ export const userApi = {
     page: number
     size: number
     username?: string
-    realName?: string
+    personalCompanyName?: string
+    email?: string
+    phone?: string
+    roleName?: string
     status?: string
+    companyId?: number
   }) {
     return request.get('/api/users', { params })
   },
@@ -45,13 +49,26 @@ export const userApi = {
   },
 
   // 重置用户密码
-  resetPassword(id: number, newPassword: string) {
-    return request.patch(`/api/users/${id}/password`, null, { params: { newPassword } })
+  resetPassword(id: number, newPassword: string, confirmPassword: string) {
+    return request.post(`/api/users/${id}/reset-password`, {
+      newPassword,
+      confirmPassword
+    })
   },
 
   // 获取所有用户
   getAllUsers() {
     return request.get('/api/users/all')
+  },
+
+  // 获取可用角色列表
+  getAvailableRoles() {
+    return request.get('/api/users/roles/available')
+  },
+
+  // 获取可用公司列表
+  getAvailableCompanies() {
+    return request.get('/api/users/companies/available')
   }
 }
 
@@ -141,7 +158,9 @@ export const {
   batchDeleteUsers,
   updateUserStatus,
   resetPassword,
-  getAllUsers
+  getAllUsers,
+  getAvailableRoles,
+  getAvailableCompanies
 } = userApi
 
 export const {

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yibang.erp.domain.entity.Company;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 公司服务接口
@@ -98,9 +99,24 @@ public interface CompanyService {
     List<Company> getCompaniesByType(String type);
 
     /**
+     * 根据业务类型获取公司列表（返回Map格式，用于前端显示）
+     *
+     * @param type 业务类型
+     * @return 公司信息Map列表
+     */
+    List<Map<String, Object>> getCompaniesByTypeMap(String type);
+
+    /**
      * 获取激活状态的公司列表
      *
      * @return 激活的公司列表
      */
     List<Company> getActiveCompanies();
+
+    /**
+     * 获取所有激活状态的公司（返回Map格式，用于前端显示）
+     *
+     * @return 公司信息Map列表
+     */
+    List<Map<String, Object>> getAllActiveCompanies();
 }

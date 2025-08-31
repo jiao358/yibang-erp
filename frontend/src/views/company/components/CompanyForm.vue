@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="dialogVisible"
-    :title="isEdit ? '编辑公司' : '新增公司'"
+    :title="getDialogTitle"
     width="700px"
     :close-on-click-modal="false"
     @close="handleClose"
@@ -19,6 +19,7 @@
             <el-input
               v-model="form.name"
               placeholder="请输入公司名称"
+              :disabled="isViewMode"
             />
           </el-form-item>
         </el-col>
@@ -28,6 +29,7 @@
               v-model="form.type"
               placeholder="请选择业务类型"
               style="width: 100%"
+              :disabled="isViewMode"
             >
               <el-option label="供应商" value="SUPPLIER" />
               <el-option label="销售商" value="SALES" />
@@ -43,6 +45,7 @@
               v-model="form.status"
               placeholder="请选择状态"
               style="width: 100%"
+              :disabled="isViewMode"
             >
               <el-option label="激活" value="ACTIVE" />
               <el-option label="未激活" value="INACTIVE" />
@@ -55,6 +58,7 @@
             <el-input
               v-model="form.businessLicense"
               placeholder="请输入营业执照号"
+              :disabled="isViewMode"
             />
           </el-form-item>
         </el-col>
@@ -66,6 +70,7 @@
             <el-input
               v-model="form.contactPerson"
               placeholder="请输入联系人"
+              :disabled="isViewMode"
             />
           </el-form-item>
         </el-col>
@@ -74,6 +79,7 @@
             <el-input
               v-model="form.contactPhone"
               placeholder="请输入联系电话"
+              :disabled="isViewMode"
             />
           </el-form-item>
         </el-col>
@@ -85,6 +91,7 @@
             <el-input
               v-model="form.contactEmail"
               placeholder="请输入联系邮箱"
+              :disabled="isViewMode"
             />
           </el-form-item>
         </el-col>
@@ -93,6 +100,7 @@
             <el-input
               v-model="form.address"
               placeholder="请输入公司地址"
+              :disabled="isViewMode"
             />
           </el-form-item>
         </el-col>
@@ -104,14 +112,22 @@
           type="textarea"
           :rows="3"
           placeholder="请输入公司描述"
+          :disabled="isViewMode"
         />
       </el-form-item>
     </el-form>
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
+        <el-button @click="handleClose">
+          {{ isViewMode ? '关闭' : '取消' }}
+        </el-button>
+        <el-button 
+          v-if="!isViewMode"
+          type="primary" 
+          @click="handleSubmit" 
+          :loading="submitting"
+        >
           {{ isEdit ? '更新' : '创建' }}
         </el-button>
       </div>
@@ -122,18 +138,21 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { createCompany, updateCompany } from '@/api/company'
+import { companyApi } from '@/api/company'
+import { CompanyType, CompanyStatus } from '@/types/company'
 import type { Company } from '@/types/company'
 
 // Props
 interface Props {
   visible: boolean
   companyData?: Company | null
+  isViewMode?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   visible: false,
-  companyData: null
+  companyData: null,
+  isViewMode: false
 })
 
 // Emits
@@ -149,8 +168,8 @@ const submitting = ref(false)
 // 表单数据
 const form = reactive({
   name: '',
-  type: 'SUPPLIER',
-  status: 'ACTIVE',
+  type: CompanyType.SUPPLIER,
+  status: CompanyStatus.ACTIVE,
   businessLicense: '',
   contactPerson: '',
   contactPhone: '',
@@ -201,16 +220,20 @@ const dialogVisible = computed({
 
 const isEdit = computed(() => !!props.companyData)
 
+const getDialogTitle = computed(() => {
+  if (props.isViewMode) return '查看公司'
+  return isEdit.value ? '编辑公司' : '新增公司'
+})
+
 // 重置表单
 const resetForm = () => {
   Object.assign(form, {
     name: '',
-    type: 'SUPPLIER',
-    status: 'ACTIVE',
+    type: CompanyType.SUPPLIER,
+    status: CompanyStatus.ACTIVE,
     businessLicense: '',
     contactPerson: '',
     contactPhone: '',
-    contactEmail: '',
     address: '',
     description: ''
   })
@@ -221,8 +244,8 @@ const resetForm = () => {
 const fillFormData = (companyData: Company) => {
   Object.assign(form, {
     name: companyData.name || '',
-    type: companyData.type || 'SUPPLIER',
-    status: companyData.status || 'ACTIVE',
+    type: companyData.type || CompanyType.SUPPLIER,
+    status: companyData.status || CompanyStatus.ACTIVE,
     businessLicense: companyData.businessLicense || '',
     contactPerson: companyData.contactPerson || '',
     contactPhone: companyData.contactPhone || '',
@@ -249,15 +272,15 @@ const handleSubmit = async () => {
     await formRef.value.validate()
     submitting.value = true
     
-    if (isEdit.value && props.companyData) {
-      // 编辑公司
-      await updateCompany(props.companyData.id, form)
-      ElMessage.success('更新成功')
-    } else {
-      // 新增公司
-      await createCompany(form)
-      ElMessage.success('创建成功')
-    }
+          if (isEdit.value && props.companyData) {
+        // 编辑公司
+        await companyApi.updateCompany(props.companyData.id, form)
+        ElMessage.success('更新成功')
+      } else {
+        // 新增公司
+        await companyApi.createCompany(form)
+        ElMessage.success('创建成功')
+      }
     
     emit('success')
   } catch (error) {

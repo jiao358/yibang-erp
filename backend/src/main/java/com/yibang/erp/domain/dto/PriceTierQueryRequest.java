@@ -27,37 +27,31 @@ public class PriceTierQueryRequest {
     private String tierType;
 
     /**
-     * 是否启用
+     * 分层级别
+     */
+    private Integer tierLevel;
+
+    /**
+     * 是否激活
      */
     private Boolean isActive;
 
     /**
-     * 商品分类ID
+     * 客户等级要求
      */
-    private Long categoryId;
-
-    /**
-     * 客户类型
-     */
-    private String customerType;
-
-    /**
-     * 最低价格范围
-     */
-    private BigDecimal minPriceFrom;
-    private BigDecimal minPriceTo;
-
-    /**
-     * 最高价格范围
-     */
-    private BigDecimal maxPriceFrom;
-    private BigDecimal maxPriceTo;
+    private String customerLevelRequirement;
 
     /**
      * 折扣率范围
      */
     private BigDecimal discountRateFrom;
     private BigDecimal discountRateTo;
+
+    /**
+     * 加价率范围
+     */
+    private BigDecimal markupRateFrom;
+    private BigDecimal markupRateTo;
 
     /**
      * 优先级范围

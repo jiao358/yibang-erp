@@ -1,6 +1,12 @@
 <template>
-  <div class="product-detail">
-    <div v-if="product" class="detail-content">
+  <el-dialog
+    v-model="visible"
+    :title="product ? `${product.name} - 商品详情` : '商品详情'"
+    width="800px"
+    :before-close="handleClose"
+  >
+    <div v-if="product" class="product-detail">
+      <div class="detail-content">
       <!-- 基本信息 -->
       <div class="detail-section">
         <h3 class="section-title">基本信息</h3>
@@ -51,6 +57,39 @@
           <div class="info-item">
             <label>市场价：</label>
             <span class="price market-price">¥{{ product.marketPrice || '--' }}</span>
+          </div>
+          <div class="info-item">
+            <label>零售限价：</label>
+            <span class="price retail-limit-price">¥{{ product.retailLimitPrice || '--' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 价格分层信息 -->
+      <div class="detail-section" v-if="product.priceTierConfigs && product.priceTierConfigs.length > 0">
+        <h3 class="section-title">价格分层配置</h3>
+        <div class="price-tier-grid">
+          <div 
+            v-for="config in product.priceTierConfigs" 
+            :key="config.id" 
+            class="price-tier-item"
+          >
+            <div class="tier-header">
+              <h4>{{ config.priceTierName }}</h4>
+              <el-tag :type="config.isActive ? 'success' : 'info'" size="small">
+                {{ config.isActive ? '启用' : '停用' }}
+              </el-tag>
+            </div>
+            <div class="tier-content">
+              <div class="tier-price">
+                <label>一件代发价格：</label>
+                <span class="price dropshipping-price">¥{{ config.dropshippingPrice }}</span>
+              </div>
+              <div class="tier-price">
+                <label>零售限价：</label>
+                <span class="price retail-limit-price">¥{{ config.retailLimitPrice }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -162,26 +201,43 @@
       </div>
     </div>
 
+    </div>
+    
     <div v-else class="no-data">
       <el-empty description="暂无商品信息" />
     </div>
-  </div>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Star, Fire, Gift } from '@element-plus/icons-vue'
+// 使用Element Plus内置图标，避免@element-plus/icons-vue的导入问题
 import type { Product } from '@/types/product'
 
 // Props
 interface Props {
+  visible: boolean
   product: Product | null
 }
 
 const props = defineProps<Props>()
+const emit = defineEmits<{
+  'update:visible': [value: boolean]
+}>()
 
 // 计算属性
 const product = computed(() => props.product)
+
+// 对话框可见性
+const visible = computed({
+  get: () => props.visible,
+  set: (value: boolean) => emit('update:visible', value)
+})
+
+// 关闭对话框
+const handleClose = () => {
+  emit('update:visible', false)
+}
 
 // 方法
 const getStatusTagType = (status: string) => {
@@ -301,6 +357,77 @@ const parseTags = (tags: string) => {
 
 .market-price {
   color: var(--md-sys-color-on-surface-variant);
+}
+
+.retail-limit-price {
+  color: var(--md-sys-color-tertiary);
+}
+
+/* 价格分层配置样式 */
+.price-tier-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.price-tier-item {
+  background: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+.price-tier-item:hover {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: var(--md-sys-elevation-level1);
+}
+
+.tier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.tier-header h4 {
+  margin: 0;
+  color: var(--md-sys-color-on-surface);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.tier-content {
+  display: grid;
+  gap: 12px;
+}
+
+.tier-price {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.tier-price label {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tier-price .price {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.dropshipping-price {
+  color: var(--md-sys-color-primary);
+}
+
+.retail-limit-price {
+  color: var(--md-sys-color-tertiary);
 }
 
 .description-content {

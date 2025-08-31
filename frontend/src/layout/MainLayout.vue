@@ -22,7 +22,10 @@
               <el-icon><Setting /></el-icon>
               <span>系统管理</span>
             </template>
-            <el-menu-item index="/user">
+            <el-menu-item 
+              v-if="hasUserManagePermission" 
+              index="/user"
+            >
               <el-icon><User /></el-icon>
               <span>用户管理</span>
             </el-menu-item>
@@ -33,7 +36,7 @@
               <el-icon><Lock /></el-icon>
               <span>角色管理</span>
             </el-menu-item>
-            <el-menu-item index="/company">
+            <el-menu-item  v-if="hasSystemAdminPermission" index="/company">
               <el-icon><OfficeBuilding /></el-icon>
               <span>公司管理</span>
             </el-menu-item>
@@ -44,26 +47,62 @@
               <el-icon><Briefcase /></el-icon>
               <span>业务管理</span>
             </template>
-            <el-menu-item index="/product">
+            <el-menu-item 
+              v-if="hasSupplierPermission" 
+              index="/supplier-product"
+            >
               <el-icon><Box /></el-icon>
-              <span>产品管理</span>
+              <span>供应链商品管理</span>
+            </el-menu-item>
+            <el-menu-item 
+              v-if="hasSalesPermission" 
+              index="/product-filter"
+            >
+              <el-icon><Search /></el-icon>
+              <span>商品筛选</span>
             </el-menu-item>
             <el-menu-item index="/order">
               <el-icon><Document /></el-icon>
               <span>订单管理</span>
             </el-menu-item>
-            <el-menu-item index="/inventory">
-              <el-icon><Box /></el-icon>
-              <span>库存管理</span>
+            <el-menu-item 
+              v-if="hasCustomerManagePermission" 
+              index="/customer"
+            >
+              <el-icon><UserFilled /></el-icon>
+              <span>客户管理</span>
             </el-menu-item>
+            <el-sub-menu index="/inventory">
+              <template #title>
+                <el-icon><Box /></el-icon>
+                <span>库存管理</span>
+              </template>
+              <el-menu-item index="/warehouse">
+                <el-icon><House /></el-icon>
+                <span>仓库管理</span>
+              </el-menu-item>
+              <el-menu-item index="/inventory">
+                <el-icon><Box /></el-icon>
+                <span>库存管理</span>
+              </el-menu-item>
+              <el-menu-item index="/inventory-alert">
+                <el-icon><Warning /></el-icon>
+                <span>库存预警</span>
+              </el-menu-item>
+              <el-menu-item index="/inventory-check">
+                <el-icon><Check /></el-icon>
+                <span>库存盘点</span>
+              </el-menu-item>
+            </el-sub-menu>
             <el-menu-item index="/pricing">
               <el-icon><TrendCharts /></el-icon>
               <span>价格分层管理</span>
             </el-menu-item>
-            <el-menu-item index="/price-strategy">
+            <!-- 暂时隐藏价格策略管理 -->
+            <!-- <el-menu-item index="/price-strategy">
               <el-icon><TrendCharts /></el-icon>
               <span>价格策略管理</span>
-            </el-menu-item>
+            </el-menu-item> -->
             <el-menu-item index="/sales-target">
               <el-icon><TrendCharts /></el-icon>
               <span>销售目标管理</span>
@@ -141,7 +180,7 @@ import { useRouter } from 'vue-router'
 import { 
   Monitor, Setting, User, Lock, OfficeBuilding, Briefcase, 
   Box, Document, DataBoard, Cpu, TrendCharts, Fold, 
-  ArrowDown, SwitchButton
+  ArrowDown, SwitchButton, UserFilled, House, Warning, Check
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -166,6 +205,62 @@ const hasSystemAdminPermission = computed(() => {
     try {
       const roles = JSON.parse(userRoles)
       return roles.includes('SYSTEM_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
+// 检查是否有用户管理权限（系统管理员或供应链管理员）
+const hasUserManagePermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SUPPLIER_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
+// 检查是否有供应链权限（系统管理员或供应链管理员）
+const hasSupplierPermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SUPPLIER_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
+// 检查是否有销售权限（系统管理员、销售管理员或销售）
+const hasSalesPermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SALES_ADMIN') || roles.includes('SALES')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
+// 检查是否有客户管理权限（系统管理员或销售管理员）
+const hasCustomerManagePermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SALES_ADMIN')
     } catch {
       return false
     }

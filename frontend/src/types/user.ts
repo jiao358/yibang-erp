@@ -11,7 +11,7 @@ export const UserStatusText: Record<UserStatus, string> = {
   [UserStatus.ACTIVE]: '激活',
   [UserStatus.INACTIVE]: '未激活',
   [UserStatus.LOCKED]: '锁定',
-  [UserStatus.PENDING]: '待审核'
+  [UserStatus.PENDING]: '待激活'
 }
 
 // 用户状态标签类型
@@ -30,9 +30,15 @@ export interface User {
   email?: string
   phone?: string
   realName?: string
+  companyName?: string // 新增：公司名称字段
   avatar?: string
   roleId: number
-  companyId: number
+  roleName?: string // 新增：角色名称字段
+  companyId?: number // 新增：所属公司ID（可以为空）
+  companyType?: string // 新增：所属公司类型
+  priceTierId?: number // 新增：价格分层等级ID
+  priceTierName?: string // 新增：价格分层名称
+  priceTierType?: string // 新增：价格分层类型
   department?: string
   position?: string
   status: UserStatus
@@ -93,6 +99,45 @@ export const CompanyStatusText: Record<string, string> = {
   ACTIVE: '激活',
   INACTIVE: '未激活',
   SUSPENDED: '暂停'
+}
+
+// 供应链关系类型
+export interface CompanySupplierRelationship {
+  id: number
+  supplierCompanyId: number
+  salesCompanyId: number
+  relationshipType: 'DIRECT' | 'PARTNER' | 'FRANCHISE'
+  status: string
+  commissionRate?: number
+  startDate?: string
+  endDate?: string
+  createdAt: string
+  updatedAt: string
+  createdBy?: number
+  updatedBy?: number
+  deleted: boolean
+  supplierCompany?: Company
+  salesCompany?: Company
+}
+
+// 关系类型显示文本
+export const RelationshipTypeText: Record<string, string> = {
+  DIRECT: '直营',
+  PARTNER: '合作伙伴',
+  FRANCHISE: '加盟'
+}
+
+// 销售类型显示文本
+export const SalesTypeText: Record<string, string> = {
+  COMPANY_SALES: '公司销售',
+  INDIVIDUAL_SALES: '个人销售'
+}
+
+// 权限范围显示文本
+export const SupplierScopeText: Record<string, string> = {
+  ALL: '全部',
+  OWN_SUPPLIER: '仅自己供应链',
+  OWN_SALES: '仅自己销售'
 }
 
 // 用户创建请求类型

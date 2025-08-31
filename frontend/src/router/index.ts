@@ -58,13 +58,23 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
-        path: 'product',
-        name: 'ProductManagement',
+        path: 'supplier-product',
+        name: 'SupplierProductManagement',
         component: () => import('@/views/product/ProductList.vue'),
         meta: {
-          title: '产品管理',
+          title: '供应链商品管理',
           requiresAuth: true,
-          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN']
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN']
+        }
+      },
+      {
+        path: 'product-filter',
+        name: 'ProductFilter',
+        component: () => import('@/views/product/ProductFilter.vue'),
+        meta: {
+          title: '商品筛选',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SALES_ADMIN', 'SALES']
         }
       },
       {
@@ -75,6 +85,16 @@ const routes: RouteRecordRaw[] = [
           title: '订单管理',
           requiresAuth: true,
           roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN', 'SUPPLIER_OPERATOR', 'SALES']
+        }
+      },
+      {
+        path: 'customer',
+        name: 'CustomerManagement',
+        component: () => import('@/views/customer/CustomerList.vue'),
+        meta: {
+          title: '客户管理',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN', 'SALES']
         }
       },
       {
@@ -125,6 +145,47 @@ const routes: RouteRecordRaw[] = [
           title: '销售目标管理',
           requiresAuth: true,
           roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN']
+        }
+      },
+      // 库存管理相关路由
+      {
+        path: 'warehouse',
+        name: 'WarehouseManagement',
+        component: () => import('@/views/inventory/WarehouseList.vue'),
+        meta: {
+          title: '仓库管理',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN']
+        }
+      },
+      {
+        path: 'inventory',
+        name: 'InventoryManagement',
+        component: () => import('@/views/inventory/InventoryList.vue'),
+        meta: {
+          title: '库存管理',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN']
+        }
+      },
+      {
+        path: 'inventory-alert',
+        name: 'InventoryAlertManagement',
+        component: () => import('@/views/inventory/InventoryAlertList.vue'),
+        meta: {
+          title: '库存预警',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN']
+        }
+      },
+      {
+        path: 'inventory-check',
+        name: 'InventoryCheckManagement',
+        component: () => import('@/views/inventory/InventoryCheckList.vue'),
+        meta: {
+          title: '库存盘点',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN']
         }
       },
       {

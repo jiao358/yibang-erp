@@ -21,6 +21,16 @@ public class UserQueryRequest extends PageRequest {
     private String realName;
     
     /**
+     * 个人公司名称（模糊查询）
+     */
+    private String personalCompanyName;
+    
+    /**
+     * 角色名称（模糊查询）
+     */
+    private String roleName;
+    
+    /**
      * 状态
      */
     private String status;
@@ -39,6 +49,11 @@ public class UserQueryRequest extends PageRequest {
      * 手机号（模糊查询）
      */
     private String phone;
+    
+    /**
+     * 所属公司ID
+     */
+    private Long companyId;
     
     public UserQueryRequest() {}
     
@@ -61,6 +76,22 @@ public class UserQueryRequest extends PageRequest {
     
     public void setRealName(String realName) {
         this.realName = realName;
+    }
+    
+    public String getPersonalCompanyName() {
+        return personalCompanyName;
+    }
+    
+    public void setPersonalCompanyName(String personalCompanyName) {
+        this.personalCompanyName = personalCompanyName;
+    }
+    
+    public String getRoleName() {
+        return roleName;
+    }
+    
+    public void setRoleName(String roleName) {
+        this.roleName = roleName;
     }
     
     public String getStatus() {
@@ -93,6 +124,14 @@ public class UserQueryRequest extends PageRequest {
     
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+    
+    public Long getCompanyId() {
+        return companyId;
+    }
+    
+    public void setCompanyId(Long companyId) {
+        this.companyId = companyId;
     }
     
     /**

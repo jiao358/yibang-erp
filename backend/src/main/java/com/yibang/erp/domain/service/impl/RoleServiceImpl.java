@@ -13,6 +13,9 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Collectors;
 
 /**
  * 角色服务实现类
@@ -38,10 +41,14 @@ public class RoleServiceImpl implements RoleService {
         if (StringUtils.hasText(status)) {
             queryWrapper.eq(Role::getStatus, status);
         }
-        
         // 按创建时间倒序排列
         queryWrapper.orderByDesc(Role::getCreatedAt);
-        
+
+
+        //增加count
+        Long totalCount= roleRepository.selectCount(queryWrapper);
+        page.setTotal(totalCount);
+
         return roleRepository.selectPage(page, queryWrapper);
     }
 
@@ -147,10 +154,48 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
+    public List<Map<String, Object>> getAllActiveRoles() {
+        LambdaQueryWrapper<Role> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Role::getStatus, "ACTIVE")
+                   .eq(Role::getDeleted, false)
+                   .orderByAsc(Role::getName);
+        
+        List<Role> roles = roleRepository.selectList(queryWrapper);
+        return roles.stream()
+            .map(role -> {
+                Map<String, Object> roleMap = new HashMap<>();
+                roleMap.put("id", role.getId());
+                roleMap.put("name", role.getName());
+                roleMap.put("description", role.getDescription());
+                roleMap.put("supplierScope", role.getSupplierScope());
+                return roleMap;
+            })
+            .collect(Collectors.toList());
+    }
+
+    @Override
     public List<Role> getActiveRoles() {
         LambdaQueryWrapper<Role> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(Role::getStatus, "ACTIVE");
-        queryWrapper.orderByAsc(Role::getName);
+        queryWrapper.eq(Role::getStatus, "ACTIVE")
+                   .eq(Role::getDeleted, false)
+                   .orderByAsc(Role::getName);
         return roleRepository.selectList(queryWrapper);
+    }
+
+    @Override
+    public List<Map<String, Object>> getRolesByName(String name) {
+        LambdaQueryWrapper<Role> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.like(Role::getName, name);
+        List<Role> roles = roleRepository.selectList(queryWrapper);
+        return roles.stream()
+            .map(role -> {
+                Map<String, Object> roleMap = new HashMap<>();
+                roleMap.put("id", role.getId());
+                roleMap.put("name", role.getName());
+                roleMap.put("description", role.getDescription());
+                roleMap.put("supplierScope", role.getSupplierScope());
+                return roleMap;
+            })
+            .collect(Collectors.toList());
     }
 }

@@ -9,51 +9,32 @@ import type {
   AIOrderProcessResult,
   AIProcessStatistics,
   AIHistoryQueryParams,
-  AIHistoryPageResult,
-  ExcelImportResult
+  AIHistoryPageResult
 } from '@/types/ai'
 
 // 获取AI配置信息
 export function getAIConfig() {
-  return request<AIConfigResponse>({
-    url: '/api/ai/config',
-    method: 'get'
-  })
+  return request.get<AIConfigResponse>('/api/ai/config')
 }
 
 // 更新AI配置
 export function updateAIConfig(data: AIConfigRequest) {
-  return request<AIConfigResponse>({
-    url: '/api/ai/config',
-    method: 'put',
-    data
-  })
+  return request.put<AIConfigResponse>('/api/ai/config', data)
 }
 
 // 测试AI连接
 export function testAIConnection() {
-  return request<boolean>({
-    url: '/api/ai/config/test',
-    method: 'post'
-  })
+  return request.post<boolean>('/api/ai/config/test')
 }
 
 // 处理单个AI订单
 export function processAIOrder(data: AIOrderProcessRequest) {
-  return request<AIOrderProcessResult>({
-    url: '/api/ai/orders/process',
-    method: 'post',
-    data
-  })
+  return request.post<AIOrderProcessResult>('/api/ai/orders/process', data)
 }
 
 // 批量处理AI订单
 export function batchProcessAIOrders(data: AIOrderProcessRequest[]) {
-  return request<AIOrderProcessResult[]>({
-    url: '/api/ai/orders/batch-process',
-    method: 'post',
-    data
-  })
+  return request.post<AIOrderProcessResult[]>('/api/ai/orders/batch-process', data)
 }
 
 // 从Excel文件批量处理订单
@@ -62,10 +43,7 @@ export function processOrdersFromExcel(file: File, companyId: number) {
   formData.append('file', file)
   formData.append('companyId', companyId.toString())
   
-  return request<AIOrderProcessResult[]>({
-    url: '/api/ai/orders/excel-process',
-    method: 'post',
-    data: formData,
+  return request.post<AIOrderProcessResult[]>('/api/ai/orders/excel-process', formData, {
     headers: {
       'Content-Type': 'multipart/form-data'
     }
@@ -74,75 +52,51 @@ export function processOrdersFromExcel(file: File, companyId: number) {
 
 // 获取AI处理统计信息
 export function getAIProcessStatistics(companyId: number) {
-  return request<AIProcessStatistics>({
-    url: '/api/ai/statistics',
-    method: 'get',
+  return request.get<AIProcessStatistics>('/api/ai/statistics', {
     params: { companyId }
   })
 }
 
 // 获取AI处理历史
 export function getAIProcessHistory(params: AIHistoryQueryParams) {
-  return request<AIHistoryPageResult>({
-    url: '/api/ai/history',
-    method: 'get',
+  return request.get<AIHistoryPageResult>('/api/ai/history', {
     params
   })
 }
 
 // 获取AI健康状态
 export function getAIHealth() {
-  return request<string>({
-    url: '/api/ai/health',
-    method: 'get'
-  })
+  return request.get<string>('/api/ai/health')
 }
 
 // 获取可用的AI处理类型
 export function getAIProcessTypes() {
-  return request<Array<{ value: string; label: string; description: string }>>({
-    url: '/api/ai/process-types',
-    method: 'get'
-  })
+  return request.get<Array<{ value: string; label: string; description: string }>>('/api/ai/process-types')
 }
 
 // 获取AI模型信息
 export function getAIModels() {
-  return request<Array<{ name: string; description: string; maxTokens: number }>>({
-    url: '/api/ai/models',
-    method: 'get'
-  })
+  return request.get<Array<{ name: string; description: string; maxTokens: number }>>('/api/ai/models')
 }
 
 // 取消AI处理任务
 export function cancelAIProcess(processId: number) {
-  return request<boolean>({
-    url: `/api/ai/orders/${processId}/cancel`,
-    method: 'post'
-  })
+  return request.post<boolean>(`/api/ai/orders/${processId}/cancel`)
 }
 
 // 重新处理AI任务
 export function retryAIProcess(processId: number) {
-  return request<AIOrderProcessResult>({
-    url: `/api/ai/orders/${processId}/retry`,
-    method: 'post'
-  })
+  return request.post<AIOrderProcessResult>(`/api/ai/orders/${processId}/retry`)
 }
 
 // 获取AI处理详情
 export function getAIProcessDetail(processId: number) {
-  return request<AIOrderProcessResult>({
-    url: `/api/ai/orders/${processId}`,
-    method: 'get'
-  })
+  return request.get<AIOrderProcessResult>(`/api/ai/orders/${processId}`)
 }
 
 // 导出AI处理历史
 export function exportAIProcessHistory(params: AIHistoryQueryParams) {
-  return request<Blob>({
-    url: '/api/ai/history/export',
-    method: 'get',
+  return request.get<Blob>('/api/ai/history/export', {
     params,
     responseType: 'blob'
   })
@@ -150,27 +104,22 @@ export function exportAIProcessHistory(params: AIHistoryQueryParams) {
 
 // 获取AI使用配额
 export function getAIUsageQuota() {
-  return request<{
+  return request.get<{
     totalTokens: number
     usedTokens: number
     remainingTokens: number
     resetDate: string
-  }>({
-    url: '/api/ai/usage/quota',
-    method: 'get'
-  })
+  }>('/api/ai/usage/quota')
 }
 
 // 获取AI使用统计
 export function getAIUsageStatistics(startDate: string, endDate: string) {
-  return request<Array<{
+  return request.get<Array<{
     date: string
     tokensUsed: number
     requestsCount: number
     cost: number
-  }>>({
-    url: '/api/ai/usage/statistics',
-    method: 'get',
+  }>>('/api/ai/usage/statistics', {
     params: { startDate, endDate }
   })
 }

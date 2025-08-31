@@ -4,17 +4,19 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yibang.erp.common.response.PageResult;
-import com.yibang.erp.common.util.PageUtils;
+import com.yibang.erp.domain.dto.PriceTierQueryRequest;
 import com.yibang.erp.domain.dto.PriceTierRequest;
 import com.yibang.erp.domain.dto.PriceTierResponse;
-import com.yibang.erp.domain.dto.PriceTierQueryRequest;
+import com.yibang.erp.domain.entity.Company;
 import com.yibang.erp.domain.entity.PriceTier;
 import com.yibang.erp.domain.enums.PriceTierType;
 import com.yibang.erp.domain.service.PriceTierService;
+import com.yibang.erp.infrastructure.repository.CompanyRepository;
 import com.yibang.erp.infrastructure.repository.PriceTierRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -33,6 +35,7 @@ import java.util.stream.Collectors;
 public class PriceTierServiceImpl implements PriceTierService {
 
     private final PriceTierRepository priceTierRepository;
+    private final CompanyRepository companyRepository;
 
     @Override
     @Transactional
@@ -53,7 +56,7 @@ public class PriceTierServiceImpl implements PriceTierService {
         // 设置默认值
         priceTier.setCreatedAt(LocalDateTime.now());
         priceTier.setUpdatedAt(LocalDateTime.now());
-        priceTier.setIsDeleted(false);
+        priceTier.setDeleted(false);
 
         priceTierRepository.insert(priceTier);
         
@@ -110,7 +113,17 @@ public class PriceTierServiceImpl implements PriceTierService {
     @Override
     public PageResult<PriceTierResponse> getPriceTierPage(PriceTierQueryRequest request) {
         Page<PriceTier> page = new Page<>(request.getPage(), request.getSize());
-        
+
+
+
+        boolean isAdmin=  SecurityContextHolder.getContext().getAuthentication().getAuthorities().
+                stream().anyMatch(x->x.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
+
+
+        if(isAdmin){
+            request.setCompanyId(null);
+        }
+
         LambdaQueryWrapper<PriceTier> wrapper = buildQueryWrapper(request);
         IPage<PriceTier> result = priceTierRepository.selectPage(page, wrapper);
         
@@ -177,8 +190,7 @@ public class PriceTierServiceImpl implements PriceTierService {
         LambdaQueryWrapper<PriceTier> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PriceTier::getCompanyId, companyId)
                 .eq(PriceTier::getIsActive, true)
-                .and(w -> w.eq(PriceTier::getCategoryId, categoryId).or().isNull(PriceTier::getCategoryId))
-                .and(w -> w.eq(PriceTier::getCustomerType, customerType).or().isNull(PriceTier::getCustomerType))
+
                 .orderByAsc(PriceTier::getPriority);
         
         List<PriceTier> priceTiers = priceTierRepository.selectList(wrapper);
@@ -202,33 +214,14 @@ public class PriceTierServiceImpl implements PriceTierService {
             finalPrice = finalPrice.multiply(BigDecimal.ONE.subtract(priceTier.getDiscountRate()));
         }
         
-        // 应用固定折扣
-        if (priceTier.getFixedDiscount() != null) {
-            finalPrice = finalPrice.subtract(priceTier.getFixedDiscount());
-        }
-        
-        // 确保价格不低于最小值
-        if (priceTier.getMinPrice() != null && finalPrice.compareTo(priceTier.getMinPrice()) < 0) {
-            finalPrice = priceTier.getMinPrice();
-        }
-        
-        // 确保价格不超过最大值
-        if (priceTier.getMaxPrice() != null && finalPrice.compareTo(priceTier.getMaxPrice()) > 0) {
-            finalPrice = priceTier.getMaxPrice();
-        }
-        
+
         return finalPrice.max(BigDecimal.ZERO);
     }
 
     @Override
     public boolean validatePriceTierConfig(PriceTierRequest request) {
         // 验证价格范围
-        if (request.getMinPrice() != null && request.getMaxPrice() != null) {
-            if (request.getMinPrice().compareTo(request.getMaxPrice()) >= 0) {
-                return false;
-            }
-        }
-        
+
         // 验证折扣率
         if (request.getDiscountRate() != null) {
             if (request.getDiscountRate().compareTo(BigDecimal.ZERO) < 0 || 
@@ -238,9 +231,7 @@ public class PriceTierServiceImpl implements PriceTierService {
         }
         
         // 验证固定折扣
-        if (request.getFixedDiscount() != null && request.getFixedDiscount().compareTo(BigDecimal.ZERO) < 0) {
-            return false;
-        }
+
         
         // 验证生效时间
         if (request.getEffectiveStart() != null && request.getEffectiveEnd() != null) {
@@ -258,8 +249,10 @@ public class PriceTierServiceImpl implements PriceTierService {
     private LambdaQueryWrapper<PriceTier> buildQueryWrapper(PriceTierQueryRequest request) {
         LambdaQueryWrapper<PriceTier> wrapper = new LambdaQueryWrapper<>();
         
-        wrapper.eq(PriceTier::getCompanyId, request.getCompanyId())
-                .eq(PriceTier::getIsDeleted, false);
+
+        if(request.getCompanyId() !=null ){
+            wrapper.eq(PriceTier::getCompanyId, request.getCompanyId());
+        }
         
         if (StringUtils.hasText(request.getTierName())) {
             wrapper.like(PriceTier::getTierName, request.getTierName());
@@ -277,15 +270,11 @@ public class PriceTierServiceImpl implements PriceTierService {
             wrapper.eq(PriceTier::getIsActive, request.getIsActive());
         }
         
-        if (request.getCategoryId() != null) {
-            wrapper.eq(PriceTier::getCategoryId, request.getCategoryId());
-        }
+
         
-        if (StringUtils.hasText(request.getCustomerType())) {
-            wrapper.eq(PriceTier::getCustomerType, request.getCustomerType());
-        }
+
         
-        // 价格范围查询
+       /* // 价格范围查询
         if (request.getMinPriceFrom() != null) {
             wrapper.ge(PriceTier::getMinPrice, request.getMinPriceFrom());
         }
@@ -299,7 +288,7 @@ public class PriceTierServiceImpl implements PriceTierService {
         if (request.getMaxPriceTo() != null) {
             wrapper.le(PriceTier::getMaxPrice, request.getMaxPriceTo());
         }
-        
+        */
         // 折扣率范围查询
         if (request.getDiscountRateFrom() != null) {
             wrapper.ge(PriceTier::getDiscountRate, request.getDiscountRateFrom());
@@ -344,7 +333,7 @@ public class PriceTierServiceImpl implements PriceTierService {
         LambdaQueryWrapper<PriceTier> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PriceTier::getTierCode, tierCode)
                 .eq(PriceTier::getCompanyId, companyId)
-                .eq(PriceTier::getIsDeleted, false);
+                .eq(PriceTier::getDeleted, false);
         
         if (excludeId != null) {
             wrapper.ne(PriceTier::getId, excludeId);
@@ -363,9 +352,21 @@ public class PriceTierServiceImpl implements PriceTierService {
         // 设置分层类型描述
         try {
             PriceTierType tierType = PriceTierType.fromCode(priceTier.getTierType());
-            response.setTierTypeDescription(tierType.getDescription());
+            response.setDescription(tierType.getDescription());
         } catch (Exception e) {
-            response.setTierTypeDescription("未知类型");
+            response.setDescription("未知类型");
+        }
+        
+        // 设置公司名称
+        if (priceTier.getCompanyId() != null) {
+            try {
+                Company company = companyRepository.selectById(priceTier.getCompanyId());
+                if (company != null) {
+                    response.setCompanyName(company.getName());
+                }
+            } catch (Exception e) {
+                log.warn("获取公司名称失败, companyId: {}, error: {}", priceTier.getCompanyId(), e.getMessage());
+            }
         }
         
         return response;

@@ -60,6 +60,7 @@ CREATE TABLE products (
     cost_price DECIMAL(10,2) NOT NULL COMMENT '成本价',
     selling_price DECIMAL(10,2) NOT NULL COMMENT '销售价',
     market_price DECIMAL(10,2) COMMENT '市场价',
+    retail_limit_price DECIMAL(10,2) COMMENT '零售端限价',
     weight DECIMAL(8,3) COMMENT '重量(kg)',
     dimensions JSON COMMENT '尺寸信息JSON',
     barcode VARCHAR(100) COMMENT '条形码',

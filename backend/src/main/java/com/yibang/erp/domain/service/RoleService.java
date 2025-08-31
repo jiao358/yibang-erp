@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yibang.erp.domain.entity.Role;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 角色服务接口
@@ -94,4 +95,19 @@ public interface RoleService {
      * @return 激活的角色列表
      */
     List<Role> getActiveRoles();
+
+    /**
+     * 获取所有激活状态的角色（返回Map格式，用于前端显示）
+     *
+     * @return 角色信息Map列表
+     */
+    List<Map<String, Object>> getAllActiveRoles();
+
+    /**
+     * 根据角色名称获取角色列表
+     *
+     * @param name 角色名称
+     * @return 角色信息Map列表
+     */
+    List<Map<String, Object>> getRolesByName(String name);
 }

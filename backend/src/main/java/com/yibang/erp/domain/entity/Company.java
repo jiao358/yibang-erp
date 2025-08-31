@@ -36,6 +36,18 @@ public class Company {
     private String type;
 
     /**
+     * 上级供应链公司ID（可为空，表示顶级供应链公司）
+     */
+    @TableField("parent_supplier_id")
+    private Long parentSupplierId;
+
+    /**
+     * 供应链层级：1-顶级，2-二级，3-三级
+     */
+    @TableField("supplier_level")
+    private Integer supplierLevel;
+
+    /**
      * 状态：ACTIVE-激活, INACTIVE-未激活, SUSPENDED-暂停
      */
     @TableField("status")

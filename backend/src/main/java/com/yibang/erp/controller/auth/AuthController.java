@@ -101,11 +101,11 @@ public class AuthController {
                 }
                 System.out.println("最终的角色信息: " + roles);
             
-            // 生成JWT Token，使用真实的角色信息
+            // 生成JWT Token，使用真实的用户信息
             String token = jwtUtil.generateToken(
                 userDetails.getUsername(), 
-                1L, // 开发阶段硬编码用户ID
-                1L, // 开发阶段硬编码公司ID
+                userEntity.getId(), // 使用数据库中的真实用户ID
+                userEntity.getCompanyId(), // 使用数据库中的真实公司ID
                 roles // 传入真实的角色信息
             );
             System.out.println("JWT Token生成完成");
@@ -130,20 +130,14 @@ public class AuthController {
                 System.out.println("角色ID: " + userEntity.getRoleId());
                 System.out.println("公司ID: " + userEntity.getCompanyId());
             } else {
-                // 如果用户不存在，则使用默认值或抛出异常
-                user.put("id", 1L); // 暂时硬编码，需要从数据库获取
-                user.put("username", userDetails.getUsername());
-                user.put("realName", userDetails.getUsername()); // 暂时使用用户名，需要从数据库获取真实姓名
-                user.put("email", userDetails.getUsername() + "@yibang.com"); // 暂时生成，需要从数据库获取真实邮箱
-                user.put("roleId", 1L); // 暂时硬编码，需要从数据库获取真实角色ID
-                user.put("companyId", 1L); // 暂时硬编码，需要从数据库获取真实公司ID
-                user.put("status", "ACTIVE");
+                // 如果用户不存在，抛出异常（不应该发生，因为前面已经验证了用户存在）
+                throw new RuntimeException("用户数据异常：无法从数据库获取用户信息");
             }
             
-            // 添加注释说明需要完善的部分
-            System.out.println("=== 注意：用户信息需要从数据库查询 ===");
+            // 用户信息已从数据库获取完成
+            System.out.println("=== 用户信息获取完成 ===");
             System.out.println("当前用户: " + userDetails.getUsername());
-            System.out.println("需要完善：从数据库查询用户的真实信息");
+            System.out.println("用户信息已从数据库获取，无硬编码数据");
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);

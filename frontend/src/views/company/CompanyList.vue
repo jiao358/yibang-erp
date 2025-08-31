@@ -17,17 +17,28 @@
             v-model="searchForm.name"
             placeholder="请输入公司名称"
             clearable
+            style="width: 250px;"
             @keyup.enter="handleSearch"
           />
         </el-form-item>
         <el-form-item label="业务类型">
-          <el-select v-model="searchForm.type" placeholder="请选择业务类型" clearable>
+          <el-select 
+            v-model="searchForm.type" 
+            placeholder="请选择业务类型" 
+            clearable
+            style="width: 200px;"
+          >
             <el-option label="供应商" value="SUPPLIER" />
             <el-option label="销售商" value="SALES" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+          <el-select 
+            v-model="searchForm.status" 
+            placeholder="请选择状态" 
+            clearable
+            style="width: 200px;"
+          >
             <el-option label="激活" value="ACTIVE" />
             <el-option label="未激活" value="INACTIVE" />
             <el-option label="暂停" value="SUSPENDED" />
@@ -86,7 +97,7 @@
       <!-- 分页 -->
       <div class="pagination-area">
         <el-pagination
-          v-model:current-page="pagination.current"
+          v-model:current-page="pagination.page"
           v-model:page-size="pagination.size"
           :page-sizes="[10, 20, 50, 100]"
           :total="pagination.total"
@@ -101,6 +112,7 @@
     <CompanyForm
       v-model:visible="formVisible"
       :company-data="currentCompany"
+      :is-view-mode="isViewMode"
       @success="handleFormSuccess"
     />
   </div>
@@ -111,7 +123,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import CompanyForm from './components/CompanyForm.vue'
-import { getCompanyList, deleteCompany } from '@/api/company'
+import { companyApi } from '@/api/company'
 import type { Company } from '@/types/company'
 
 // 响应式数据
@@ -119,6 +131,7 @@ const loading = ref(false)
 const companyList = ref<Company[]>([])
 const formVisible = ref(false)
 const currentCompany = ref<Company | null>(null)
+const isViewMode = ref(false)
 
 // 搜索表单
 const searchForm = reactive({
@@ -129,7 +142,7 @@ const searchForm = reactive({
 
 // 分页信息
 const pagination = reactive({
-  current: 1,
+  page: 1,
   size: 20,
   total: 0
 })
@@ -143,7 +156,7 @@ const fetchCompanyList = async () => {
       size: pagination.size,
       ...searchForm
     }
-    const response = await getCompanyList(params)
+    const response = await companyApi.getCompanyList(params)
     companyList.value = response.data.records
     pagination.total = response.data.total
   } catch (error) {
@@ -156,7 +169,7 @@ const fetchCompanyList = async () => {
 
 // 搜索
 const handleSearch = () => {
-  pagination.current = 1
+  pagination.page = 1
   fetchCompanyList()
 }
 
@@ -167,25 +180,28 @@ const handleReset = () => {
     type: '',
     status: ''
   })
-  pagination.current = 1
+  pagination.page = 1
   fetchCompanyList()
 }
 
 // 新增公司
 const handleAdd = () => {
   currentCompany.value = null
+  isViewMode.value = false
   formVisible.value = true
 }
 
 // 查看公司
 const handleView = (row: Company) => {
   currentCompany.value = { ...row }
+  isViewMode.value = true
   formVisible.value = true
 }
 
 // 编辑公司
 const handleEdit = (row: Company) => {
   currentCompany.value = { ...row }
+  isViewMode.value = false
   formVisible.value = true
 }
 
@@ -202,7 +218,7 @@ const handleDelete = async (row: Company) => {
       }
     )
     
-    await deleteCompany(row.id)
+    await companyApi.deleteCompany(row.id)
     ElMessage.success('删除成功')
     fetchCompanyList()
   } catch (error) {
@@ -222,13 +238,13 @@ const handleFormSuccess = () => {
 // 分页大小改变
 const handleSizeChange = (size: number) => {
   pagination.size = size
-  pagination.current = 1
+  pagination.page = 1
   fetchCompanyList()
 }
 
 // 当前页改变
 const handleCurrentChange = (page: number) => {
-  pagination.current = page
+  pagination.page = page
   fetchCompanyList()
 }
 

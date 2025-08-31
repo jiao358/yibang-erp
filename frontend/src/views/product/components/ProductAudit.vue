@@ -124,7 +124,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Check, Close } from '@element-plus/icons-vue'
+// 使用Element Plus内置图标，避免@element-plus/icons-vue的导入问题
 import { auditProduct } from '@/api/product'
 import type { Product } from '@/types/product'
 

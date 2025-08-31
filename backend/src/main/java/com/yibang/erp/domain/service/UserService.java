@@ -2,6 +2,7 @@ package com.yibang.erp.domain.service;
 
 import com.yibang.erp.common.response.PageResult;
 import com.yibang.erp.domain.dto.UserQueryRequest;
+import com.yibang.erp.domain.dto.UserListResponse;
 import com.yibang.erp.domain.entity.User;
 
 import java.util.List;
@@ -21,6 +22,14 @@ public interface UserService {
      * @return 分页用户列表
      */
     PageResult<User> getUserPage(UserQueryRequest queryRequest);
+
+    /**
+     * 分页查询用户列表（带角色和公司信息联查）
+     *
+     * @param queryRequest 查询参数（包含分页信息）
+     * @return 分页用户列表响应
+     */
+    PageResult<UserListResponse> getUserPageWithRoleAndCompany(UserQueryRequest queryRequest,Long belongCompanyId);
 
     /**
      * 根据ID获取用户

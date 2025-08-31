@@ -2,8 +2,8 @@
   <div class="product-list-container">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h1 class="page-title">商品管理</h1>
-      <p class="page-subtitle">管理商品信息、状态和审核流程</p>
+      <h1 class="page-title">供应链商品管理</h1>
+      <p class="page-subtitle">管理供应链公司的商品信息、状态和库存</p>
     </div>
 
     <!-- 搜索和筛选区域 -->
@@ -15,6 +15,51 @@
             placeholder="请输入商品名称"
             clearable
             style="width: 200px"
+          />
+        </el-form-item>
+        <el-form-item label="品牌">
+          <el-select
+            v-model="searchForm.brand"
+            placeholder="请选择品牌"
+            clearable
+            style="width: 150px"
+          >
+            <el-option
+              v-for="brand in brandOptions"
+              :key="brand.id"
+              :label="brand.name"
+              :value="brand.name"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="商品分类">
+          <el-select
+            v-model="searchForm.categoryId"
+            placeholder="请选择分类"
+            clearable
+            style="width: 150px"
+          >
+            <el-option
+              v-for="category in categoryOptions"
+              :key="category.id"
+              :label="category.name"
+              :value="category.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="价格范围">
+          <el-input
+            v-model="searchForm.minPrice"
+            placeholder="最低价"
+            clearable
+            style="width: 120px"
+          />
+          <span style="margin: 0 8px;">-</span>
+          <el-input
+            v-model="searchForm.maxPrice"
+            placeholder="最高价"
+            clearable
+            style="width: 120px"
           />
         </el-form-item>
         <el-form-item label="商品状态">
@@ -32,28 +77,13 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="审核状态">
-          <el-select
-            v-model="searchForm.approvalStatus"
-            placeholder="请选择审核状态"
-            clearable
-            style="width: 150px"
-          >
-            <el-option
-              v-for="status in approvalStatusOptions"
-              :key="status.value"
-              :label="status.label"
-              :value="status.value"
-            />
-          </el-select>
-        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>
+            <el-icon><i class="el-icon-search"></i></el-icon>
             搜索
           </el-button>
           <el-button @click="handleReset">
-            <el-icon><Refresh /></el-icon>
+            <el-icon><i class="el-icon-refresh"></i></el-icon>
             重置
           </el-button>
         </el-form-item>
@@ -63,21 +93,14 @@
     <!-- 操作按钮区域 -->
     <div class="action-section">
       <el-button type="primary" @click="handleCreate">
-        <el-icon><Plus /></el-icon>
+        <el-icon><i class="el-icon-plus"></i></el-icon>
         新增商品
       </el-button>
-      <el-button type="success" @click="handleBatchApprove" :disabled="!hasSelectedItems">
-        <el-icon><Check /></el-icon>
-        批量审核
+      <el-button type="success" @click="handleBatchActivate" :disabled="!hasSelectedItems">
+        <el-icon><i class="el-icon-check"></i></el-icon>
+        批量上架
       </el-button>
-      <el-button type="warning" @click="handleBatchDeactivate" :disabled="!hasSelectedItems">
-        <el-icon><Remove /></el-icon>
-        批量下架
-      </el-button>
-      <el-button type="danger" @click="handleBatchDelete" :disabled="!hasSelectedItems">
-        <el-icon><Delete /></el-icon>
-        批量删除
-      </el-button>
+     
     </div>
 
     <!-- 商品列表表格 -->
@@ -91,18 +114,58 @@
       >
         <el-table-column type="selection" width="55" />
         
-        <el-table-column prop="sku" label="商品编码" width="120" />
-        
-        <el-table-column prop="name" label="商品名称" min-width="200">
+        <el-table-column prop="name" label="商品名称" width="200">
           <template #default="{ row }">
             <div class="product-name">
-              <span class="name-text">{{ row.name }}</span>
-              <div class="product-tags">
-                <el-tag v-if="row.isFeatured" type="success" size="small">推荐</el-tag>
-                <el-tag v-if="row.isHot" type="danger" size="small">热销</el-tag>
-                <el-tag v-if="row.isNew" type="warning" size="small">新品</el-tag>
-              </div>
+              <el-tooltip 
+                :content="row.name" 
+                placement="top" 
+                :show-after="500"
+                :hide-after="0"
+              >
+                <span class="name-text">{{ row.name.length > 20 ? row.name.substring(0, 20) + '...' : row.name }}</span>
+              </el-tooltip>
             </div>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="images" label="商品图片" width="100">
+          <template #default="{ row }">
+            <div class="product-image">
+              <el-image
+                v-if="row.images && row.images.length > 0"
+                :src="row.images[0]"
+                style="width: 60px; height: 60px"
+                fit="cover"
+                :preview-src-list="row.images"
+                :initial-index="0"
+              />
+              <span v-else class="no-image">无图片</span>
+            </div>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="sku" label="69码" width="120">
+          <template #default="{ row }">
+            <span>{{ row.sku || '-' }}</span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="unit" label="规格单位" width="100">
+          <template #default="{ row }">
+            <span>{{ row.unit || '-' }}</span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="costPrice" label="成本价" width="100">
+          <template #default="{ row }">
+            <span>¥{{ row.costPrice || '-' }}</span>
+          </template>
+        </el-table-column>
+        
+        <el-table-column prop="sellingPrice" label="销售价" width="100">
+          <template #default="{ row }">
+            <span>¥{{ row.sellingPrice || '-' }}</span>
           </template>
         </el-table-column>
         
@@ -114,54 +177,26 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="approvalStatus" label="审核状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getApprovalStatusTagType(row.approvalStatus)" size="small">
-              {{ getApprovalStatusText(row.approvalStatus) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="sellingPrice" label="销售价" width="100">
-          <template #default="{ row }">
-            <span class="price">¥{{ row.sellingPrice }}</span>
-          </template>
-        </el-table-column>
-        
-        <el-table-column prop="createdAt" label="创建时间" width="160">
-          <template #default="{ row }">
-            {{ formatDate(row.createdAt) }}
-          </template>
-        </el-table-column>
-        
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button type="primary" size="small" @click="handleView(row)">
                 查看
               </el-button>
               <el-button type="success" size="small" @click="handleEdit(row)" 
-                         v-if="row.status === 'DRAFT'">
+                         v-if="row.status === 'DRAFT' || row.status === 'INACTIVE'">
                 编辑
               </el-button>
-              <el-button type="warning" size="small" @click="handleSubmit(row)" 
-                         v-if="row.status === 'DRAFT'">
-                提交审核
-              </el-button>
-              <el-button type="success" size="small" @click="handleApprove(row)" 
-                         v-if="row.status === 'PENDING'">
-                审核
-              </el-button>
               <el-button type="success" size="small" @click="handleActivate(row)" 
-                         v-if="row.approvalStatus === 'APPROVED' && row.status !== 'ACTIVE'">
+                         v-if="row.status === 'DRAFT' || row.status === 'INACTIVE'">
                 上架
               </el-button>
               <el-button type="warning" size="small" @click="handleDeactivate(row)" 
                          v-if="row.status === 'ACTIVE'">
                 下架
               </el-button>
-              <el-button type="danger" size="small" @click="handleDelete(row)">
-                删除
+              <el-button type="info" size="small" @click="handleUploadImage(row)">
+                上传图片
               </el-button>
             </div>
           </template>
@@ -183,14 +218,12 @@
     </div>
 
     <!-- 商品详情对话框 -->
-    <el-dialog
-      v-model="detailDialogVisible"
-      title="商品详情"
-      width="800px"
-      class="product-detail-dialog"
-    >
-      <ProductDetail v-if="detailDialogVisible" :product="selectedProduct" />
-    </el-dialog>
+    <ProductDetail 
+      v-if="detailDialogVisible" 
+      :visible="detailDialogVisible"
+      :product="selectedProduct" 
+      @update:visible="detailDialogVisible = $event"
+    />
 
     <!-- 商品编辑对话框 -->
     <el-dialog
@@ -221,17 +254,56 @@
         @cancel="auditDialogVisible = false"
       />
     </el-dialog>
+
+    <!-- 上传图片对话框 -->
+    <el-dialog
+      v-model="uploadImageDialogVisible"
+      title="上传商品图片"
+      width="500px"
+      class="upload-image-dialog"
+    >
+      <div class="upload-image-content">
+        <el-upload
+          ref="uploadRef"
+          :action="uploadAction"
+          :headers="uploadHeaders"
+          :data="{ productId: selectedProduct?.id }"
+          :multiple="true"
+          :show-file-list="true"
+          :on-success="handleUploadSuccess"
+          :on-error="handleUploadError"
+          :before-upload="beforeUpload"
+          accept="image/*"
+          list-type="picture-card"
+        >
+          <el-icon><i class="el-icon-plus"></i></el-icon>
+          <template #tip>
+            <div class="el-upload__tip">
+              支持 jpg/png 格式，单个文件不超过 5MB
+            </div>
+          </template>
+        </el-upload>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="uploadImageDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleUploadConfirm">确定</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Check, Remove, Delete } from '@element-plus/icons-vue'
+// 使用Element Plus内置图标，避免@element-plus/icons-vue的导入问题
 import ProductDetail from './components/ProductDetail.vue'
 import ProductEdit from './components/ProductEdit.vue'
 import ProductAudit from './components/ProductAudit.vue'
-import { getProductList, deleteProduct, submitForApproval } from '@/api/product'
+import { getProductList, deleteProduct, submitForApproval, getProductBrands, getProductCategories, activateProduct, deactivateProduct } from '@/api/product'
+import { productPriceConfigApi } from '@/api/productPriceConfig'
 import type { Product } from '@/types/product'
 
 // 响应式数据
@@ -241,13 +313,17 @@ const selectedItems = ref<Product[]>([])
 const detailDialogVisible = ref(false)
 const editDialogVisible = ref(false)
 const auditDialogVisible = ref(false)
+const uploadImageDialogVisible = ref(false)
 const selectedProduct = ref<Product | null>(null)
 
 // 搜索表单
 const searchForm = reactive({
   name: '',
-  status: '',
-  approvalStatus: ''
+  brand: '',
+  categoryId: null as number | null,
+  minPrice: '',
+  maxPrice: '',
+  status: ''
 })
 
 // 分页信息
@@ -260,18 +336,22 @@ const pagination = reactive({
 // 商品状态选项
 const productStatusOptions = [
   { value: 'DRAFT', label: '草稿' },
-  { value: 'PENDING', label: '待审核' },
-  { value: 'ACTIVE', label: '已上架' },
-  { value: 'INACTIVE', label: '已下架' },
-  { value: 'DISCONTINUED', label: '已停售' }
+  { value: 'ACTIVE', label: '上架' },
+  { value: 'INACTIVE', label: '下架' }
 ]
 
-// 审核状态选项
-const approvalStatusOptions = [
-  { value: 'PENDING', label: '待审核' },
-  { value: 'APPROVED', label: '已通过' },
-  { value: 'REJECTED', label: '已拒绝' }
-]
+// 品牌选项
+const brandOptions = ref<any[]>([])
+
+// 分类选项
+const categoryOptions = ref<any[]>([])
+
+// 上传相关配置
+const uploadAction = '/api/products/upload-image' // 上传接口地址
+const uploadHeaders = computed(() => {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+})
 
 // 计算属性
 const hasSelectedItems = computed(() => selectedItems.value.length > 0)
@@ -280,14 +360,31 @@ const hasSelectedItems = computed(() => selectedItems.value.length > 0)
 const loadProductList = async () => {
   loading.value = true
   try {
-    const params = {
+    // 获取当前用户的公司ID
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const companyId = userInfo.companyId
+    
+    const params: any = {
       page: pagination.current,
       size: pagination.size,
+      companyId: companyId, // 添加公司ID参数
       ...searchForm
     }
+    // 过滤空值
+    Object.keys(params).forEach(key => {
+      if (params[key] === '' || params[key] === null || params[key] === undefined) {
+        delete params[key]
+      }
+    })
     const response = await getProductList(params)
-    productList.value = response.data.records || []
-    pagination.total = response.data.total || 0
+    // 安全地处理响应数据，避免 undefined 错误
+    if (response && response.data) {
+      productList.value = response.data.records || []
+      pagination.total = response.data.total || 0
+    } else {
+      productList.value = []
+      pagination.total = 0
+    }
   } catch (error) {
     ElMessage.error('加载商品列表失败')
     console.error('加载商品列表失败:', error)
@@ -304,8 +401,11 @@ const handleSearch = () => {
 const handleReset = () => {
   Object.assign(searchForm, {
     name: '',
-    status: '',
-    approvalStatus: ''
+    brand: '',
+    categoryId: null,
+    minPrice: '',
+    maxPrice: '',
+    status: ''
   })
   pagination.current = 1
   loadProductList()
@@ -320,9 +420,23 @@ const handleCreate = () => {
   editDialogVisible.value = true
 }
 
-const handleView = (row: Product) => {
-  selectedProduct.value = row
-  detailDialogVisible.value = true
+const handleView = async (row: Product) => {
+  try {
+    // 获取商品详情，包括价格分层配置
+    const productWithConfigs = { ...row }
+    
+    // 调用价格分层配置API获取该商品的价格配置
+    const priceConfigs = await productPriceConfigApi.getConfigsByProductId(row.id)
+    productWithConfigs.priceTierConfigs = priceConfigs
+    
+    selectedProduct.value = productWithConfigs
+    detailDialogVisible.value = true
+  } catch (error) {
+    console.error('获取商品价格配置失败:', error)
+    // 如果获取价格配置失败，仍然显示基本信息
+    selectedProduct.value = row
+    detailDialogVisible.value = true
+  }
 }
 
 const handleEdit = (row: Product) => {
@@ -362,7 +476,8 @@ const handleActivate = async (row: Product) => {
       type: 'warning'
     })
     
-    // 调用上架API
+    // 调用上架API - 更新商品状态为ACTIVE
+    await activateProduct(row.id, 1) // 传入操作人ID
     ElMessage.success('商品上架成功')
     loadProductList()
   } catch (error) {
@@ -381,7 +496,8 @@ const handleDeactivate = async (row: Product) => {
       type: 'warning'
     })
     
-    // 调用下架API
+    // 调用下架API - 更新商品状态为INACTIVE
+    await deactivateProduct(row.id, 1) // 传入操作人ID
     ElMessage.success('商品下架成功')
     loadProductList()
   } catch (error) {
@@ -411,17 +527,81 @@ const handleDelete = async (row: Product) => {
   }
 }
 
-const handleBatchApprove = () => {
-  ElMessage.info('批量审核功能开发中...')
+const handleUploadImage = (row: Product) => {
+  selectedProduct.value = row
+  uploadImageDialogVisible.value = true
+}
+
+const handleUploadSuccess = (response: any, file: any) => {
+  ElMessage.success('图片上传成功')
+  console.log('上传成功:', response, file)
+}
+
+const handleUploadError = (error: any, file: any) => {
+  ElMessage.error('图片上传失败')
+  console.error('上传失败:', error, file)
+}
+
+const beforeUpload = (file: any) => {
+  const isImage = file.type.startsWith('image/')
+  const isLt5M = file.size / 1024 / 1024 < 5
+
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件!')
+    return false
+  }
+  if (!isLt5M) {
+    ElMessage.error('图片大小不能超过 5MB!')
+    return false
+  }
+  return true
+}
+
+const handleUploadConfirm = () => {
+  uploadImageDialogVisible.value = false
+  loadProductList() // 刷新商品列表
+  ElMessage.success('图片上传完成')
+}
+
+const handleBatchActivate = async () => {
+  if (selectedItems.value.length === 0) {
+    ElMessage.warning('请选择要上架的商品')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要上架选中的 ${selectedItems.value.length} 个商品吗？`,
+      '确认上架',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    // 批量上架逻辑
+    for (const item of selectedItems.value) {
+      if (item.status === 'DRAFT' || item.status === 'INACTIVE') {
+        await activateProduct(item.id, 1) // 假设当前用户ID为1
+      }
+    }
+    
+    ElMessage.success('批量上架成功')
+    loadProductList()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('批量上架失败')
+      console.error('批量上架失败:', error)
+    }
+  }
 }
 
 const handleBatchDeactivate = () => {
   ElMessage.info('批量下架功能开发中...')
 }
 
-const handleBatchDelete = () => {
-  ElMessage.info('批量删除功能开发中...')
-}
+// 移除批量删除功能
 
 const handleSizeChange = (size: number) => {
   pagination.size = size
@@ -449,10 +629,8 @@ const handleAuditSuccess = () => {
 const getStatusTagType = (status: string) => {
   const typeMap: Record<string, string> = {
     'DRAFT': 'info',
-    'PENDING': 'warning',
     'ACTIVE': 'success',
-    'INACTIVE': 'danger',
-    'DISCONTINUED': 'danger'
+    'INACTIVE': 'danger'
   }
   return typeMap[status] || 'info'
 }
@@ -460,40 +638,46 @@ const getStatusTagType = (status: string) => {
 const getStatusText = (status: string) => {
   const textMap: Record<string, string> = {
     'DRAFT': '草稿',
-    'PENDING': '待审核',
-    'ACTIVE': '已上架',
-    'INACTIVE': '已下架',
-    'DISCONTINUED': '已停售'
+    'ACTIVE': '上架',
+    'INACTIVE': '下架'
   }
   return textMap[status] || status
 }
 
-const getApprovalStatusTagType = (status: string) => {
-  const typeMap: Record<string, string> = {
-    'PENDING': 'warning',
-    'APPROVED': 'success',
-    'REJECTED': 'danger'
-  }
-  return typeMap[status] || 'info'
-}
-
-const getApprovalStatusText = (status: string) => {
-  const textMap: Record<string, string> = {
-    'PENDING': '待审核',
-    'APPROVED': '已通过',
-    'REJECTED': '已拒绝'
-  }
-  return textMap[status] || status
-}
+// 移除审核状态相关方法
 
 const formatDate = (date: string) => {
   if (!date) return ''
   return new Date(date).toLocaleString('zh-CN')
 }
 
+// 获取品牌列表
+const loadBrandOptions = async () => {
+  try {
+    const response = await getProductBrands()
+    brandOptions.value = response.data || []
+  } catch (error) {
+    console.error('获取品牌列表失败:', error)
+    ElMessage.warning('获取品牌列表失败')
+  }
+}
+
+// 获取分类列表
+const loadCategoryOptions = async () => {
+  try {
+    const response = await getProductCategories()
+    categoryOptions.value = response.data || []
+  } catch (error) {
+    console.error('获取分类列表失败:', error)
+    ElMessage.warning('获取分类列表失败')
+  }
+}
+
 // 生命周期
 onMounted(() => {
   loadProductList()
+  loadBrandOptions()
+  loadCategoryOptions()
 })
 </script>
 

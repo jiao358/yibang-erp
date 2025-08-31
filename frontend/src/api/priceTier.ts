@@ -12,113 +12,73 @@ import type {
 export const priceTierApi = {
   // 创建价格分层
   createPriceTier(data: PriceTierForm) {
-    return request<PriceTierResponse>({
-      url: '/api/price-tiers',
-      method: 'post',
-      data
-    })
+    return request.post<PriceTierResponse>('/api/price-tiers', data)
   },
 
   // 更新价格分层
   updatePriceTier(id: number, data: PriceTierForm) {
-    return request<PriceTierResponse>({
-      url: `/api/price-tiers/${id}`,
-      method: 'put',
-      data
-    })
+    return request.put<PriceTierResponse>(`/api/price-tiers/${id}`, data)
   },
 
   // 删除价格分层
   deletePriceTier(id: number) {
-    return request<boolean>({
-      url: `/api/price-tiers/${id}`,
-      method: 'delete'
-    })
+    return request.delete<boolean>(`/api/price-tiers/${id}`)
   },
 
   // 根据ID获取价格分层
   getPriceTierById(id: number) {
-    return request<PriceTierResponse>({
-      url: `/api/price-tiers/${id}`,
-      method: 'get'
-    })
+    return request.get<PriceTierResponse>(`/api/price-tiers/${id}`)
   },
 
   // 分页查询价格分层
   getPriceTierPage(params: PriceTierQueryRequest) {
-    return request<{
+    return request.get<{
       records: PriceTierResponse[]
       total: number
       current: number
       size: number
-    }>({
-      url: '/api/price-tiers/page',
-      method: 'get',
-      params
-    })
+    }>('/api/price-tiers/page', { params })
   },
 
   // 查询价格分层列表
   getPriceTierList(params: PriceTierQueryRequest) {
-    return request<PriceTierResponse[]>({
-      url: '/api/price-tiers/list',
-      method: 'get',
-      params
-    })
+    return request.get<PriceTierResponse[]>('/api/price-tiers/list', { params })
   },
 
   // 启用/禁用价格分层
   togglePriceTierStatus(id: number, isActive: boolean) {
-    return request<boolean>({
-      url: `/api/price-tiers/${id}/status`,
-      method: 'put',
-      params: { isActive }
-    })
+    return request.put<boolean>(`/api/price-tiers/${id}/status`, null, { params: { isActive } })
   },
 
   // 批量启用/禁用价格分层
   batchTogglePriceTierStatus(ids: number[], isActive: boolean) {
-    return request<boolean>({
-      url: '/api/price-tiers/batch-status',
-      method: 'put',
-      params: { ids, isActive }
-    })
+    return request.put<boolean>('/api/price-tiers/batch-status', null, { params: { ids, isActive } })
   },
 
   // 获取适用的价格分层
   getApplicablePriceTiers(categoryId: number | null, customerType: string | null, companyId: number) {
-    return request<PriceTierResponse[]>({
-      url: '/api/price-tiers/applicable',
-      method: 'get',
-      params: { categoryId, customerType, companyId }
-    })
+    return request.get<PriceTierResponse[]>('/api/price-tiers/applicable', { params: { categoryId, customerType, companyId } })
   },
 
   // 计算最终价格
   calculateFinalPrice(priceTierId: number, originalPrice: number) {
-    return request<number>({
-      url: '/api/price-tiers/calculate-price',
-      method: 'post',
-      params: { priceTierId, originalPrice }
-    })
+    return request.post<number>('/api/price-tiers/calculate-price', null, { params: { priceTierId, originalPrice } })
   },
 
   // 验证价格分层配置
   validatePriceTierConfig(data: PriceTierForm) {
-    return request<boolean>({
-      url: '/api/price-tiers/validate',
-      method: 'post',
-      data
-    })
+    return request.post<boolean>('/api/price-tiers/validate', data)
   }
 }
 
 // 价格分层类型选项
 export const priceTierTypeOptions = [
-  { value: 'BASIC', label: '基础价格', description: '基础价格分层' },
-  { value: 'VIP', label: 'VIP价格', description: 'VIP客户价格分层' },
-  { value: 'WHOLESALE', label: '批发价格', description: '批发客户价格分层' },
-  { value: 'CUSTOM', label: '自定义价格', description: '自定义价格分层' }
+  { value: 'DEALER_LEVEL_1', label: '1级经销商', description: '一级经销商价格分层' },
+  { value: 'DEALER_LEVEL_2', label: '2级经销商', description: '二级经销商价格分层' },
+  { value: 'DEALER_LEVEL_3', label: '3级经销商', description: '三级经销商价格分层' },
+  { value: 'VIP_CUSTOMER', label: 'VIP客户', description: 'VIP客户价格分层' },
+  { value: 'WHOLESALE', label: '批发客户', description: '批发客户价格分层' },
+  { value: 'RETAIL', label: '零售客户', description: '零售客户价格分层' }
 ]
 
 // 客户类型选项

@@ -12,6 +12,7 @@ CREATE TABLE price_tiers (
     company_id BIGINT NOT NULL COMMENT '供应链公司ID',
     tier_name VARCHAR(100) NOT NULL COMMENT '分层名称',
     tier_code VARCHAR(50) NOT NULL COMMENT '分层代码',
+    tier_type VARCHAR(50) NOT NULL COMMENT '分层类型：DEALER_LEVEL_1, DEALER_LEVEL_2, VIP_CUSTOMER等',
     tier_level INT NOT NULL COMMENT '分层级别（数字越小级别越高）',
     description TEXT COMMENT '分层描述',
     discount_rate DECIMAL(5,4) NOT NULL DEFAULT 1.00 COMMENT '折扣率（1.00表示无折扣）',
@@ -23,6 +24,8 @@ CREATE TABLE price_tiers (
     customer_level_requirement ENUM('REGULAR', 'VIP', 'PREMIUM', 'ALL') NOT NULL DEFAULT 'ALL' COMMENT '客户等级要求',
     payment_terms VARCHAR(100) COMMENT '付款条件',
     credit_limit DECIMAL(12,2) COMMENT '信用额度',
+    effective_start TIMESTAMP NULL COMMENT '生效开始时间',
+    effective_end TIMESTAMP NULL COMMENT '生效结束时间',
     is_active TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否激活：0-否，1-是',
     priority INT NOT NULL DEFAULT 0 COMMENT '优先级（数字越大优先级越高）',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -35,9 +38,11 @@ CREATE TABLE price_tiers (
     FOREIGN KEY (updated_by) REFERENCES users(id),
     UNIQUE KEY uk_company_tier_code (company_id, tier_code),
     INDEX idx_company_id (company_id),
+    INDEX idx_tier_type (tier_type),
     INDEX idx_tier_level (tier_level),
     INDEX idx_is_active (is_active),
-    INDEX idx_priority (priority)
+    INDEX idx_priority (priority),
+    INDEX idx_effective_time (effective_start, effective_end)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='价格分层表';
 
 -- 2. 价格策略表 (price_strategies)
@@ -227,11 +232,13 @@ CREATE TABLE customer_price_levels (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='客户价格等级表';
 
 -- 插入示例价格分层数据
-INSERT INTO price_tiers (company_id, tier_name, tier_code, tier_level, description, discount_rate, markup_rate, customer_level_requirement, created_by) VALUES
-(2, '钻石级', 'DIAMOND', 1, '最高级别客户，享受最大折扣', 0.85, 1.00, 'PREMIUM', 1),
-(2, '黄金级', 'GOLD', 2, '高级客户，享受较大折扣', 0.90, 1.00, 'VIP', 1),
-(2, '白银级', 'SILVER', 3, '中级客户，享受标准折扣', 0.95, 1.00, 'REGULAR', 1),
-(2, '标准级', 'STANDARD', 4, '普通客户，无特殊折扣', 1.00, 1.00, 'ALL', 1);
+INSERT INTO price_tiers (company_id, tier_name, tier_code, tier_type, tier_level, description, discount_rate, markup_rate, customer_level_requirement, effective_start, effective_end, created_by) VALUES
+(2, '1级经销商', 'DEALER_LEVEL_1', 'DEALER_LEVEL_1', 1, '一级经销商，享受最大折扣', 0.80, 1.00, 'PREMIUM', NOW(), DATE_ADD(NOW(), INTERVAL 10 YEAR), 1),
+(2, '2级经销商', 'DEALER_LEVEL_2', 'DEALER_LEVEL_2', 2, '二级经销商，享受较大折扣', 0.85, 1.00, 'VIP', NOW(), DATE_ADD(NOW(), INTERVAL 10 YEAR), 1),
+(2, '3级经销商', 'DEALER_LEVEL_3', 'DEALER_LEVEL_3', 3, '三级经销商，享受标准折扣', 0.90, 1.00, 'REGULAR', NOW(), DATE_ADD(NOW(), INTERVAL 10 YEAR), 1),
+(2, 'VIP客户', 'VIP_CUSTOMER', 'VIP_CUSTOMER', 4, 'VIP客户，享受特殊优惠', 0.95, 1.00, 'VIP', NOW(), DATE_ADD(NOW(), INTERVAL 10 YEAR), 1),
+(2, '批发客户', 'WHOLESALE', 'WHOLESALE', 5, '批发客户，享受批发价格', 0.88, 1.00, 'REGULAR', NOW(), DATE_ADD(NOW(), INTERVAL 10 YEAR), 1),
+(2, '零售客户', 'RETAIL', 'RETAIL', 6, '零售客户，标准价格', 1.00, 1.00, 'ALL', NOW(), DATE_ADD(NOW(), INTERVAL 10 YEAR), 1);
 
 -- 插入示例价格策略数据
 INSERT INTO price_strategies (company_id, strategy_name, strategy_type, description, base_price_type, base_price_multiplier, min_margin_rate, created_by) VALUES

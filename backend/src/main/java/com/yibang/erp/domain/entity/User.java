@@ -73,6 +73,30 @@ public class User {
     private Long companyId;
 
     /**
+     * 所属供应链公司ID（可为空，表示个人销售）
+     */
+    @TableField("supplier_company_id")
+    private Long supplierCompanyId;
+
+    /**
+     * 所属销售公司ID（可为空，表示个人销售）
+     */
+    @TableField("sales_company_id")
+    private Long salesCompanyId;
+
+    /**
+     * 销售类型：COMPANY_SALES-公司销售，INDIVIDUAL_SALES-个人销售
+     */
+    @TableField("sales_type")
+    private String salesType;
+
+    /**
+     * 价格分层等级ID
+     */
+    @TableField("price_tier_id")
+    private Long priceTierId;
+
+    /**
      * 部门
      */
     @TableField("department")
@@ -164,4 +188,7 @@ public class User {
      */
     @TableField(exist = false)
     private Set<Permission> permissions;
+
+    @TableField(exist = false)
+    private String password;
 }

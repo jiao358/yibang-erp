@@ -13,6 +13,9 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Collectors;
 
 /**
  * 公司服务实现类
@@ -29,6 +32,8 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     public IPage<Company> getCompanyPage(Page<Company> page, String name, String type, String status) {
+
+
         LambdaQueryWrapper<Company> queryWrapper = new LambdaQueryWrapper<>();
         
         // 添加查询条件
@@ -44,7 +49,9 @@ public class CompanyServiceImpl implements CompanyService {
         
         // 按创建时间倒序排列
         queryWrapper.orderByDesc(Company::getCreatedAt);
-        
+        //增加count
+        Long totalCount= companyRepository.selectCount(queryWrapper);
+        page.setTotal(totalCount);
         return companyRepository.selectPage(page, queryWrapper);
     }
 
@@ -124,6 +131,51 @@ public class CompanyServiceImpl implements CompanyService {
         LambdaQueryWrapper<Company> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.orderByDesc(Company::getCreatedAt);
         return companyRepository.selectList(queryWrapper);
+    }
+
+    @Override
+    public List<Map<String, Object>> getAllActiveCompanies() {
+        LambdaQueryWrapper<Company> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Company::getStatus, "ACTIVE")
+                   .eq(Company::getDeleted, false)
+                   .orderByAsc(Company::getName);
+        
+        List<Company> companies = companyRepository.selectList(queryWrapper);
+        return companies.stream()
+            .map(company -> {
+                Map<String, Object> companyMap = new HashMap<>();
+                companyMap.put("id", company.getId());
+                companyMap.put("name", company.getName());
+                companyMap.put("type", company.getType());
+                companyMap.put("parentSupplierId", company.getParentSupplierId());
+                companyMap.put("supplierLevel", company.getSupplierLevel());
+                companyMap.put("status", company.getStatus());
+                return companyMap;
+            })
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Map<String, Object>> getCompaniesByTypeMap(String type) {
+        LambdaQueryWrapper<Company> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Company::getType, type)
+                   .eq(Company::getStatus, "ACTIVE")
+                   .eq(Company::getDeleted, false)
+                   .orderByAsc(Company::getName);
+        
+        List<Company> companies = companyRepository.selectList(queryWrapper);
+        return companies.stream()
+            .map(company -> {
+                Map<String, Object> companyMap = new HashMap<>();
+                companyMap.put("id", company.getId());
+                companyMap.put("name", company.getName());
+                companyMap.put("type", company.getType());
+                companyMap.put("parentSupplierId", company.getParentSupplierId());
+                companyMap.put("supplierLevel", company.getSupplierLevel());
+                companyMap.put("status", company.getStatus());
+                return companyMap;
+            })
+            .collect(Collectors.toList());
     }
 
     @Override

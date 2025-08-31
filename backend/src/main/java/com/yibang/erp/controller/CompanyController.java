@@ -1,10 +1,14 @@
 package com.yibang.erp.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yibang.erp.common.util.JwtUtil;
 import com.yibang.erp.domain.entity.Company;
 import com.yibang.erp.domain.service.CompanyService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.yibang.erp.infrastructure.repository.CompanyRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -19,13 +23,16 @@ import java.util.Map;
  * @author yibang-erp
  * @since 2024-01-14
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/companies")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('SYSTEM_ADMIN','SUPPLIER_ADMIN')")
+@RequiredArgsConstructor
 public class CompanyController {
 
-    @Autowired
-    private CompanyService companyService;
+    private final CompanyService companyService;
+    private final CompanyRepository companyRepository;
+    private final JwtUtil jwtUtil;
 
     /**
      * 分页查询公司列表
@@ -289,6 +296,74 @@ public class CompanyController {
             response.put("timestamp", System.currentTimeMillis());
             
             return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * 获取供应商公司列表（供销售用户使用）
+     */
+    @GetMapping("/suppliers")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_USER')")
+    public ResponseEntity<Map<String, Object>> getSupplierCompanies(
+            @RequestHeader("Authorization") String authHeader) {
+        try {
+            // 获取当前用户公司ID
+            Long currentUserCompanyId = extractCompanyIdFromJWT(authHeader);
+            
+            // 查询所有供应商类型的公司
+            QueryWrapper<Company> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("type", "SUPPLIER");
+            queryWrapper.eq("status", "ACTIVE");
+            queryWrapper.eq("deleted", false);
+            
+            // 如果不是系统管理员，只显示与当前用户公司有关系的供应商
+            if (currentUserCompanyId != null && !hasSystemAdminRole(authHeader)) {
+                // TODO: 这里可以根据业务关系表查询，暂时返回所有供应商
+            }
+            
+            List<Company> suppliers = companyRepository.selectList(queryWrapper);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", suppliers);
+            response.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("获取供应商公司列表失败", e);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "获取供应商公司列表失败: " + e.getMessage());
+            response.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    /**
+     * 从JWT中提取公司ID
+     */
+    private Long extractCompanyIdFromJWT(String authHeader) {
+        try {
+            String token = authHeader.substring(7);
+            Long companyId = jwtUtil.getCompanyIdFromToken(token);
+            return companyId;
+        } catch (Exception e) {
+            log.warn("从JWT提取公司ID失败", e);
+            return null;
+        }
+    }
+
+    /**
+     * 检查是否有系统管理员角色
+     */
+    private boolean hasSystemAdminRole(String authHeader) {
+        try {
+            String token = authHeader.substring(7);
+            List<String> roles = jwtUtil.getRolesFromToken(token);
+            return roles != null && roles.contains("SYSTEM_ADMIN");
+        } catch (Exception e) {
+            log.warn("检查系统管理员角色失败", e);
+            return false;
         }
     }
 }

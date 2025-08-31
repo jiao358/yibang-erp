@@ -99,6 +99,12 @@ public class Product {
     private BigDecimal marketPrice;
 
     /**
+     * 零售端限价
+     */
+    @TableField("retail_limit_price")
+    private BigDecimal retailLimitPrice;
+
+    /**
      * 重量(kg)
      */
     @TableField("weight")

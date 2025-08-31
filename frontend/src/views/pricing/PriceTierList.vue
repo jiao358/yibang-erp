@@ -3,66 +3,10 @@
     <!-- 页面标题 -->
     <div class="page-header">
       <h1 class="page-title">价格分层管理</h1>
-      <p class="page-description">管理不同客户等级的价格分层和折扣策略</p>
+      <p class="page-description">配置供应链公司的客户价格分层体系，支持不同客户等级的价格策略</p>
     </div>
 
-    <!-- 搜索和过滤区域 -->
-    <div class="search-section">
-      <el-form :model="searchForm" :inline="true" class="search-form">
-        <el-form-item label="分层名称">
-          <el-input
-            v-model="searchForm.tierName"
-            placeholder="请输入分层名称"
-            clearable
-            style="width: 200px"
-            @input="handleSearchDebounced"
-          />
-        </el-form-item>
-        <el-form-item label="分层代码">
-          <el-input
-            v-model="searchForm.tierCode"
-            placeholder="请输入分层代码"
-            clearable
-            style="width: 200px"
-            @input="handleSearchDebounced"
-          />
-        </el-form-item>
-        <el-form-item label="客户等级">
-          <el-select
-            v-model="searchForm.customerLevel"
-            placeholder="请选择客户等级"
-            clearable
-            style="width: 150px"
-          >
-            <el-option label="钻石级" value="PREMIUM" />
-            <el-option label="黄金级" value="VIP" />
-            <el-option label="白银级" value="REGULAR" />
-            <el-option label="标准级" value="ALL" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select
-            v-model="searchForm.isActive"
-            placeholder="请选择状态"
-            clearable
-            style="width: 120px"
-          >
-            <el-option label="启用" :value="true" />
-            <el-option label="禁用" :value="false" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>
-            搜索
-          </el-button>
-          <el-button @click="handleReset">
-            <el-icon><Refresh /></el-icon>
-            重置
-          </el-button>
-        </el-form-item>
-      </el-form>
-    </div>
+
 
     <!-- 操作按钮区域 -->
     <div class="action-section">
@@ -96,56 +40,57 @@
         :height="400"
         :max-height="600"
         :row-key="(row: any) => row.id"
-        :default-sort="{ prop: 'createdAt', order: 'descending' }"
+        :default-sort="{ prop: 'priority', order: 'ascending' }"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="tierName" label="分层名称" min-width="120" />
+        
+        <!-- 所属公司名称列 - 只有管理员可见 -->
+        <el-table-column 
+          v-if="isAdmin" 
+          prop="companyName" 
+          label="所属公司" 
+          width="350" 
+          show-overflow-tooltip
+        />
+        
+        <el-table-column prop="tierName" label="分层名称" width="150" sortable />
+        
         <el-table-column prop="tierCode" label="分层代码" width="120" />
-        <el-table-column prop="tierLevel" label="分层级别" width="100">
+        
+        <el-table-column prop="tierType" label="分层类型" width="120">
           <template #default="{ row }">
-            <el-tag :type="getTierLevelType(row.tierLevel)">
-              {{ getTierLevelLabel(row.tierLevel) }}
+            <el-tag :type="getTierTypeTagType(row.tierType)" size="small">
+              {{ getTierTypeLabel(row.tierType) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="discountRate" label="折扣率" width="100">
+        
+        <el-table-column prop="priority" label="优先级" width="80" sortable>
           <template #default="{ row }">
-            <span>{{ (row.discountRate * 100).toFixed(2) }}%</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="markupRate" label="加价率" width="100">
-          <template #default="{ row }">
-            <span>{{ (row.markupRate * 100).toFixed(2) }}%</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="customerLevelRequirement" label="客户等级要求" width="120">
-          <template #default="{ row }">
-            <el-tag :type="getCustomerLevelType(row.customerLevelRequirement)">
-              {{ getCustomerLevelLabel(row.customerLevelRequirement) }}
+            <el-tag :type="getPriorityTagType(row.priority)" size="small">
+              {{ row.priority }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="priority" label="优先级" width="80" />
+        
+        <el-table-column prop="description" label="描述" width="200" show-overflow-tooltip />
+        
         <el-table-column prop="isActive" label="状态" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.isActive ? 'success' : 'danger'">
+            <el-tag :type="row.isActive ? 'success' : 'danger'" size="small">
               {{ row.isActive ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createdAt" label="创建时间" width="160">
-          <template #default="{ row }">
-            {{ formatDateTime(row.createdAt) }}
-          </template>
-        </el-table-column>
+        
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="handleEdit(row)">
               编辑
             </el-button>
-            <el-button
-              :type="row.isActive ? 'warning' : 'success'"
-              size="small"
+            <el-button 
+              :type="row.isActive ? 'warning' : 'success'" 
+              size="small" 
               @click="handleToggleStatus(row)"
             >
               {{ row.isActive ? '禁用' : '启用' }}
@@ -186,16 +131,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus, Check, Close, Delete } from '@element-plus/icons-vue'
 import PriceTierDialog from './components/PriceTierDialog.vue'
 import { priceTierApi } from '@/api/priceTier'
-import { measureAsync } from '@/utils/performance'
 
-// 搜索表单
-const searchForm = reactive({
-  tierName: '',
-  tierCode: '',
-  customerLevel: '',
-  isActive: undefined as boolean | undefined,
-  companyId: 1 // 添加必需的companyId字段
-})
+// 搜索表单 - 已移除搜索框，保留空对象用于API调用
+const searchForm = reactive({})
 
 // 表格数据
 const tableData = ref<any[]>([])
@@ -209,16 +147,7 @@ const pagination = reactive({
   total: 0
 })
 
-// 性能优化：虚拟滚动配置
-const virtualScrollConfig = {
-  itemHeight: 60, // 每行高度
-  bufferSize: 10, // 缓冲区大小
-  throttleDelay: 100 // 节流延迟
-}
 
-// 性能优化：防抖搜索
-const searchDebounce = ref<NodeJS.Timeout | null>(null)
-const searchDelay = 300 // 搜索延迟时间
 
 // 对话框
 const dialogVisible = ref(false)
@@ -227,55 +156,75 @@ const currentPriceTier = ref(null)
 // 计算属性
 const hasSelection = computed(() => selectedRows.value.length > 0)
 
+// 判断是否为管理员
+const isAdmin = computed(() => {
+  const userInfo = localStorage.getItem('userInfo')
+  if (userInfo) {
+    try {
+    const user = JSON.parse(userInfo)
+    const userRoles = localStorage.getItem('userRoles')
+    if (userRoles) {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SUPPLIER_ADMIN')
+    }
+    } catch (error) {
+      console.error('解析用户信息失败:', error)
+    }
+  }
+  return false
+})
+
+// 获取用户所属公司ID
+const getUserCompanyId = () => {
+  const userInfo = localStorage.getItem('userInfo')
+  if (userInfo) {
+    try {
+      const user = JSON.parse(userInfo)
+      return user.companyId || 1 // 如果没有公司ID，默认使用1
+    } catch (error) {
+      console.error('解析用户信息失败:', error)
+      return 1
+    }
+  }
+  return 1
+}
+
 // 获取数据
 const fetchData = async () => {
   loading.value = true
   try {
-    const response = await measureAsync('fetchPriceTierData', async () => {
-      return await priceTierApi.getPriceTierPage({
-        ...searchForm,
-        page: pagination.current,
-        size: pagination.size
-      })
-    }, {
+    const response = await priceTierApi.getPriceTierPage({
+      ...searchForm,
       page: pagination.current,
       size: pagination.size,
-      filters: searchForm
+      companyId: getUserCompanyId() // 从用户信息获取公司ID
     })
     
-    tableData.value = response.records
-    pagination.total = response.total
+    if (response && response.records) {
+      tableData.value = response.records
+      pagination.total = response.total
+    } else {
+      tableData.value = []
+      pagination.total = 0
+    }
   } catch (error) {
+    console.error('获取价格分层数据失败:', error)
     ElMessage.error('获取数据失败')
+    tableData.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
 }
 
-// 搜索
+// 搜索 - 已移除搜索框，直接刷新数据
 const handleSearch = () => {
   pagination.current = 1
   fetchData()
 }
 
-// 性能优化：防抖搜索
-const handleSearchDebounced = () => {
-  if (searchDebounce.value) {
-    clearTimeout(searchDebounce.value)
-  }
-  searchDebounce.value = setTimeout(() => {
-    handleSearch()
-  }, searchDelay)
-}
-
-// 重置
+// 重置 - 已移除搜索框，直接刷新数据
 const handleReset = () => {
-  Object.assign(searchForm, {
-    tierName: '',
-    tierCode: '',
-    customerLevel: '',
-    isActive: null
-  })
   pagination.current = 1
   fetchData()
 }
@@ -301,19 +250,26 @@ const handleEdit = (row: any) => {
 const handleToggleStatus = async (row: any) => {
   try {
     await priceTierApi.togglePriceTierStatus(row.id, !row.isActive)
-    row.isActive = !row.isActive
-    ElMessage.success('状态更新成功')
+    ElMessage.success(`${row.isActive ? '禁用' : '启用'}成功`)
+    fetchData()
   } catch (error) {
-    ElMessage.error('状态更新失败')
+    ElMessage.error(`${row.isActive ? '禁用' : '启用'}失败`)
   }
 }
 
 // 删除
 const handleDelete = async (row: any) => {
   try {
-    await ElMessageBox.confirm('确定要删除这个价格分层吗？', '提示', {
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(
+      `确定要删除价格分层"${row.tierName}"吗？`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
     await priceTierApi.deletePriceTier(row.id)
     ElMessage.success('删除成功')
     fetchData()
@@ -324,7 +280,7 @@ const handleDelete = async (row: any) => {
   }
 }
 
-// 批量操作
+// 批量启用
 const handleBatchActivate = async () => {
   try {
     const ids = selectedRows.value.map(row => row.id)
@@ -336,6 +292,7 @@ const handleBatchActivate = async () => {
   }
 }
 
+// 批量禁用
 const handleBatchDeactivate = async () => {
   try {
     const ids = selectedRows.value.map(row => row.id)
@@ -347,13 +304,21 @@ const handleBatchDeactivate = async () => {
   }
 }
 
+// 批量删除
 const handleBatchDelete = async () => {
   try {
-    await ElMessageBox.confirm(`确定要删除选中的 ${selectedRows.value.length} 个价格分层吗？`, '提示', {
-      type: 'warning'
-    })
+    const names = selectedRows.value.map(row => row.tierName).join('、')
+    await ElMessageBox.confirm(
+      `确定要删除以下价格分层吗？\n${names}`,
+      '确认批量删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
     const ids = selectedRows.value.map(row => row.id)
-    // 批量删除 - 逐个调用删除API
     for (const id of ids) {
       await priceTierApi.deletePriceTier(id)
     }
@@ -366,13 +331,14 @@ const handleBatchDelete = async () => {
   }
 }
 
-// 分页
+// 分页大小变化
 const handleSizeChange = (size: number) => {
   pagination.size = size
   pagination.current = 1
   fetchData()
 }
 
+// 当前页变化
 const handleCurrentChange = (current: number) => {
   pagination.current = current
   fetchData()
@@ -384,38 +350,43 @@ const handleDialogSuccess = () => {
   fetchData()
 }
 
-// 工具函数
-const getTierLevelType = (level: number) => {
-  const types = ['danger', 'warning', 'success', 'info']
-  return types[Math.min(level - 1, types.length - 1)]
-}
-
-const getTierLevelLabel = (level: number) => {
-  const labels = ['钻石级', '黄金级', '白银级', '标准级']
-  return labels[Math.min(level - 1, labels.length - 1)]
-}
-
-const getCustomerLevelType = (level: string) => {
+// 获取分层类型标签类型
+const getTierTypeTagType = (type: string) => {
   const types: Record<string, string> = {
-    'PREMIUM': 'danger',
-    'VIP': 'warning',
-    'REGULAR': 'success',
-    'ALL': 'info'
+    'DEALER_LEVEL_1': 'danger',
+    'DEALER_LEVEL_2': 'warning',
+    'DEALER_LEVEL_3': 'success',
+    'VIP_CUSTOMER': 'info',
+    'WHOLESALE': 'primary',
+    'RETAIL': 'default'
   }
-  return types[level] || 'info'
+  return types[type] || 'default'
 }
 
-const getCustomerLevelLabel = (level: string) => {
+// 获取分层类型标签
+const getTierTypeLabel = (type: string) => {
   const labels: Record<string, string> = {
-    'PREMIUM': '钻石级',
-    'VIP': '黄金级',
-    'REGULAR': '白银级',
-    'ALL': '标准级'
+    'DEALER_LEVEL_1': '1级经销商',
+    'DEALER_LEVEL_2': '2级经销商',
+    'DEALER_LEVEL_3': '3级经销商',
+    'VIP_CUSTOMER': 'VIP客户',
+    'WHOLESALE': '批发客户',
+    'RETAIL': '零售客户'
   }
-  return labels[level] || level
+  return labels[type] || type
 }
 
+// 获取优先级标签类型
+const getPriorityTagType = (priority: number) => {
+  if (priority <= 1) return 'danger'
+  if (priority <= 3) return 'warning'
+  if (priority <= 5) return 'success'
+  return 'info'
+}
+
+// 格式化日期时间
 const formatDateTime = (dateTime: string) => {
+  if (!dateTime) return '-'
   return new Date(dateTime).toLocaleString('zh-CN')
 }
 

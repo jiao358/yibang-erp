@@ -43,6 +43,12 @@ public class Role {
     private String permissionsConfig;
 
     /**
+     * 权限范围：ALL-全部，OWN_SUPPLIER-仅自己供应链，OWN_SALES-仅自己销售
+     */
+    @TableField("supplier_scope")
+    private String supplierScope;
+
+    /**
      * 是否系统角色
      */
     @TableField("is_system")

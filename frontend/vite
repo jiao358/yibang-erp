@@ -1,0 +1,80 @@
+
+
+  VITE v4.5.14  ready in 256 ms
+
+  ➜  Local:   http://localhost:7101/
+  ➜  Network: http://192.168.31.207:7101/
+  ➜  Network: http://100.64.164.2:7101/
+  ➜  press h to show help
+02:50:12 [vite] hmr update /src/views/company/CompanyList.vue
+02:50:29 [vite] hmr update /src/views/company/CompanyList.vue (x2)
+02:50:42 [vite] hmr update /src/views/company/components/CompanyForm.vu
+02:50:42 [vite] hmr update /src/views/company/components/CompanyForm.vue
+02:51:32 [vite] hmr update /src/views/company/components/CompanyForm.vu
+02:51:32 [vite] hmr update /src/views/company/components/CompanyForm.vue (x2)
+02:51:44 [vite] hmr update /src/views/company/components/CompanyForm.vu
+02:51:44 [vite] hmr update /src/views/company/components/CompanyForm.vue (x3)
+02:51:59 [vite] hmr update /src/views/company/components/CompanyForm.vu
+02:51:59 [vite] hmr update /src/views/company/components/CompanyForm.vue (x4)
+02:52:16 [vite] hmr update /src/views/company/components/CompanyForm.vu
+02:52:16 [vite] hmr update /src/views/company/components/CompanyForm.vue (x5)
+02:52:32 [vite] hmr update /src/views/company/components/CompanyForm.vu
+02:52:32 [vite] hmr update /src/views/company/components/CompanyForm.vue (x6)
+02:54:10 [vite] hmr update /src/views/company/CompanyList.vue
+02:54:24 [vite] hmr update /src/views/company/CompanyList.vue (x2)
+02:54:39 [vite] hmr update /src/views/company/CompanyList.vue (x3)
+02:54:53 [vite] hmr update /src/views/company/CompanyList.vue (x4)
+03:01:51 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:01:51 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue
+03:07:11 [vite] hmr update /src/views/pricing/PriceTierList.vue, /src/v
+03:07:11 [vite] hmr update /src/views/pricing/PriceTierList.vue, /src/views/pricing/components/PriceTierDialog.vue
+03:07:23 [vite] hmr update /src/views/pricing/PriceTierList.vue, /src/v
+03:07:23 [vite] hmr update /src/views/pricing/PriceTierList.vue, /src/views/pricing/components/PriceTierDialog.vue (x2)
+03:07:30 [vite] hmr update /src/views/pricing/PriceTierList.vue, /src/v
+03:07:30 [vite] hmr update /src/views/pricing/PriceTierList.vue, /src/views/pricing/components/PriceTierDialog.vue (x3)
+03:12:21 [vite] hmr update /src/views/pricing/PriceTierList.vue
+03:12:35 [vite] hmr update /src/views/pricing/PriceTierList.vue (x2)
+03:12:49 [vite] hmr update /src/views/pricing/PriceTierList.vue (x3)
+03:13:01 [vite] hmr update /src/views/pricing/PriceTierList.vue (x4)
+03:13:13 [vite] hmr update /src/views/pricing/PriceTierList.vue (x5)
+03:13:36 [vite] hmr update /src/views/pricing/PriceTierList.vue (x6)
+03:13:50 [vite] hmr update /src/views/pricing/PriceTierList.vue (x7)
+03:19:22 [vite] hmr update /src/views/pricing/PriceTierList.vue (x8)
+03:20:00 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:20:00 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue
+03:20:31 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:20:31 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x2)
+03:20:51 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:20:51 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x3)
+03:21:06 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:21:06 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x4)
+03:21:22 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:21:22 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x5)
+03:21:40 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:21:40 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x6)
+03:21:45 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:21:45 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x7)
+03:21:58 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:21:58 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x8)
+03:22:13 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:22:13 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x9)
+03:35:26 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:35:26 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x10)
+03:35:36 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:35:36 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x11)
+03:35:46 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:35:46 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x12)
+03:35:59 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:35:59 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x13)
+03:36:04 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:36:04 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x14)
+03:36:04 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:36:04 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x15)
+03:36:05 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:36:05 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x16)
+03:36:25 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:36:25 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x17)
+03:36:48 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:36:48 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x18)
+03:37:54 [vite] hmr update /src/views/pricing/components/PriceTierDialo
+03:37:54 [vite] hmr update /src/views/pricing/components/PriceTierDialog.vue (x19)clear

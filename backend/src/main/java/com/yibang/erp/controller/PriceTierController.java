@@ -22,6 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/price-tiers")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER_ADMIN')")
 public class PriceTierController {
 
     private final PriceTierService priceTierService;
@@ -30,7 +31,7 @@ public class PriceTierController {
      * 创建价格分层
      */
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN')")
+
     public ResponseEntity<PriceTierResponse> createPriceTier(@Valid @RequestBody PriceTierRequest request) {
         log.info("创建价格分层: {}", request);
         PriceTierResponse response = priceTierService.createPriceTier(request);
@@ -41,7 +42,6 @@ public class PriceTierController {
      * 更新价格分层
      */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN')")
     public ResponseEntity<PriceTierResponse> updatePriceTier(
             @PathVariable Long id,
             @Valid @RequestBody PriceTierRequest request) {
@@ -54,7 +54,6 @@ public class PriceTierController {
      * 删除价格分层
      */
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN')")
     public ResponseEntity<Boolean> deletePriceTier(@PathVariable Long id) {
         log.info("删除价格分层: id={}", id);
         boolean success = priceTierService.deletePriceTier(id);
@@ -65,7 +64,6 @@ public class PriceTierController {
      * 根据ID获取价格分层
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN') or hasRole('SALES_ADMIN')")
     public ResponseEntity<PriceTierResponse> getPriceTierById(@PathVariable Long id) {
         log.info("获取价格分层: id={}", id);
         PriceTierResponse response = priceTierService.getPriceTierById(id);
@@ -79,7 +77,6 @@ public class PriceTierController {
      * 分页查询价格分层
      */
     @GetMapping("/page")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN') or hasRole('SALES_ADMIN')")
     public ResponseEntity<PageResult<PriceTierResponse>> getPriceTierPage(PriceTierQueryRequest request) {
         log.info("分页查询价格分层: {}", request);
         PageResult<PriceTierResponse> result = priceTierService.getPriceTierPage(request);
@@ -90,7 +87,6 @@ public class PriceTierController {
      * 查询价格分层列表
      */
     @GetMapping("/list")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN') or hasRole('SALES_ADMIN')")
     public ResponseEntity<List<PriceTierResponse>> getPriceTierList(PriceTierQueryRequest request) {
         log.info("查询价格分层列表: {}", request);
         List<PriceTierResponse> result = priceTierService.getPriceTierList(request);
@@ -101,7 +97,6 @@ public class PriceTierController {
      * 启用/禁用价格分层
      */
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN')")
     public ResponseEntity<Boolean> togglePriceTierStatus(
             @PathVariable Long id,
             @RequestParam Boolean isActive) {
@@ -114,7 +109,6 @@ public class PriceTierController {
      * 批量启用/禁用价格分层
      */
     @PutMapping("/batch-status")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN')")
     public ResponseEntity<Boolean> batchTogglePriceTierStatus(
             @RequestParam List<Long> ids,
             @RequestParam Boolean isActive) {
@@ -127,7 +121,6 @@ public class PriceTierController {
      * 获取适用的价格分层
      */
     @GetMapping("/applicable")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN') or hasRole('SALES_ADMIN')")
     public ResponseEntity<List<PriceTierResponse>> getApplicablePriceTiers(
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String customerType,
@@ -141,7 +134,6 @@ public class PriceTierController {
      * 计算最终价格
      */
     @PostMapping("/calculate-price")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN') or hasRole('SALES_ADMIN')")
     public ResponseEntity<BigDecimal> calculateFinalPrice(
             @RequestParam Long priceTierId,
             @RequestParam BigDecimal originalPrice) {
@@ -154,7 +146,6 @@ public class PriceTierController {
      * 验证价格分层配置
      */
     @PostMapping("/validate")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN')")
     public ResponseEntity<Boolean> validatePriceTierConfig(@Valid @RequestBody PriceTierRequest request) {
         log.info("验证价格分层配置: {}", request);
         boolean isValid = priceTierService.validatePriceTierConfig(request);
