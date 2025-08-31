@@ -114,12 +114,12 @@ public interface OrderService {
     /**
      * 生成平台订单号（指定账户和渠道）
      */
-    String generatePlatformOrderNo(Long accountId, String orderSource);
+    String generatePlatformOrderNo(String userName, String orderSource);
 
     /**
      * 批量预生成订单号
      */
-    List<String> preGenerateOrderNumbers(Long accountId, String orderSource, int count);
+    List<String> preGenerateOrderNumbers(String userName, String orderSource, int count);
 
     /**
      * 验证订单数据完整性

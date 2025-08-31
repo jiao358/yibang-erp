@@ -29,11 +29,12 @@
           <el-form-item label="客户" prop="customerId">
             <el-select
               v-model="form.customerId"
-              placeholder="请选择客户"
+              placeholder="请选择客户（可选）"
               filterable
               remote
               :remote-method="searchCustomers"
               :loading="customerLoading"
+              clearable
               style="width: 100%"
             >
               <el-option
@@ -106,7 +107,7 @@
           <el-form-item label="收货地址" prop="deliveryAddress">
             <el-input
               v-model="form.deliveryAddress"
-              placeholder="请输入收货地址"
+              placeholder="请输入完整收货地址（省市区街道门牌号等）"
               type="textarea"
               :rows="2"
             />
@@ -146,47 +147,32 @@
       <div class="order-items">
         <div class="items-header">
           <h4>订单商品</h4>
-          <el-button type="primary" size="small" @click="addOrderItem">
+          <el-button type="primary" size="small" @click="openProductSelector">
             <el-icon><Plus /></el-icon>
-            添加商品
+            选择商品
           </el-button>
         </div>
         
         <el-table :data="form.orderItems" border style="width: 100%">
-          <el-table-column label="商品名称" width="200">
-            <template #default="{ row, $index }">
-              <el-select
-                v-model="row.productId"
-                placeholder="请选择商品"
-                filterable
-                remote
-                :remote-method="searchProducts"
-                :loading="productLoading"
-                style="width: 100%"
-                @change="handleProductChange($index)"
-              >
-                <el-option
-                  v-for="product in productOptions"
-                  :key="product.id"
-                  :label="product.name"
-                  :value="product.id"
-                >
-                  <span>{{ product.name }}</span>
-                  <span style="float: right; color: #8492a6; font-size: 13px">
-                    {{ product.sku }}
-                  </span>
-                </el-option>
-              </el-select>
-            </template>
-          </el-table-column>
-          
-          <el-table-column label="规格" width="150">
+                    <el-table-column label="商品名称" width="180">
             <template #default="{ row }">
-              <el-input v-model="row.productSpecifications" placeholder="规格" />
+              <span>{{ row.productName || '--' }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="商品编码" width="120">
+            <template #default="{ row }">
+              <span>{{ row.productSku || '--' }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="单位" width="80">
+            <template #default="{ row }">
+              <span>{{ row.unit || '--' }}</span>
             </template>
           </el-table-column>
           
-          <el-table-column label="数量" width="100">
+          <el-table-column label="数量" width="140">
             <template #default="{ row, $index }">
               <el-input-number
                 v-model="row.quantity"
@@ -198,7 +184,7 @@
             </template>
           </el-table-column>
           
-          <el-table-column label="单价" width="120">
+          <el-table-column label="单价" width="160">
             <template #default="{ row, $index }">
               <el-input-number
                 v-model="row.unitPrice"
@@ -210,7 +196,7 @@
             </template>
           </el-table-column>
           
-          <el-table-column label="小计" width="120">
+          <el-table-column label="小计" width="100">
             <template #default="{ row }">
               <span>¥{{ row.subtotal?.toFixed(2) || '0.00' }}</span>
             </template>
@@ -229,6 +215,112 @@
           </el-table-column>
         </el-table>
       </div>
+
+      <!-- 商品选择对话框 -->
+      <el-dialog
+        v-model="productSelectorVisible"
+        title="选择商品"
+        width="80%"
+        :close-on-click-modal="true"
+        @close="handleProductSelectorClose"
+        class="product-selector-dialog"
+      >
+        <div class="product-selector-content">
+          <!-- 搜索条件 -->
+          <el-form :inline="true" class="search-form">
+            <el-form-item label="商品名称">
+              <el-input
+                v-model="productSearchForm.name"
+                placeholder="请输入商品名称"
+                clearable
+                @keyup.enter="searchProductsForSelector"
+              />
+            </el-form-item>
+            <el-form-item label="商品编码">
+              <el-input
+                v-model="productSearchForm.sku"
+                placeholder="请输入商品编码"
+                clearable
+                @keyup.enter="searchProductsForSelector"
+              />
+            </el-form-item>
+            <el-form-item label="品牌">
+              <el-input
+                v-model="productSearchForm.brand"
+                placeholder="请输入品牌"
+                clearable
+                @keyup.enter="searchProductsForSelector"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="searchProductsForSelector">
+                <el-icon><Search /></el-icon>
+                搜索
+              </el-button>
+              <el-button @click="resetProductSearch">
+                <el-icon><Refresh /></el-icon>
+                重置
+              </el-button>
+            </el-form-item>
+          </el-form>
+
+          <!-- 商品列表 -->
+          <el-table
+            :data="productSelectorList"
+            border
+            style="width: 100%"
+            @selection-change="handleProductSelectionChange"
+            v-loading="productSelectorLoading"
+          >
+            <el-table-column type="selection" width="55" />
+            <el-table-column label="商品名称" prop="name" min-width="200" />
+            <el-table-column label="商品编码" prop="sku" width="120" />
+            <el-table-column label="品牌" prop="brand" width="100" />
+            <el-table-column label="单位" width="100">
+              <template #default="{ row }">
+                <span>{{ row.unit || '--' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="一件代发价" width="120">
+              <template #default="{ row }">
+                <span>¥{{ row.sellingPrice?.toFixed(2) || '--' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="零售限价" width="120">
+              <template #default="{ row }">
+                <span>¥{{ row.marketPrice?.toFixed(2) || '--' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="库存" width="80">
+              <template #default="{ row }">
+                <span>{{ row.availableQuantity || 0 }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <!-- 分页 -->
+          <div class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="productSearchForm.page"
+              v-model:page-size="productSearchForm.size"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="productSelectorTotal"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleProductPageSizeChange"
+              @current-change="handleProductPageChange"
+            />
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button @click="handleProductSelectorClose">取消</el-button>
+            <el-button type="primary" @click="confirmProductSelection">
+              确定选择 ({{ selectedProducts.length }})
+            </el-button>
+          </div>
+        </template>
+      </el-dialog>
 
       <!-- 费用信息 -->
       <el-divider content-position="left">费用信息</el-divider>
@@ -306,7 +398,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { orderApi } from '@/api/order'
 import { customerApi } from '@/api/customer'
@@ -314,6 +406,10 @@ import { productApi } from '@/api/product'
 import type { OrderResponse, OrderCreateRequest, OrderUpdateRequest } from '@/types/order'
 import type { Customer } from '@/types/customer'
 import type { Product } from '@/types/product'
+// 暂时注释掉 china-area-data 导入，使用简化数据
+// import pkg from 'china-area-data'
+// const { pcaa } = pkg
+
 
 // Props
 interface Props {
@@ -346,11 +442,36 @@ const productLoading = ref(false)
 const customerOptions = ref<Customer[]>([])
 const productOptions = ref<Product[]>([])
 
+// 商品选择器相关
+const productSelectorVisible = ref(false)
+const productSelectorList = ref<Product[]>([])
+const productSelectorTotal = ref(0)
+const selectedProducts = ref<Product[]>([])
+const productSelectorLoading = ref(false)
+
+// 商品搜索表单
+const productSearchForm = reactive({
+  name: '',
+  sku: '',
+  brand: '',
+  page: 1,
+  size: 20
+})
+
+
+
+// 计算48小时后的日期
+const getDefaultDeliveryDate = () => {
+  const now = new Date()
+  const deliveryDate = new Date(now.getTime() + 48 * 60 * 60 * 1000)
+  return deliveryDate.toISOString().split('T')[0] // 格式化为 YYYY-MM-DD
+}
+
 // 表单数据
 const form = reactive<OrderCreateRequest>({
   customerId: null,
   orderType: 'NORMAL',
-  expectedDeliveryDate: '',
+  expectedDeliveryDate: getDefaultDeliveryDate(),
   currency: 'CNY',
   specialRequirements: '',
   deliveryAddress: '',
@@ -368,7 +489,7 @@ const form = reactive<OrderCreateRequest>({
 // 表单验证规则
 const rules: FormRules = {
   customerId: [
-    { required: true, message: '请选择客户', trigger: 'change' }
+    { required: false, message: '请选择客户', trigger: 'change' }
   ],
   orderType: [
     { required: true, message: '请选择订单类型', trigger: 'change' }
@@ -396,6 +517,129 @@ const totalAmount = computed(() => {
   return form.orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0)
 })
 
+// 打开商品选择器
+const openProductSelector = () => {
+  productSelectorVisible.value = true
+  searchProductsForSelector()
+}
+
+// 搜索商品
+const searchProductsForSelector = async () => {
+  try {
+    productSelectorLoading.value = true
+    
+    // 构建查询参数
+    const params: Record<string, any> = {
+      page: productSearchForm.page,
+      size: productSearchForm.size,
+      name: productSearchForm.name || undefined,
+      brand: productSearchForm.brand || undefined
+    }
+    
+    // 过滤空值
+    Object.keys(params).forEach(key => {
+      if (params[key] === '' || params[key] === null || params[key] === undefined) {
+        delete params[key]
+      }
+    })
+    
+    // 使用销售商品API - 这是专门为销售用户设计的API
+    const response = await fetch(`/api/products/sales?${new URLSearchParams(params)}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    
+    const data = await response.json()
+    console.log('销售商品API响应:', data) // 调试日志
+    
+    if (data.success && data.data) {
+      productSelectorList.value = data.data.records || []
+      productSelectorTotal.value = data.data.total || 0
+    } else {
+      console.warn('销售商品API返回格式异常:', data)
+      productSelectorList.value = []
+      productSelectorTotal.value = 0
+    }
+  } catch (error) {
+    console.error('搜索商品失败:', error)
+    ElMessage.error('搜索商品失败')
+    productSelectorList.value = []
+    productSelectorTotal.value = 0
+  } finally {
+    productSelectorLoading.value = false
+  }
+}
+
+// 重置商品搜索
+const resetProductSearch = () => {
+  productSearchForm.name = ''
+  productSearchForm.sku = ''
+  productSearchForm.brand = ''
+  productSearchForm.page = 1
+  searchProductsForSelector()
+}
+
+// 处理商品选择变化
+const handleProductSelectionChange = (selection: Product[]) => {
+  selectedProducts.value = selection
+}
+
+// 处理商品分页大小变化
+const handleProductPageSizeChange = (size: number) => {
+  productSearchForm.size = size
+  productSearchForm.page = 1
+  searchProductsForSelector()
+}
+
+// 处理商品分页变化
+const handleProductPageChange = (page: number) => {
+  productSearchForm.page = page
+  searchProductsForSelector()
+}
+
+// 处理商品选择器关闭
+const handleProductSelectorClose = () => {
+  productSelectorVisible.value = false
+  selectedProducts.value = []
+  productSelectorLoading.value = false
+}
+
+// 确认商品选择
+const confirmProductSelection = () => {
+  if (selectedProducts.value.length === 0) {
+    ElMessage.warning('请选择至少一个商品')
+    return
+  }
+
+  // 将选中的商品添加到订单中
+  selectedProducts.value.forEach(product => {
+    // 检查是否已经添加过
+    const existingIndex = form.orderItems.findIndex(item => item.productId === product.id)
+    if (existingIndex === -1) {
+      form.orderItems.push({
+        productId: product.id,
+        productName: product.name,
+        productSku: product.sku,
+        productSpecifications: product.unit,
+        unit: product.unit,
+        quantity: 1,
+        unitPrice: product.sellingPrice || 0,
+        subtotal: product.sellingPrice || 0
+      })
+    }
+  })
+
+  // 重新计算总额
+  calculateFinalAmount()
+  
+  // 关闭选择器
+  productSelectorVisible.value = false
+  selectedProducts.value = []
+  
+  ElMessage.success(`成功添加 ${selectedProducts.value.length} 个商品`)
+}
+
 // 监听器
 watch(() => props.order, (newOrder) => {
   if (newOrder && props.mode === 'edit') {
@@ -408,7 +652,7 @@ watch(() => props.order, (newOrder) => {
       deliveryAddress: newOrder.deliveryAddress,
       deliveryContact: newOrder.deliveryContact,
       deliveryPhone: newOrder.deliveryPhone,
-      remarks: newOrder.remarks,
+      remarks: newOrder.remarks || '',
       orderItems: newOrder.orderItems || [],
       discountAmount: newOrder.discountAmount,
       shippingAmount: newOrder.shippingAmount,
@@ -521,13 +765,16 @@ const handleSubmit = async () => {
       return
     }
     
+    // 直接使用输入的地址
+    const submitData = { ...form }
+    
     submitting.value = true
     
     if (props.mode === 'create') {
-      await orderApi.createOrder(form)
+      await orderApi.createOrder(submitData)
       ElMessage.success('订单创建成功')
     } else {
-      const updateData: OrderUpdateRequest = { ...form }
+      const updateData: OrderUpdateRequest = { ...submitData }
       await orderApi.updateOrder(props.order!.id, updateData)
       ElMessage.success('订单更新成功')
     }
@@ -553,6 +800,8 @@ const handleClose = () => {
     // 用户取消
   })
 }
+
+
 </script>
 
 <style scoped>
@@ -592,9 +841,9 @@ const handleClose = () => {
   text-align: right;
 }
 
-:deep(.el-divider__text) {
-  font-size: 16px;
-  font-weight: bold;
-  color: #409eff;
-}
+  :deep(.el-divider__text) {
+    font-size: 16px;
+    font-weight: bold;
+    color: #409eff;
+  }
 </style>

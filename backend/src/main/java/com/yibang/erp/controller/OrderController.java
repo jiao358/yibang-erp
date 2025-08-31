@@ -229,9 +229,9 @@ public class OrderController {
     @PostMapping("/generate-order-no")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SALES')")
     public ResponseEntity<String> generatePlatformOrderNoWithParams(
-            @RequestParam Long accountId,
+            @RequestParam String userName,
             @RequestParam String orderSource) {
-        String orderNo = orderService.generatePlatformOrderNo(accountId, orderSource);
+        String orderNo = orderService.generatePlatformOrderNo(userName, orderSource);
         return ResponseEntity.ok(orderNo);
     }
 
@@ -241,10 +241,10 @@ public class OrderController {
     @PostMapping("/pre-generate-order-numbers")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SALES')")
     public ResponseEntity<List<String>> preGenerateOrderNumbers(
-            @RequestParam Long accountId,
+            @RequestParam String userName,
             @RequestParam String orderSource,
             @RequestParam int count) {
-        List<String> orderNumbers = orderService.preGenerateOrderNumbers(accountId, orderSource, count);
+        List<String> orderNumbers = orderService.preGenerateOrderNumbers(userName, orderSource, count);
         return ResponseEntity.ok(orderNumbers);
     }
 

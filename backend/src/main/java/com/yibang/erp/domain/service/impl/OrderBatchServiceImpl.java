@@ -11,12 +11,16 @@ import com.yibang.erp.domain.dto.OrderBatchProcessResponse;
 import com.yibang.erp.domain.entity.ExcelImportLog;
 import com.yibang.erp.domain.entity.Order;
 import com.yibang.erp.domain.entity.OrderItem;
+import com.yibang.erp.domain.entity.User;
 import com.yibang.erp.infrastructure.repository.ExcelImportLogRepository;
 import com.yibang.erp.infrastructure.repository.OrderItemRepository;
 import com.yibang.erp.infrastructure.repository.OrderRepository;
 import com.yibang.erp.domain.service.OrderBatchService;
 import com.yibang.erp.domain.service.OrderNumberGeneratorService;
+import com.yibang.erp.infrastructure.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -46,6 +50,9 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
 
     @Autowired
     private OrderNumberGeneratorService orderNumberGeneratorService;
+
+    @Autowired
+    private UserRepository userRepository;
 
     // 批量处理进度缓存
     private final Map<String, BatchProgress> progressCache = new ConcurrentHashMap<>();
@@ -84,7 +91,7 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
 
             progress.setStatus("FAILED");
             progress.setErrorMessage(e.getMessage());
-            
+
             return buildBatchResponse(batchId, progress, 0);
         }
     }
@@ -106,9 +113,9 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
             // 批量更新状态
             UpdateWrapper<Order> updateWrapper = new UpdateWrapper<>();
             updateWrapper.in("id", orderIds)
-                       .set("order_status", newStatus)
-                       .set("updated_at", LocalDateTime.now())
-                       .set("updated_by", getCurrentUserId());
+                    .set("order_status", newStatus)
+                    .set("updated_at", LocalDateTime.now())
+                    .set("updated_by", getCurrentUserId());
 
             int updatedCount = orderRepository.update(null, updateWrapper);
 
@@ -177,9 +184,9 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
             // 批量分配供应商
             UpdateWrapper<Order> updateWrapper = new UpdateWrapper<>();
             updateWrapper.in("id", orderIds)
-                       .set("supplier_company_id", supplierCompanyId)
-                       .set("updated_at", LocalDateTime.now())
-                       .set("updated_by", getCurrentUserId());
+                    .set("supplier_company_id", supplierCompanyId)
+                    .set("updated_at", LocalDateTime.now())
+                    .set("updated_by", getCurrentUserId());
 
             int updatedCount = orderRepository.update(null, updateWrapper);
 
@@ -276,10 +283,14 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
 
         try {
             // 预生成所有订单号，提高性能
-            Long accountId = getCurrentUserId();
+//            Long accountId = getCurrentUserId();
+            UserDetails userDetails = ((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+            String userName = userDetails.getUsername();
+
+
             String orderSource = "EXCEL_IMPORT";
-            List<String> orderNumbers = orderNumberGeneratorService.preGenerateOrderNumbers(accountId, orderSource, dataList.size());
-            
+            List<String> orderNumbers = orderNumberGeneratorService.preGenerateOrderNumbers(userName, orderSource, dataList.size());
+
             for (int i = 0; i < dataList.size(); i++) {
                 try {
                     Order order = buildOrderFromImportData(dataList.get(i), templateId);
@@ -330,20 +341,20 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
      */
     private Order buildOrderFromImportData(OrderImportData data, Long templateId) {
         Order order = new Order();
-        
+
         // 设置基本信息（订单号将在外部设置）
         order.setCustomerId(resolveCustomerId(data.getCustomerName()));
         order.setOrderStatus("DRAFT");
         order.setOrderSource("EXCEL_IMPORT");
         order.setOrderType("STANDARD");
-        
+
         // 设置金额信息
         double totalAmount = data.getOrderItems().stream()
                 .mapToDouble(item -> item.getQuantity() * item.getUnitPrice())
                 .sum();
         order.setTotalAmount(java.math.BigDecimal.valueOf(totalAmount));
         order.setCurrency("CNY");
-        
+
         // 设置其他信息
         order.setDeliveryAddress(data.getDeliveryAddress());
         if (data.getExpectedDeliveryDate() != null && !data.getExpectedDeliveryDate().trim().isEmpty()) {
@@ -380,8 +391,8 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
     private void validateOrdersForDeletion(List<Long> orderIds) {
         QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
         queryWrapper.in("id", orderIds)
-                   .in("order_status", Arrays.asList("CONFIRMED", "PROCESSING", "SHIPPED"));
-        
+                .in("order_status", Arrays.asList("CONFIRMED", "PROCESSING", "SHIPPED"));
+
         if (orderRepository.selectCount(queryWrapper) > 0) {
             throw new IllegalStateException("已确认、处理中或已发货的订单不能删除");
         }
@@ -453,7 +464,7 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
         log.setErrorMessage(errorMessage);
         log.setCompletedAt(LocalDateTime.now());
         log.setUpdatedAt(LocalDateTime.now());
-        
+
         excelImportLogRepository.updateById(log);
     }
 
@@ -481,7 +492,6 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
     }
 
 
-
     /**
      * 解析客户ID
      */
@@ -496,7 +506,14 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
      */
     private Long getCurrentUserId() {
         // TODO: 从Spring Security上下文获取当前用户ID
-        return 1L;
+        UserDetails userDetails = ((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        String userName = userDetails.getUsername();
+
+
+        User user = userRepository.findByUsername(userName);
+
+
+        return user.getId();
     }
 
     /**
@@ -525,24 +542,73 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
         }
 
         // Getters and setters
-        public String getBatchId() { return batchId; }
-        public String getStatus() { return status; }
-        public void setStatus(String status) { this.status = status; }
-        public int getTotalRows() { return totalRows; }
-        public void setTotalRows(int totalRows) { this.totalRows = totalRows; }
-        public int getProcessedRows() { return processedRows; }
-        public void setProcessedRows(int processedRows) { this.processedRows = processedRows; }
-        public int getSuccessRows() { return successRows; }
-        public void setSuccessRows(int successRows) { this.successRows = successRows; }
-        public int getFailedRows() { return failedRows; }
-        public void setFailedRows(int failedRows) { this.failedRows = failedRows; }
-        public String getErrorMessage() { return errorMessage; }
-        public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+        public String getBatchId() {
+            return batchId;
+        }
 
-        public void incrementProcessedRows() { this.processedRows++; }
-        public void incrementSuccessRows() { this.successRows++; }
-        public void incrementFailedRows() { this.failedRows++; }
-        public void addError(String error) { this.errors.add(error); }
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public int getTotalRows() {
+            return totalRows;
+        }
+
+        public void setTotalRows(int totalRows) {
+            this.totalRows = totalRows;
+        }
+
+        public int getProcessedRows() {
+            return processedRows;
+        }
+
+        public void setProcessedRows(int processedRows) {
+            this.processedRows = processedRows;
+        }
+
+        public int getSuccessRows() {
+            return successRows;
+        }
+
+        public void setSuccessRows(int successRows) {
+            this.successRows = successRows;
+        }
+
+        public int getFailedRows() {
+            return failedRows;
+        }
+
+        public void setFailedRows(int failedRows) {
+            this.failedRows = failedRows;
+        }
+
+        public String getErrorMessage() {
+            return errorMessage;
+        }
+
+        public void setErrorMessage(String errorMessage) {
+            this.errorMessage = errorMessage;
+        }
+
+        public void incrementProcessedRows() {
+            this.processedRows++;
+        }
+
+        public void incrementSuccessRows() {
+            this.successRows++;
+        }
+
+        public void incrementFailedRows() {
+            this.failedRows++;
+        }
+
+        public void addError(String error) {
+            this.errors.add(error);
+        }
     }
 
     /**
@@ -556,16 +622,45 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
         private List<OrderItemImportData> orderItems;
 
         // Getters and setters
-        public String getCustomerName() { return customerName; }
-        public void setCustomerName(String customerName) { this.customerName = customerName; }
-        public String getDeliveryAddress() { return deliveryAddress; }
-        public void setDeliveryAddress(String deliveryAddress) { this.deliveryAddress = deliveryAddress; }
-        public String getExpectedDeliveryDate() { return expectedDeliveryDate; }
-        public void setExpectedDeliveryDate(String expectedDeliveryDate) { this.expectedDeliveryDate = expectedDeliveryDate; }
-        public String getRemarks() { return remarks; }
-        public void setRemarks(String remarks) { this.remarks = remarks; }
-        public List<OrderItemImportData> getOrderItems() { return orderItems; }
-        public void setOrderItems(List<OrderItemImportData> orderItems) { this.orderItems = orderItems; }
+        public String getCustomerName() {
+            return customerName;
+        }
+
+        public void setCustomerName(String customerName) {
+            this.customerName = customerName;
+        }
+
+        public String getDeliveryAddress() {
+            return deliveryAddress;
+        }
+
+        public void setDeliveryAddress(String deliveryAddress) {
+            this.deliveryAddress = deliveryAddress;
+        }
+
+        public String getExpectedDeliveryDate() {
+            return expectedDeliveryDate;
+        }
+
+        public void setExpectedDeliveryDate(String expectedDeliveryDate) {
+            this.expectedDeliveryDate = expectedDeliveryDate;
+        }
+
+        public String getRemarks() {
+            return remarks;
+        }
+
+        public void setRemarks(String remarks) {
+            this.remarks = remarks;
+        }
+
+        public List<OrderItemImportData> getOrderItems() {
+            return orderItems;
+        }
+
+        public void setOrderItems(List<OrderItemImportData> orderItems) {
+            this.orderItems = orderItems;
+        }
     }
 
     /**
@@ -577,11 +672,28 @@ public class OrderBatchServiceImpl extends ServiceImpl<OrderRepository, Order> i
         private double unitPrice;
 
         // Getters and setters
-        public String getProductName() { return productName; }
-        public void setProductName(String productName) { this.productName = productName; }
-        public int getQuantity() { return quantity; }
-        public void setQuantity(int quantity) { this.quantity = quantity; }
-        public double getUnitPrice() { return unitPrice; }
-        public void setUnitPrice(double unitPrice) { this.unitPrice = unitPrice; }
+        public String getProductName() {
+            return productName;
+        }
+
+        public void setProductName(String productName) {
+            this.productName = productName;
+        }
+
+        public int getQuantity() {
+            return quantity;
+        }
+
+        public void setQuantity(int quantity) {
+            this.quantity = quantity;
+        }
+
+        public double getUnitPrice() {
+            return unitPrice;
+        }
+
+        public void setUnitPrice(double unitPrice) {
+            this.unitPrice = unitPrice;
+        }
     }
 }

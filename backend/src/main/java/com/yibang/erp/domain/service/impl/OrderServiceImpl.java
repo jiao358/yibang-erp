@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yibang.erp.domain.dto.*;
 import com.yibang.erp.domain.entity.*;
-import com.yibang.erp.infrastructure.repository.*;
-import com.yibang.erp.domain.service.OrderService;
 import com.yibang.erp.domain.service.OrderNumberGeneratorService;
+import com.yibang.erp.domain.service.OrderService;
+import com.yibang.erp.infrastructure.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -365,23 +367,26 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     public String generatePlatformOrderNo() {
         // 使用新的订单号生成服务，默认使用当前登录用户ID和手动创建渠道
         // 这里需要从SecurityContext获取当前用户信息
-        Long currentUserId = getCurrentUserId();
+//        Long currentUserId = getCurrentUserId();
         String orderSource = "MANUAL";
-        
         // 使用登录用户ID作为账户号
-        Long accountId = currentUserId;
+//        Long accountId = currentUserId;
+
+        UserDetails userDetails=((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        String userName = userDetails.getUsername();
+
         
-        return orderNumberGeneratorService.generatePlatformOrderNo(accountId, orderSource);
+        return orderNumberGeneratorService.generatePlatformOrderNo(userName, orderSource);
     }
 
     @Override
-    public String generatePlatformOrderNo(Long accountId, String orderSource) {
-        return orderNumberGeneratorService.generatePlatformOrderNo(accountId, orderSource);
+    public String generatePlatformOrderNo(String userName, String orderSource) {
+        return orderNumberGeneratorService.generatePlatformOrderNo(userName, orderSource);
     }
 
     @Override
-    public List<String> preGenerateOrderNumbers(Long accountId, String orderSource, int count) {
-        return orderNumberGeneratorService.preGenerateOrderNumbers(accountId, orderSource, count);
+    public List<String> preGenerateOrderNumbers(String userName, String orderSource, int count) {
+        return orderNumberGeneratorService.preGenerateOrderNumbers(userName, orderSource, count);
     }
 
     @Override
@@ -578,7 +583,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
     private Long getCurrentUserId() {
         // TODO: 从Spring Security上下文获取当前用户ID
-        return 1L;
+        UserDetails userDetails=((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        String userName = userDetails.getUsername();
+
+        User user = userRepository.findByUsername(userName);
+
+
+        return user.getId();
     }
 
     private Long getCurrentUserCompanyId() {

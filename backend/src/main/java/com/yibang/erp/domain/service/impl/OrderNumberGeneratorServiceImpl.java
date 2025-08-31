@@ -35,13 +35,17 @@ public class OrderNumberGeneratorServiceImpl implements OrderNumberGeneratorServ
     private static final String SEQUENCE_FORMAT = "%04d";
     
     @Override
-    public String generatePlatformOrderNo(Long accountId, String orderSource) {
-        if (accountId == null || orderSource == null) {
+    public String generatePlatformOrderNo(String  userName, String orderSource) {
+        if (userName == null || orderSource == null) {
             throw new IllegalArgumentException("登录ID和订单渠道不能为空");
         }
-        
-        String lockKey = ORDER_NUMBER_LOCK_PREFIX + accountId + ":" + orderSource;
+
+
+
+
+        String lockKey = ORDER_NUMBER_LOCK_PREFIX + userName + ":" + orderSource;
         String orderNo = null;
+
         
         try {
             // 获取分布式锁
@@ -50,16 +54,16 @@ public class OrderNumberGeneratorServiceImpl implements OrderNumberGeneratorServ
             
             if (Boolean.TRUE.equals(locked)) {
                 // 生成订单号
-                orderNo = generateOrderNumberWithLock(accountId, orderSource);
+                orderNo = generateOrderNumberWithLock(userName, orderSource);
                 log.debug("成功生成订单号: {}", orderNo);
             } else {
                 // 等待锁释放后重试
                 log.debug("获取锁失败，等待后重试: {}", lockKey);
                 Thread.sleep(100);
-                return generatePlatformOrderNo(accountId, orderSource);
+                return generatePlatformOrderNo(userName, orderSource);
             }
         } catch (Exception e) {
-            log.error("生成订单号失败: userId={}, orderSource={}", accountId, orderSource, e);
+            log.error("生成订单号失败: userId={}, orderSource={}", userName, orderSource, e);
             throw new RuntimeException("生成订单号失败", e);
         } finally {
             // 释放锁
@@ -74,13 +78,13 @@ public class OrderNumberGeneratorServiceImpl implements OrderNumberGeneratorServ
     }
     
     @Override
-    public List<String> preGenerateOrderNumbers(Long accountId, String orderSource, int count) {
+    public List<String> preGenerateOrderNumbers(String userName, String orderSource, int count) {
         if (count <= 0) {
             throw new IllegalArgumentException("生成数量必须大于0");
         }
         
         List<String> orderNumbers = new ArrayList<>();
-        String lockKey = ORDER_NUMBER_LOCK_PREFIX + accountId + ":" + orderSource;
+        String lockKey = ORDER_NUMBER_LOCK_PREFIX + userName + ":" + orderSource;
         
         try {
             // 获取分布式锁
@@ -90,20 +94,20 @@ public class OrderNumberGeneratorServiceImpl implements OrderNumberGeneratorServ
             if (Boolean.TRUE.equals(locked)) {
                 // 批量生成订单号
                 for (int i = 0; i < count; i++) {
-                    String orderNo = generateOrderNumberWithLock(accountId, orderSource);
+                    String orderNo = generateOrderNumberWithLock(userName, orderSource);
                     orderNumbers.add(orderNo);
                 }
                 log.debug("批量生成订单号成功: count={}, accountId={}, orderSource={}", 
-                         count, accountId, orderSource);
+                         count, userName, orderSource);
             } else {
                 // 等待锁释放后重试
                 log.debug("获取锁失败，等待后重试: {}", lockKey);
                 Thread.sleep(100);
-                return preGenerateOrderNumbers(accountId, orderSource, count);
+                return preGenerateOrderNumbers(userName, orderSource, count);
             }
         } catch (Exception e) {
-            log.error("批量生成订单号失败: userId={}, orderSource={}, count={}", 
-                     accountId, orderSource, count, e);
+            log.error("批量生成订单号失败: userId={}, orderSource={}, count={}",
+                    userName, orderSource, count, e);
             throw new RuntimeException("批量生成订单号失败", e);
         } finally {
             // 释放锁
@@ -172,9 +176,9 @@ public class OrderNumberGeneratorServiceImpl implements OrderNumberGeneratorServ
     /**
      * 在锁保护下生成订单号
      */
-    private String generateOrderNumberWithLock(Long accountId, String orderSource) {
+    private String generateOrderNumberWithLock(String userName, String orderSource) {
         String datePrefix = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String sequenceKey = ORDER_NUMBER_SEQUENCE_PREFIX + accountId + ":" + orderSource + ":" + datePrefix;
+        String sequenceKey = ORDER_NUMBER_SEQUENCE_PREFIX + userName + ":" + orderSource + ":" + datePrefix;
         
         // 获取并递增序号
         Long sequence = redisTemplate.opsForValue().increment(sequenceKey);
@@ -186,8 +190,10 @@ public class OrderNumberGeneratorServiceImpl implements OrderNumberGeneratorServ
         redisTemplate.expire(sequenceKey, 24, TimeUnit.HOURS);
         
         // 格式化账户号（确保6位）
-        String formattedAccountId = String.format("%06d", accountId);
-        
+        // 确保账户名为6位，不足6位左补0，超过6位取前6位
+        String formattedAccountId =userName.length() > 6 ? userName.substring(0, 6) : userName;
+
+
         // 格式化序号（4位）
         String formattedSequence = String.format(SEQUENCE_FORMAT, sequence);
         
