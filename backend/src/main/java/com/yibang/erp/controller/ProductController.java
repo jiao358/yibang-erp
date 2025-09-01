@@ -443,7 +443,7 @@ public class ProductController {
             // 执行分页查询
             Page<Product> pageParam = new Page<>(page, size);
             Page<Product> result = productRepository.selectPage(pageParam, queryWrapper);
-
+            long countData= productRepository.selectCount(queryWrapper);
             if (CollectionUtils.isEmpty(result.getRecords())) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
@@ -543,7 +543,7 @@ public class ProductController {
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("data", PageResult.of(productsWithCompany, result.getTotal(), page, size));
+            response.put("data", PageResult.of(productsWithCompany, countData, page, size));
             response.put("timestamp", System.currentTimeMillis());
 
             return ResponseEntity.ok(response);

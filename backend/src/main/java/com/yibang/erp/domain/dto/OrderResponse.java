@@ -3,6 +3,7 @@ package com.yibang.erp.domain.dto;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +109,21 @@ public class OrderResponse {
      */
     private String sourceName;
 
+
+    /**
+     * 配送联系人
+     */
+    private String deliveryContact;
+
+    /**
+     * 配送电话
+     */
+    private String deliveryPhone;
+    /**
+     * 配送地址
+     */
+    private String address;
+
     /**
      * 模板版本
      */
@@ -144,6 +160,11 @@ public class OrderResponse {
     private String createdByName;
 
     /**
+     * 预计发货时间
+     */
+    private LocalDate expectedDeliveryDate;
+
+    /**
      * 更新人ID
      */
     private Long updatedBy;
@@ -152,6 +173,33 @@ public class OrderResponse {
      * 更新人姓名
      */
     private String updatedByName;
+
+    /**
+     * 是否使用AI处理
+     */
+    private boolean aiProcessed;
+
+    /**
+     * AI处理置信度
+     */
+    private String aiConfidence;
+
+
+    /**
+     * 省份名称
+     */
+    private String provinceName;
+
+
+    /**
+     * 城市名称
+     */
+    private String cityName;
+
+    /**
+     * 区域名称
+     */
+    private String districtName;
 
     /**
      * 订单商品列表

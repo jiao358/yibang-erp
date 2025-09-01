@@ -129,10 +129,10 @@ export interface OrderItemCreateRequest {
 export interface OrderListRequest {
   current: number
   size: number
-  platformOrderId?: string
+  platformOrderNo?: string
   customerName?: string
-  orderStatus?: string
-  orderSource?: string
+  status?: string
+  source?: string
   dateRange?: string[]
   salesUserId?: number
   supplierCompanyId?: number

@@ -797,18 +797,42 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setPlatformOrderNo(order.getPlatformOrderId());
         response.setCustomerId(order.getCustomerId());
 
-        response.setTotalAmount(order.getTotalAmount());
+
+        //销售id
+        response.setSalesUserId(order.getSalesId());
+        User saleUser = userRepository.selectById(order.getSalesId());
+        response.setSalesUserName(saleUser.getUsername());
+        //供应商id
+        response.setSupplierCompanyId(order.getSupplierCompanyId());
+        Company company = companyRepository.selectById(order.getSupplierCompanyId());
+        response.setSupplierCompanyName(company.getName());
+
+        //订单状态
+        response.setStatus(order.getOrderStatus());
+        response.setSource(order.getOrderSource());
+        ;
+        response.setAiProcessed(order.getAiProcessed());
+        response.setProvinceName(order.getProvinceName());
+        response.setCityName(order.getCityName());
+        response.setDistrictName(order.getDistrictName());
+        response.setTotalAmount(order.getFinalAmount());
 
         response.setCreatedAt(order.getCreatedAt());
         response.setUpdatedAt(order.getUpdatedAt());
+        response.setAddress(order.getDeliveryAddress());
+        response.setDeliveryContact(order.getDeliveryContact());
+        response.setDeliveryPhone(order.getDeliveryPhone());
+        response.setExpectedDeliveryDate(order.getExpectedDeliveryDate());
 
         // 获取客户信息
-        if (order.getCustomerId() != null) {
+        if (order.getCustomerId() != null && order.getCustomerId().longValue()!=0L) {
             Customer customer = customerRepository.selectById(order.getCustomerId());
             if (customer != null) {
                 response.setCustomerName(customer.getName());
             }
         }
+
+
 
         // 获取订单项
         QueryWrapper<OrderItem> itemWrapper = new QueryWrapper<>();

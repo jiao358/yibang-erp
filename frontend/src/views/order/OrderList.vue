@@ -19,7 +19,7 @@
       <el-form :model="searchForm" inline>
         <el-form-item label="平台订单号">
           <el-input
-            v-model="searchForm.platformOrderId"
+            v-model="searchForm.platformOrderNo"
             placeholder="请输入平台订单号"
             clearable
           />
@@ -32,7 +32,7 @@
           />
         </el-form-item>
         <el-form-item label="订单状态">
-          <el-select v-model="searchForm.orderStatus" placeholder="请选择状态" clearable>
+          <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
             <el-option label="草稿" value="DRAFT" />
             <el-option label="已提交" value="SUBMITTED" />
             <el-option label="供应商确认" value="SUPPLIER_CONFIRMED" />
@@ -45,7 +45,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="订单来源">
-          <el-select v-model="searchForm.orderSource" placeholder="请选择来源" clearable>
+          <el-select v-model="searchForm.source" placeholder="请选择来源" clearable>
             <el-option label="手动创建" value="MANUAL" />
             <el-option label="Excel导入" value="EXCEL_IMPORT" />
             <el-option label="API接口" value="API" />
@@ -85,24 +85,25 @@
         border
         style="width: 100%"
       >
-        <el-table-column prop="platformOrderId" label="平台订单号" width="180" />
-        <el-table-column prop="customerName" label="客户名称" width="150" />
+        <el-table-column prop="platformOrderNo" label="平台订单号" width="180" />
         <el-table-column prop="salesUserName" label="销售人" width="100" />
+        <el-table-column prop="deliveryContact" label="收货人" width="100" />
+        <el-table-column prop="deliveryPhone" label="手机号" width="130" />
         <el-table-column prop="totalAmount" label="订单金额" width="120">
           <template #default="{ row }">
             ¥{{ row.totalAmount?.toFixed(2) || '0.00' }}
           </template>
         </el-table-column>
-        <el-table-column prop="orderStatus" label="订单状态" width="120">
+        <el-table-column prop="source" label="订单来源" width="120">
           <template #default="{ row }">
-            <el-tag :type="getStatusTagType(row.orderStatus)">
-              {{ getStatusText(row.orderStatus) }}
-            </el-tag>
+            <el-tag type="info">{{ getSourceText(row.source) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="orderSource" label="订单来源" width="120">
+        <el-table-column prop="status" label="订单状态" width="120">
           <template #default="{ row }">
-            <el-tag type="info">{{ getSourceText(row.orderSource) }}</el-tag>
+            <el-tag :type="getStatusTagType(row.status)">
+              {{ getStatusText(row.status) }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="180">
@@ -110,7 +111,7 @@
             {{ formatDateTime(row.createdAt) }}
           </template>
         </el-table-column>
-        <el-table-column prop="expectedDeliveryDate" label="预计交货日期" width="150">
+        <el-table-column prop="expectedDeliveryDate" label="最迟发货时间" width="150">
           <template #default="{ row }">
             {{ formatDate(row.expectedDeliveryDate) }}
           </template>
@@ -236,10 +237,10 @@ const currentOrderId = ref<number | null>(null)
 const searchForm = reactive<OrderListRequest>({
   current: 1,
   size: 20,
-  platformOrderId: '',
+  platformOrderNo: '',
   customerName: '',
-  orderStatus: '',
-  orderSource: '',
+  status: '',
+  source: '',
   dateRange: []
 })
 
@@ -283,10 +284,10 @@ const resetSearch = () => {
   Object.assign(searchForm, {
     current: 1,
     size: 20,
-    platformOrderId: '',
+    platformOrderNo: '',
     customerName: '',
-    orderStatus: '',
-    orderSource: '',
+    status: '',
+    source: '',
     dateRange: []
   })
   loadOrderList()
