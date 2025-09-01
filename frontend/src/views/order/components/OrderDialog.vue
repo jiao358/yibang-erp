@@ -198,7 +198,7 @@
           
           <el-table-column label="小计" width="100">
             <template #default="{ row }">
-              <span>¥{{ row.subtotal?.toFixed(2) || '0.00' }}</span>
+              <span>¥{{ (parseFloat(row.subtotal || '0') || 0).toFixed(2) }}</span>
             </template>
           </el-table-column>
           
@@ -283,12 +283,12 @@
             </el-table-column>
             <el-table-column label="一件代发价" width="120">
               <template #default="{ row }">
-                <span>¥{{ row.sellingPrice?.toFixed(2) || '--' }}</span>
+                <span>¥{{ (parseFloat(row.sellingPrice || '0') || 0).toFixed(2) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="零售限价" width="120">
               <template #default="{ row }">
-                <span>¥{{ row.marketPrice?.toFixed(2) || '--' }}</span>
+                <span>¥{{ (parseFloat(row.marketPrice || '0') || 0).toFixed(2) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="库存" width="80">
@@ -368,7 +368,7 @@
         </el-col>
         <el-col :span="8">
           <el-form-item label="最终金额">
-            <span class="amount-display final-amount">¥{{ form.finalAmount?.toFixed(2) || '0.00' }}</span>
+            <span class="amount-display final-amount">¥{{ (parseFloat(form.finalAmount || '0') || 0).toFixed(2) }}</span>
           </el-form-item>
         </el-col>
         <el-col :span="8">
@@ -469,7 +469,18 @@ const getDefaultDeliveryDate = () => {
 
 // 表单数据
 const form = reactive<OrderCreateRequest>({
-  customerId: null,
+  // 后端必需字段
+  salesOrderId: 'MANUAL_' + Date.now(),
+  salesUserId: 0, // 将从用户信息获取
+  salesCompanyId: 0, // 将从用户信息获取
+  customerId: 0,
+  source: 'MANUAL',
+  templateVersion: '1.0',
+  remarks: '',
+  extendedFields: {},
+  orderItems: [],
+  
+  // 前端显示字段
   orderType: 'NORMAL',
   expectedDeliveryDate: getDefaultDeliveryDate(),
   currency: 'CNY',
@@ -477,12 +488,10 @@ const form = reactive<OrderCreateRequest>({
   deliveryAddress: '',
   deliveryContact: '',
   deliveryPhone: '',
-  remarks: '',
-  orderItems: [],
-  discountAmount: 0,
-  shippingAmount: 0,
-  taxAmount: 0,
-  finalAmount: 0,
+  discountAmount: '0',
+  shippingAmount: '0',
+  taxAmount: '0',
+  finalAmount: '0',
   paymentMethod: 'BANK_TRANSFER'
 })
 
@@ -498,13 +507,62 @@ const rules: FormRules = {
     { required: true, message: '请选择预计交货日期', trigger: 'change' }
   ],
   deliveryAddress: [
-    { required: true, message: '请输入收货地址', trigger: 'blur' }
+    { required: true, message: '请输入收货地址', trigger: 'blur' },
+    { min: 10, message: '收货地址至少需要10个字符，请包含省市区街道门牌号等详细信息', trigger: 'blur' },
+    { max: 200, message: '收货地址不能超过200个字符', trigger: 'blur' },
+    { 
+      validator: (rule, value, callback) => {
+        if (!value) {
+          callback()
+          return
+        }
+        // 检查是否包含省市区信息
+        const provincePattern = /(省|市|区|县|自治区|特别行政区)/
+        const streetPattern = /(街道|路|号|室|楼|单元|幢|弄|巷|弄|小区|社区|大厦|广场|公园|学校|医院|银行|酒店|餐厅|超市|菜市场)/;
+        
+        if (!provincePattern.test(value)) {
+          callback(new Error('收货地址应包含省市区信息'))
+          return
+        }
+        
+        if (!streetPattern.test(value)) {
+          callback(new Error('收货地址应包含详细街道门牌号信息'))
+          return
+        }
+        
+        callback()
+      }, 
+      trigger: 'blur' 
+    }
   ],
   deliveryContact: [
-    { required: true, message: '请输入收货人姓名', trigger: 'blur' }
+    { required: true, message: '请输入收货人姓名', trigger: 'blur' },
+    { min: 2, max: 20, message: '收货人姓名长度在2到20个字符', trigger: 'blur' }
   ],
   deliveryPhone: [
-    { required: true, message: '请输入联系电话', trigger: 'blur' }
+    { required: true, message: '请输入联系电话', trigger: 'blur' },
+    { 
+      validator: (rule, value, callback) => {
+        if (!value) {
+          callback()
+          return
+        }
+        
+        // 手机号验证：1开头的11位数字
+        const mobilePattern = /^1[3-9]\d{9}$/
+        // 座机号验证：区号-号码 或 区号号码 格式
+        const landlinePattern = /^0\d{2,3}-?\d{7,8}$/
+        // 400/800电话验证
+        const servicePattern = /^[48]00-?\d{3}-?\d{4}$/
+        
+        if (mobilePattern.test(value) || landlinePattern.test(value) || servicePattern.test(value)) {
+          callback()
+        } else {
+          callback(new Error('请输入正确的电话号码格式（手机号、座机号或400/800服务电话）'))
+        }
+      }, 
+      trigger: 'blur' 
+    }
   ]
 }
 
@@ -514,7 +572,7 @@ const dialogTitle = computed(() => {
 })
 
 const totalAmount = computed(() => {
-  return form.orderItems.reduce((sum, item) => sum + (item.subtotal || 0), 0)
+  return form.orderItems.reduce((sum, item) => sum + parseFloat(item.subtotal || '0'), 0)
 })
 
 // 打开商品选择器
@@ -619,13 +677,14 @@ const confirmProductSelection = () => {
     if (existingIndex === -1) {
       form.orderItems.push({
         productId: product.id,
+        quantity: 1,
+        unitPrice: (product.sellingPrice || 0).toString(),
+        remarks: `${product.name} - ${product.sku}`,
         productName: product.name,
         productSku: product.sku,
         productSpecifications: product.unit,
         unit: product.unit,
-        quantity: 1,
-        unitPrice: product.sellingPrice || 0,
-        subtotal: product.sellingPrice || 0
+        subtotal: (product.sellingPrice || 0).toString()
       })
     }
   })
@@ -652,7 +711,7 @@ watch(() => props.order, (newOrder) => {
       deliveryAddress: newOrder.deliveryAddress,
       deliveryContact: newOrder.deliveryContact,
       deliveryPhone: newOrder.deliveryPhone,
-      remarks: newOrder.remarks || '',
+      remarks: '',
       orderItems: newOrder.orderItems || [],
       discountAmount: newOrder.discountAmount,
       shippingAmount: newOrder.shippingAmount,
@@ -668,6 +727,12 @@ onMounted(() => {
   if (props.mode === 'create') {
     generateOrderNo()
     addOrderItem()
+    // 获取当前用户信息
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    if (userInfo.id) {
+      form.salesUserId = userInfo.id
+      form.salesCompanyId = userInfo.companyId || 1
+    }
   }
 })
 
@@ -714,11 +779,15 @@ const searchProducts = async (query: string) => {
 // 添加订单项
 const addOrderItem = () => {
   form.orderItems.push({
-    productId: null,
-    productSpecifications: '',
+    productId: 0,
     quantity: 1,
-    unitPrice: 0,
-    subtotal: 0
+    unitPrice: '0',
+    remarks: '',
+    productName: '',
+    productSku: '',
+    productSpecifications: '',
+    unit: '',
+    subtotal: '0'
   })
 }
 
@@ -735,7 +804,7 @@ const handleProductChange = (index: number) => {
     const product = productOptions.value.find(p => p.id === item.productId)
     if (product) {
       // 使用默认价格或0
-      item.unitPrice = 0
+      item.unitPrice = '0'
       calculateItemTotal(index)
     }
   }
@@ -744,13 +813,21 @@ const handleProductChange = (index: number) => {
 // 计算商品小计
 const calculateItemTotal = (index: number) => {
   const item = form.orderItems[index]
-  item.subtotal = (item.quantity || 0) * (item.unitPrice || 0)
+  const quantity = item.quantity || 0
+  const unitPrice = parseFloat(item.unitPrice || '0')
+  const subtotal = quantity * unitPrice
+  item.subtotal = subtotal.toFixed(2)
   calculateFinalAmount()
 }
 
 // 计算最终金额
 const calculateFinalAmount = () => {
-  form.finalAmount = totalAmount.value - (form.discountAmount || 0) + (form.shippingAmount || 0) + (form.taxAmount || 0)
+  const total = totalAmount.value
+  const discount = parseFloat(form.discountAmount || '0')
+  const shipping = parseFloat(form.shippingAmount || '0')
+  const tax = parseFloat(form.taxAmount || '0')
+  const final = total - discount + shipping + tax
+  form.finalAmount = final.toFixed(2)
 }
 
 // 提交表单
@@ -765,8 +842,45 @@ const handleSubmit = async () => {
       return
     }
     
-    // 直接使用输入的地址
-    const submitData = { ...form }
+    // 发送所有表单数据到后端
+    const submitData = {
+      salesOrderId: form.platformOrderId || form.salesOrderId,
+      salesUserId: form.salesUserId,
+      salesCompanyId: form.salesCompanyId,
+      customerId: form.customerId,
+      source: form.source,
+      templateVersion: form.templateVersion,
+      remarks: form.remarks,
+      extendedFields: {
+        ...form.extendedFields,
+        orderType: form.orderType,
+        expectedDeliveryDate: form.expectedDeliveryDate,
+        currency: form.currency,
+        specialRequirements: form.specialRequirements,
+        deliveryAddress: form.deliveryAddress,
+        deliveryContact: form.deliveryContact,
+        deliveryPhone: form.deliveryPhone,
+        discountAmount: form.discountAmount,
+        shippingAmount: form.shippingAmount,
+        taxAmount: form.taxAmount,
+        finalAmount: form.finalAmount,
+        paymentMethod: form.paymentMethod
+      },
+      orderItems: form.orderItems.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        remarks: item.remarks,
+        extendedFields: {
+          ...item.extendedFields,
+          productName: item.productName,
+          productSku: item.productSku,
+          productSpecifications: item.productSpecifications,
+          unit: item.unit,
+          subtotal: item.subtotal
+        }
+      }))
+    }
     
     submitting.value = true
     
@@ -774,7 +888,19 @@ const handleSubmit = async () => {
       await orderApi.createOrder(submitData)
       ElMessage.success('订单创建成功')
     } else {
-      const updateData: OrderUpdateRequest = { ...submitData }
+      // 更新订单需要不同的字段
+      const updateData: OrderUpdateRequest = {
+        customerId: form.customerId,
+        remarks: form.remarks,
+        extendedFields: form.extendedFields,
+        orderItems: form.orderItems.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          remarks: item.remarks,
+          extendedFields: item.extendedFields
+        }))
+      }
       await orderApi.updateOrder(props.order!.id, updateData)
       ElMessage.success('订单更新成功')
     }

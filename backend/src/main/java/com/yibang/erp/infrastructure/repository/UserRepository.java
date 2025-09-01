@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.yibang.erp.domain.entity.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 /**
  * 用户数据访问接口
@@ -20,6 +21,7 @@ public interface UserRepository extends BaseMapper<User> {
      * @param username 用户名
      * @return 用户对象
      */
+    @Select("SELECT * FROM users WHERE username = #{username}")
     User findByUsername(@Param("username") String username);
     
     /**

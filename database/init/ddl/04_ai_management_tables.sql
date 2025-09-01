@@ -10,7 +10,7 @@ USE yibang_erp_dev;
 CREATE TABLE ai_models (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '模型ID',
     name VARCHAR(100) NOT NULL COMMENT '模型名称',
-    type ENUM('PRODUCT_MAPPING', 'ORDER_PARSING', 'PRICE_PREDICTION', 'INVENTORY_PREDICTION', 'CUSTOMER_ANALYSIS') NOT NULL COMMENT '模型类型',
+    type VARCHAR(50) NOT NULL COMMENT '模型类型：PRODUCT_MAPPING, ORDER_PARSING, PRICE_PREDICTION, INVENTORY_PREDICTION, CUSTOMER_ANALYSIS, ADDRESS_PARSING等',
     version VARCHAR(20) NOT NULL COMMENT '版本号',
     description TEXT COMMENT '模型描述',
     provider VARCHAR(50) NOT NULL COMMENT '服务提供商：OPENAI, ALIYUN, TENCENT, CUSTOM',
@@ -75,7 +75,7 @@ CREATE TABLE token_usage (
     model_id BIGINT NOT NULL COMMENT '模型ID',
     api_key_id BIGINT NOT NULL COMMENT 'API密钥ID',
     request_id VARCHAR(100) UNIQUE COMMENT '请求ID',
-    request_type ENUM('PRODUCT_MAPPING', 'ORDER_PARSING', 'PRICE_PREDICTION', 'INVENTORY_PREDICTION', 'CUSTOMER_ANALYSIS') NOT NULL COMMENT '请求类型',
+    request_type VARCHAR(50) NOT NULL COMMENT '请求类型：PRODUCT_MAPPING, ORDER_PARSING, PRICE_PREDICTION, INVENTORY_PREDICTION, CUSTOMER_ANALYSIS, ADDRESS_PARSING等',
     input_tokens INT NOT NULL DEFAULT 0 COMMENT '输入Token数量',
     output_tokens INT NOT NULL DEFAULT 0 COMMENT '输出Token数量',
     total_tokens INT NOT NULL DEFAULT 0 COMMENT '总Token数量',
@@ -146,7 +146,7 @@ CREATE TABLE model_performance (
 -- 6. AI处理任务表 (ai_processing_tasks)
 CREATE TABLE ai_processing_tasks (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '任务ID',
-    task_type ENUM('PRODUCT_MAPPING', 'ORDER_PARSING', 'PRICE_PREDICTION', 'INVENTORY_PREDICTION', 'CUSTOMER_ANALYSIS') NOT NULL COMMENT '任务类型',
+    task_type VARCHAR(50) NOT NULL COMMENT '任务类型：PRODUCT_MAPPING, ORDER_PARSING, PRICE_PREDICTION, INVENTORY_PREDICTION, CUSTOMER_ANALYSIS, ADDRESS_PARSING等',
     model_id BIGINT NOT NULL COMMENT '模型ID',
     api_key_id BIGINT NOT NULL COMMENT 'API密钥ID',
     user_id BIGINT NOT NULL COMMENT '用户ID',
@@ -188,9 +188,11 @@ INSERT INTO ai_configs (config_key, config_value, config_type, description, cate
 INSERT INTO ai_models (name, type, version, description, provider, model_config, status, is_default) VALUES
 ('商品映射模型V1.0', 'PRODUCT_MAPPING', '1.0.0', '用于Excel订单与标准商品的智能匹配', 'OPENAI', '{"model": "gpt-4", "temperature": 0.1, "max_tokens": 1000}', 'ACTIVE', 1),
 ('订单解析模型V1.0', 'ORDER_PARSING', '1.0.0', '用于非结构化订单数据的智能解析', 'OPENAI', '{"model": "gpt-4", "temperature": 0.1, "max_tokens": 2000}', 'ACTIVE', 1),
-('价格预测模型V1.0', 'PRICE_PREDICTION', '1.0.0', '用于商品价格趋势分析和建议', 'ALIYUN', '{"model": "qwen-turbo", "temperature": 0.2, "max_tokens": 500}', 'ACTIVE', 1);
+('价格预测模型V1.0', 'PRICE_PREDICTION', '1.0.0', '用于商品价格趋势分析和建议', 'ALIYUN', '{"model": "qwen-turbo", "temperature": 0.2, "max_tokens": 500}', 'ACTIVE', 1),
+('地址解析模型V1.0', 'ADDRESS_PARSING', '1.0.0', '用于订单地址的智能解析和标准化', 'DEEPSEEK', '{"model": "deepseek-chat", "temperature": 0.1, "max_tokens": 500}', 'ACTIVE', 1);
 
 -- 插入示例API密钥数据（注意：实际使用时需要加密存储）
 INSERT INTO api_keys (name, provider, api_key, permissions, status, is_default, created_by) VALUES
 ('OpenAI GPT-4 Key', 'OPENAI', 'encrypted_key_placeholder', '["PRODUCT_MAPPING", "ORDER_PARSING"]', 'ACTIVE', 1, 1),
-('阿里云通义千问 Key', 'ALIYUN', 'encrypted_key_placeholder', '["PRICE_PREDICTION", "INVENTORY_PREDICTION"]', 'ACTIVE', 1, 1);
+('阿里云通义千问 Key', 'ALIYUN', 'encrypted_key_placeholder', '["PRICE_PREDICTION", "INVENTORY_PREDICTION"]', 'ACTIVE', 1, 1),
+('DeepSeek Chat Key', 'DEEPSEEK', 'encrypted_key_placeholder', '["ADDRESS_PARSING", "ORDER_PARSING"]', 'ACTIVE', 1, 1);

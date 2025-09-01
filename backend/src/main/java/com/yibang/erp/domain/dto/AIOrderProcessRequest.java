@@ -19,8 +19,8 @@ public class AIOrderProcessRequest {
     /**
      * 公司ID
      */
-    @NotNull(message = "公司ID不能为空")
-    private Long companyId;
+    @NotNull(message = "销售ID不能为空")
+    private Long salesId;
     
     /**
      * 处理类型

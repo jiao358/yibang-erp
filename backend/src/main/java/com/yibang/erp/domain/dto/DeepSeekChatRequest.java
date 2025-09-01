@@ -17,8 +17,33 @@ public class DeepSeekChatRequest {
     /**
      * 消息列表
      */
-    private String[] messages;
-    
+//    private String[] messages;
+
+
+    private DeepSeekMessage[] messages;
+
+    public static class DeepSeekMessage {
+        private String role;
+        private String content;
+
+        // constructors
+        public DeepSeekMessage() {}
+
+        public DeepSeekMessage(String role, String content) {
+            this.role = role;
+            this.content = content;
+        }
+
+        // getters and setters
+        public String getRole() { return role; }
+        public void setRole(String role) { this.role = role; }
+        public String getContent() { return content; }
+        public void setContent(String content) { this.content = content; }
+    }
+
+
+
+
     /**
      * 最大token数
      */

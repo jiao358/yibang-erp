@@ -4,7 +4,10 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.read.listener.ReadListener;
 import com.yibang.erp.config.AIConfig;
-import com.yibang.erp.domain.dto.*;
+import com.yibang.erp.domain.dto.AIConfigRequest;
+import com.yibang.erp.domain.dto.AIConfigResponse;
+import com.yibang.erp.domain.dto.AIOrderProcessRequest;
+import com.yibang.erp.domain.dto.AIOrderProcessResult;
 import com.yibang.erp.domain.entity.User;
 import com.yibang.erp.domain.service.AIService;
 import com.yibang.erp.infrastructure.client.DeepSeekClient;
@@ -14,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -45,7 +47,7 @@ public class AIServiceImpl implements AIService {
         AIOrderProcessResult result = new AIOrderProcessResult();
         result.setProcessId(PROCESS_ID_COUNTER.getAndIncrement());
         result.setOrderId(request.getOrderId());
-        result.setCompanyId(request.getCompanyId());
+//        result.setCompanyId(request.getCompanyId());
         result.setProcessType(request.getProcessType());
         result.setDescription(request.getDescription());
         result.setUserId(request.getUserId());
@@ -101,7 +103,8 @@ public class AIServiceImpl implements AIService {
     @Transactional
     public List<AIOrderProcessResult> batchProcessAIOrders(List<AIOrderProcessRequest> requests) {
         List<AIOrderProcessResult> results = new ArrayList<>();
-        
+        //todo 核心处理的逻辑 AI的逻辑 怎么映射到自己的order表和 orderItem表信息
+
         for (AIOrderProcessRequest request : requests) {
             try {
                 AIOrderProcessResult result = processAIOrder(request);
@@ -118,20 +121,23 @@ public class AIServiceImpl implements AIService {
     
     @Override
     @Transactional
-    public List<AIOrderProcessResult> processOrdersFromExcel(MultipartFile file, Long companyId) {
+    public List<AIOrderProcessResult> processOrdersFromExcel(MultipartFile file, Long saleUserId) {
         List<AIOrderProcessRequest> requests = new ArrayList<>();
         
         try {
             EasyExcel.read(file.getInputStream(), new ReadListener<AIOrderProcessRequest>() {
                 @Override
                 public void invoke(AIOrderProcessRequest request, AnalysisContext context) {
-                    request.setCompanyId(companyId);
+                    request.setSalesId(saleUserId);
                     requests.add(request);
                 }
                 
                 @Override
                 public void doAfterAllAnalysed(AnalysisContext context) {
                     // 所有数据解析完成
+                    log.info("estela excel success ok!");
+
+
                 }
             }).sheet().doRead();
             
@@ -228,7 +234,7 @@ public class AIServiceImpl implements AIService {
     private String buildOrderContext(AIOrderProcessRequest request) {
         StringBuilder context = new StringBuilder();
         context.append("订单ID: ").append(request.getOrderId()).append("\n");
-        context.append("公司ID: ").append(request.getCompanyId()).append("\n");
+//        context.append("公司ID: ").append(request.getCompanyId()).append("\n");
         context.append("处理类型: ").append(request.getProcessType()).append("\n");
         context.append("描述: ").append(request.getDescription()).append("\n");
         context.append("优先级: ").append(request.getPriority()).append("\n");
@@ -245,7 +251,7 @@ public class AIServiceImpl implements AIService {
         AIOrderProcessResult result = new AIOrderProcessResult();
         result.setProcessId(PROCESS_ID_COUNTER.getAndIncrement());
         result.setOrderId(request.getOrderId());
-        result.setCompanyId(request.getCompanyId());
+//        result.setCompanyId(request.getCompanyId());
         result.setProcessType(request.getProcessType());
         result.setStatus("ERROR");
         result.setResult("处理失败");

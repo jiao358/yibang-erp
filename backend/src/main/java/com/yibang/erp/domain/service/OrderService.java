@@ -46,6 +46,10 @@ public interface OrderService {
      */
     com.baomidou.mybatisplus.extension.plugins.pagination.Page<OrderResponse> getOrderList(OrderListRequest request);
 
+    com.baomidou.mybatisplus.extension.plugins.pagination.Page<OrderResponse> getOrderSalesList(OrderListRequest request);
+
+    com.baomidou.mybatisplus.extension.plugins.pagination.Page<OrderResponse> getOrderSuplierList(OrderListRequest request);
+
     /**
      * 更新订单状态
      */

@@ -21,7 +21,7 @@ public class AIConfig {
     /**
      * DeepSeek API密钥
      */
-    private String apiKey;
+    private String apiKey = "sk-3f69c84d8322422498438badd98cdac3";
     
     /**
      * 默认模型名称
@@ -41,7 +41,7 @@ public class AIConfig {
     /**
      * 是否启用AI功能
      */
-    private Boolean enabled = false;
+    private Boolean enabled = true;
     
     /**
      * 请求超时时间（毫秒）

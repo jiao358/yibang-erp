@@ -1,11 +1,14 @@
 package com.yibang.erp.controller;
 
+import com.yibang.erp.common.util.JwtUtil;
+import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.dto.*;
 import com.yibang.erp.domain.service.AIService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,10 +22,12 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/ai")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER_ADMIN','SALES','SUPPLIER_OPERATOR')")
 public class AIController {
     
     private final AIService aiService;
-    
+    private JwtUtil jwtUtil;
+
     /**
      * 处理单个AI订单
      */
@@ -38,7 +43,6 @@ public class AIController {
      * 批量处理AI订单
      */
     @PostMapping("/orders/batch-process")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN') or hasRole('SALES_ADMIN')")
     public ResponseEntity<List<AIOrderProcessResult>> batchProcessAIOrders(@RequestBody List<AIOrderProcessRequest> requests) {
         log.info("开始批量处理AI订单，数量: {}", requests.size());
         List<AIOrderProcessResult> results = aiService.batchProcessAIOrders(requests);
@@ -49,12 +53,46 @@ public class AIController {
      * 从Excel文件批量处理订单
      */
     @PostMapping("/orders/excel-process")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPPLIER_ADMIN') or hasRole('SALES_ADMIN')")
     public ResponseEntity<List<AIOrderProcessResult>> processOrdersFromExcel(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("companyId") Long companyId) {
-        log.info("开始从Excel文件处理订单，公司ID: {}", companyId);
-        List<AIOrderProcessResult> results = aiService.processOrdersFromExcel(file, companyId);
+            @RequestParam("companyId") Long companyId,@RequestHeader("Authorization") String token
+    ) {
+
+        Long userId= jwtUtil.getUserIdFromToken(token);
+
+        boolean isSales=  SecurityContextHolder.getContext().getAuthentication().getAuthorities().
+                stream().anyMatch(x->x.getAuthority().equals("ROLE_SALES"));
+        String userName= UserSecurityUtils.getCurrentUsername();
+
+
+
+        //本质应该是SALES对订单进行批量导入
+        //todo 验证是SALES才可以使用
+        if(!isSales){
+            throw new IllegalArgumentException("非销售无法使用Excel导入订单，权限访问异常");
+        }
+        log.info("开始从Excel文件处理订单，用户: {}", userName);
+
+        String fileName = file.getName();
+
+        if (!fileName.endsWith(".xlsx") && !fileName.endsWith(".xls")) {
+            throw new IllegalArgumentException("文件格式错误，请上传Excel文件");
+        }
+
+
+        List<AIOrderProcessResult> results=null;
+        try{
+            results = aiService.processOrdersFromExcel(file, userId);
+
+        }catch (Exception e){
+            //todo 将这个任务的异常进行保存给客户查询。
+
+        }
+        //todo 这里应该采用异步提交的方式，因为订单处理很耗时，如果直接返回结果，可能会导致用户等待过长
+
+        //todo 要有一个excel 处理的过程信息返回给客户
+
+
         return ResponseEntity.ok(results);
     }
     

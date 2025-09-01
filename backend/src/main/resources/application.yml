@@ -96,9 +96,9 @@ management:
 ai:
   deepseek:
     base-url: https://api.deepseek.com
-    api-key: ${DEEPSEEK_API_KEY:}
+    api-key: sk-3f69c84d8322422498438badd98cdac3
     default-model: deepseek-chat
     max-tokens: 4096
     temperature: 0.7
-    enabled: false
+    enabled: true
     timeout: 30000

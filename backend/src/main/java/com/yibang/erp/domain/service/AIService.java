@@ -31,10 +31,10 @@ public interface AIService {
     /**
      * 从Excel文件批量处理订单
      * @param file Excel文件
-     * @param companyId 公司ID
+     * @param userId 销售ID
      * @return 批量处理结果
      */
-    List<AIOrderProcessResult> processOrdersFromExcel(MultipartFile file, Long companyId);
+    List<AIOrderProcessResult> processOrdersFromExcel(MultipartFile file, Long userId);
     
     /**
      * 获取AI配置信息

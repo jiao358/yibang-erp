@@ -8,6 +8,10 @@ import com.yibang.erp.domain.entity.*;
 import com.yibang.erp.domain.service.OrderNumberGeneratorService;
 import com.yibang.erp.domain.service.OrderService;
 import com.yibang.erp.infrastructure.repository.*;
+import com.yibang.erp.infrastructure.client.DeepSeekClient;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -23,6 +27,7 @@ import java.util.List;
 /**
  * 订单服务实现类
  */
+@Slf4j
 @Service
 @Transactional(rollbackFor = Exception.class)
 public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implements OrderService {
@@ -51,6 +56,98 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     @Autowired
     private OrderNumberGeneratorService orderNumberGeneratorService;
 
+    @Autowired
+    private DeepSeekClient deepSeekClient;
+
+    private OrderAddressDTO aiModelHandleAddress(String address){
+        try {
+            // 检查AI功能是否启用
+            if (address == null || address.trim().isEmpty()) {
+                return createDefaultAddressDTO();
+            }
+            
+            // 调用DeepSeek API进行地址解析
+            String aiResult = deepSeekClient.parseAddress(address.trim()).block();
+            
+            if (aiResult == null || aiResult.contains("AI地址解析失败")) {
+                log.warn("AI地址解析失败，使用默认处理: {}", address);
+//                throw new RuntimeException("AI地址解析失败，请检查配置或稍后重试");
+                return createDefaultAddressDTO();
+            }
+            
+            // 解析AI返回的JSON结果
+            OrderAddressDTO addressDTO = parseAIAddressResult(aiResult);
+            
+            // 如果解析失败，使用默认处理
+            if (addressDTO == null) {
+                log.warn("AI地址解析结果解析失败，使用默认处理: {}", aiResult);
+                return createDefaultAddressDTO();
+            }
+            
+            log.info("AI地址解析成功: {} -> {}", address, addressDTO);
+            return addressDTO;
+            
+        } catch (Exception e) {
+            log.error("AI地址解析异常: {}", e.getMessage(), e);
+            return createDefaultAddressDTO();
+        }
+    }
+    
+    /**
+     * 解析AI返回的地址结果
+     */
+    private OrderAddressDTO parseAIAddressResult(String aiResult) {
+        try {
+            // 尝试解析JSON
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode jsonNode = objectMapper.readTree(aiResult);
+            
+            OrderAddressDTO addressDTO = new OrderAddressDTO();
+            addressDTO.setProvinceName(getJsonValue(jsonNode, "provinceName"));
+            addressDTO.setCityName(getJsonValue(jsonNode, "cityName"));
+            addressDTO.setDistrictName(getJsonValue(jsonNode, "districtName"));
+            addressDTO.setFixAddress(getJsonValue(jsonNode, "fixAddress"));
+            
+            // 解析置信度
+            JsonNode confidenceNode = jsonNode.get("confidence");
+            if (confidenceNode != null && !confidenceNode.isNull()) {
+                addressDTO.setConfidence(confidenceNode.asDouble());
+            } else {
+                addressDTO.setConfidence(0.0);
+            }
+            
+            return addressDTO;
+            
+        } catch (Exception e) {
+            log.error("解析AI地址结果失败: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+    
+    /**
+     * 获取JSON字段值
+     */
+    private String getJsonValue(JsonNode jsonNode, String fieldName) {
+        JsonNode node = jsonNode.get(fieldName);
+        if (node != null && !node.isNull()) {
+            return node.asText();
+        }
+        return null;
+    }
+    
+    /**
+     * 创建默认地址DTO
+     */
+    private OrderAddressDTO createDefaultAddressDTO() {
+        OrderAddressDTO addressDTO = new OrderAddressDTO();
+        addressDTO.setProvinceName(null);
+        addressDTO.setCityName(null);
+        addressDTO.setDistrictName(null);
+        addressDTO.setConfidence(0.0);
+        addressDTO.setFixAddress(null);
+        return addressDTO;
+    }
+
     @Override
     public OrderResponse createOrder(OrderCreateRequest request) {
         // 验证请求数据
@@ -65,18 +162,50 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         order.setOrderType("NORMAL"); // 默认订单类型
         order.setOrderSource(request.getSource());
         order.setOrderStatus("DRAFT");
-        order.setExpectedDeliveryDate(LocalDate.now().plusDays(7)); // 默认7天后
-        order.setCurrency("CNY"); // 默认人民币
+        if(request.getExtendedFields().get("expectedDeliveryDate")!=null){
+            order.setExpectedDeliveryDate(LocalDate.parse(request.getExtendedFields().get("expectedDeliveryDate").toString()));
+        }else{
+            order.setExpectedDeliveryDate(LocalDate.now().plusDays(7)); // 默认7天后
+        }
+
+        order.setCurrency(request.getExtendedFields().get("currency").toString()); // 默认人民币
         order.setSpecialRequirements(request.getRemarks());
-        order.setDeliveryAddress("待填写");
-        order.setDeliveryContact("待填写");
-        order.setDeliveryPhone("待填写");
+        String address = request.getExtendedFields().get("deliveryAddress").toString();
+
+        // 使用AI自动拆分省份、城市、区域、详细地址
+        OrderAddressDTO orderAddressDTO = aiModelHandleAddress(address);
+        
+        // 设置地址相关字段
+        order.setDeliveryAddress(request.getExtendedFields().get("deliveryAddress").toString());
+        order.setDeliveryContact(request.getExtendedFields().get("deliveryContact").toString());
+        
+        // 设置AI解析的地址信息
+        if (orderAddressDTO != null && orderAddressDTO.getConfidence() > 0) {
+            order.setProvinceName(orderAddressDTO.getProvinceName());
+            order.setCityName(orderAddressDTO.getCityName());
+            order.setDistrictName(orderAddressDTO.getDistrictName());
+            order.setAiConfidence(BigDecimal.valueOf(orderAddressDTO.getConfidence()));
+            order.setAiProcessed(true);
+        } else {
+            order.setAiProcessed(false);
+            order.setAiConfidence(BigDecimal.ZERO);
+        }
+
+
+
+
+        order.setDeliveryPhone(request.getExtendedFields().get("deliveryPhone").toString());
         order.setTotalAmount(BigDecimal.ZERO);
-        order.setDiscountAmount(BigDecimal.ZERO);
-        order.setShippingAmount(BigDecimal.ZERO);
-        order.setTaxAmount(BigDecimal.ZERO);
+        order.setDiscountAmount(request.getExtendedFields().get("discountAmount") != null ? new BigDecimal(request.getExtendedFields().get("discountAmount").toString()) : BigDecimal.ZERO);
+
+        order.setShippingAmount(request.getExtendedFields().get("shippingAmount") != null ? new BigDecimal(request.getExtendedFields().get("shippingAmount").toString()) : BigDecimal.ZERO);
+
+        order.setTaxAmount(request.getExtendedFields().get("taxAmount") != null ? new BigDecimal(request.getExtendedFields().get("taxAmount").toString()) : BigDecimal.ZERO);
+
         order.setFinalAmount(BigDecimal.ZERO);
-        order.setPaymentMethod("BANK_TRANSFER");
+
+
+        order.setPaymentMethod(request.getExtendedFields().get("paymentMethod").toString());
         order.setPaymentStatus("UNPAID");
         order.setApprovalStatus("PENDING");
         order.setCreatedAt(LocalDateTime.now());
@@ -96,6 +225,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         if (request.getOrderItems() != null && !request.getOrderItems().isEmpty()) {
             createOrderItems(order.getId(), request.getOrderItems());
         }
+
 
         // 计算订单总金额
         calculateOrderTotal(order.getId());
@@ -206,12 +336,123 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         // 执行分页查询
         Page<Order> page = new Page<>(request.getCurrent(), request.getSize());
         Page<Order> orderPage = orderRepository.selectPage(page, queryWrapper);
-
+        long count= orderRepository.selectCount(queryWrapper);
         // 转换为响应对象
         Page<OrderResponse> responsePage = new Page<>();
         responsePage.setCurrent(orderPage.getCurrent());
         responsePage.setSize(orderPage.getSize());
-        responsePage.setTotal(orderPage.getTotal());
+        responsePage.setTotal(count);
+        responsePage.setPages(orderPage.getPages());
+
+        List<OrderResponse> responses = orderPage.getRecords().stream()
+                .map(this::enrichOrderResponse)
+                .toList();
+        responsePage.setRecords(responses);
+
+        return responsePage;
+    }
+
+    @Override
+    public Page<OrderResponse> getOrderSalesList(OrderListRequest request) {
+        // 构建查询条件
+        QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+
+        //只有customerName  就当收件人 不是客户！
+        if (org.apache.commons.lang3.StringUtils.isNoneEmpty(request.getCustomerName()) ) {
+            queryWrapper.like("delivery_contact", request.getCustomerName());
+        }
+
+        if(request.getSalesUserId()!=null){
+            queryWrapper.eq("sales_id", request.getSalesUserId());
+        }
+
+        if (StringUtils.hasText(request.getStatus())) {
+            queryWrapper.eq("order_status", request.getStatus());
+        }
+
+        if (StringUtils.hasText(request.getSource())) {
+            queryWrapper.eq("order_source", request.getSource());
+        }
+
+        if (StringUtils.hasText(request.getKeyword())) {
+            queryWrapper.and(wrapper -> wrapper
+                    .like("platform_order_id", request.getKeyword())
+                    .or()
+                    .like("special_requirements", request.getKeyword())
+            );
+        }
+
+        queryWrapper.orderByDesc("created_at");
+
+        // 执行分页查询
+        Page<Order> page = new Page<>(request.getCurrent(), request.getSize());
+        Page<Order> orderPage = orderRepository.selectPage(page, queryWrapper);
+
+        long count= orderRepository.selectCount(queryWrapper);
+        // 转换为响应对象
+        Page<OrderResponse> responsePage = new Page<>();
+        responsePage.setCurrent(orderPage.getCurrent());
+        responsePage.setSize(orderPage.getSize());
+        responsePage.setTotal(count);
+        responsePage.setPages(orderPage.getPages());
+
+        List<OrderResponse> responses = orderPage.getRecords().stream()
+                .map(this::enrichOrderResponse)
+                .toList();
+        responsePage.setRecords(responses);
+
+        return responsePage;
+
+    }
+
+    @Override
+    public Page<OrderResponse> getOrderSuplierList(OrderListRequest request) {
+        // 构建查询条件
+        QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+
+        //只有customerName  就当收件人 不是客户！
+        if (org.apache.commons.lang3.StringUtils.isNoneEmpty(request.getCustomerName()) ) {
+            queryWrapper.like("delivery_contact", request.getCustomerName());
+        }
+
+        if(request.getSupplierCompanyId()!=null){
+            queryWrapper.eq("supplier_company_id", request.getSupplierCompanyId());
+            /**
+             * 供应商只能看到推送到自己的订单 提交、审核、发货、处理、拒绝、送达、完成
+             */
+            queryWrapper.in("order_status", "SUBMITTED","APPROVED","SHIPPED","PROCESSING","DELIVERED","COMPLETED");
+        }
+
+        if (StringUtils.hasText(request.getStatus())) {
+            queryWrapper.eq("order_status", request.getStatus());
+        }
+        /**
+         * 手动，excel，图片，api
+         */
+
+        if (StringUtils.hasText(request.getSource())) {
+            queryWrapper.eq("order_source", request.getSource());
+        }
+
+        if (StringUtils.hasText(request.getKeyword())) {
+            queryWrapper.and(wrapper -> wrapper
+                    .like("platform_order_id", request.getKeyword())
+                    .or()
+                    .like("special_requirements", request.getKeyword())
+            );
+        }
+
+        queryWrapper.orderByDesc("created_at");
+
+        // 执行分页查询
+        Page<Order> page = new Page<>(request.getCurrent(), request.getSize());
+        Page<Order> orderPage = orderRepository.selectPage(page, queryWrapper);
+        long count= orderRepository.selectCount(queryWrapper);
+        // 转换为响应对象
+        Page<OrderResponse> responsePage = new Page<>();
+        responsePage.setCurrent(orderPage.getCurrent());
+        responsePage.setSize(orderPage.getSize());
+        responsePage.setTotal(count);
         responsePage.setPages(orderPage.getPages());
 
         List<OrderResponse> responses = orderPage.getRecords().stream()
@@ -254,6 +495,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     @Override
     public OrderResponse submitOrder(Long orderId) {
         OrderStatusUpdateRequest request = new OrderStatusUpdateRequest();
+        //todo 如果订单处于提交状态或者拒绝状态，则不允许提交，只有CANCELLED、DRAFT 的状态才可以提交
+
+
+
         request.setTargetStatus("SUBMITTED");
         request.setReason("订单提交");
         request.setOperatorId(getCurrentUserId());
@@ -263,6 +508,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     @Override
     public OrderResponse cancelOrder(Long orderId) {
         OrderStatusUpdateRequest request = new OrderStatusUpdateRequest();
+
+        //todo 对销售员来说 只有DRAFT、SUBMITTED 状态的订单才可以取消
         request.setTargetStatus("CANCELLED");
         request.setReason("订单取消");
         request.setOperatorId(getCurrentUserId());
@@ -272,6 +519,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     @Override
     public OrderResponse supplierConfirmOrder(Long orderId) {
         OrderStatusUpdateRequest request = new OrderStatusUpdateRequest();
+        //todo 只有供应商才能操作，并且订单必须为SUBMITTED的状态才可以
         request.setTargetStatus("APPROVED");
         request.setReason("供应商确认");
         request.setOperatorId(getCurrentUserId());
@@ -281,6 +529,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     @Override
     public OrderResponse supplierShipOrder(Long orderId) {
         OrderStatusUpdateRequest request = new OrderStatusUpdateRequest();
+        //todo 只有供应商才能操作，并且订单必须为Approved 才可以发货
         request.setTargetStatus("SHIPPED");
         request.setReason("供应商发货");
         request.setOperatorId(getCurrentUserId());
@@ -348,12 +597,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         // 定义有效的状态转换规则
         return switch (currentStatus) {
             case "DRAFT" -> List.of("SUBMITTED", "CANCELLED").contains(targetStatus);
-            case "SUBMITTED" -> List.of("PENDING_APPROVAL", "CANCELLED").contains(targetStatus);
+            case "SUBMITTED" -> List.of("APPROVED", "CANCELLED","REJECTED").contains(targetStatus);
             case "PENDING_APPROVAL" -> List.of("APPROVED", "REJECTED").contains(targetStatus);
-            case "APPROVED" -> List.of("PROCESSING", "CANCELLED").contains(targetStatus);
+            case "APPROVED" -> List.of("SHIPPED", "REJECTED","CANCELLED").contains(targetStatus);
             case "PROCESSING" -> List.of("SHIPPED", "CANCELLED").contains(targetStatus);
-            case "SHIPPED" -> List.of("DELIVERED", "CANCELLED").contains(targetStatus);
-            case "DELIVERED" -> List.of("COMPLETED", "CANCELLED").contains(targetStatus);
+            case "SHIPPED" -> List.of("DELIVERED", "COMPLETED").contains(targetStatus);
+            case "DELIVERED" -> List.of("COMPLETED").contains(targetStatus);
             default -> false;
         };
     }
@@ -448,15 +697,21 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     private void createOrderItems(Long orderId, List<OrderCreateRequest.OrderItemRequest> itemRequests) {
         for (OrderCreateRequest.OrderItemRequest itemRequest : itemRequests) {
             OrderItem orderItem = new OrderItem();
+            if(itemRequest.getProductId()==null ){
+                continue;
+            }
             orderItem.setOrderId(orderId);
             orderItem.setProductId(itemRequest.getProductId());
             orderItem.setQuantity(itemRequest.getQuantity());
             orderItem.setUnitPrice(itemRequest.getUnitPrice());
-            orderItem.setUnit("个"); // 默认单位
+            orderItem.setUnit(itemRequest.getExtendedFields().get("unit").toString()); // 默认单位
+
             orderItem.setDiscountRate(BigDecimal.ONE);
             orderItem.setDiscountAmount(BigDecimal.ZERO);
             orderItem.setTaxRate(BigDecimal.ZERO);
             orderItem.setTaxAmount(BigDecimal.ZERO);
+
+
             orderItem.setCreatedAt(LocalDateTime.now());
             orderItem.setUpdatedAt(LocalDateTime.now());
 
@@ -592,9 +847,5 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         return user.getId();
     }
 
-    private Long getCurrentUserCompanyId() {
-        // TODO: 从Spring Security上下文获取当前用户所属公司ID
-        // 这里暂时返回默认值，实际应该从SecurityContext获取
-        return 1L;
-    }
+
 }

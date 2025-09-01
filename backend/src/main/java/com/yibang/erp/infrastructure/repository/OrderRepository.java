@@ -30,7 +30,8 @@ public interface OrderRepository extends BaseMapper<Order> {
     /**
      * 根据销售用户ID查询订单列表
      */
-    List<Order> selectBySalesUserId(@Param("salesUserId") Long salesUserId);
+    @Select("SELECT * FROM orders WHERE sales_id = #{salesId} AND delete = 0 ORDER BY created_at DESC")
+    List<Order> selectBySalesUserId(@Param("salesId") Long salesId);
 
     /**
      * 根据供应商公司ID查询订单列表

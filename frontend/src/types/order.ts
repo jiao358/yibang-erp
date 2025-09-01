@@ -16,11 +16,11 @@ export interface OrderResponse {
   approvalComment?: string
   approvalAt?: string
   approvalBy?: number
-  totalAmount: number
-  discountAmount: number
-  taxAmount: number
-  shippingAmount: number
-  finalAmount: number
+  totalAmount: string
+  discountAmount: string
+  taxAmount: string
+  shippingAmount: string
+  finalAmount: string
   currency: string
   paymentStatus: string
   paymentMethod: string
@@ -46,13 +46,13 @@ export interface OrderItemResponse {
   sku: string
   productSpecifications?: string
   quantity: number
-  unitPrice: number
+  unitPrice: string
   unit: string
-  discountRate?: number
-  discountAmount?: number
-  taxRate?: number
-  taxAmount?: number
-  subtotal: number
+  discountRate?: string
+  discountAmount?: string
+  taxRate?: string
+  taxAmount?: string
+  subtotal: string
   aiMappedProductId?: number
   aiConfidence?: number
   aiProcessingStatus?: string
@@ -63,50 +63,66 @@ export interface OrderItemResponse {
 
 // 创建订单请求类型
 export interface OrderCreateRequest {
-  platformOrderId?: string
+  // 后端必需字段
+  salesOrderId: string
+  salesUserId: number
+  salesCompanyId: number
   customerId: number
-  orderType: string
-  expectedDeliveryDate: string
-  currency: string
-  specialRequirements?: string
-  deliveryAddress: string
-  deliveryContact: string
-  deliveryPhone: string
+  source: string
+  templateVersion?: string
   remarks?: string
+  extendedFields?: Record<string, any>
   orderItems: OrderItemCreateRequest[]
-  discountAmount?: number
-  shippingAmount?: number
-  taxAmount?: number
-  finalAmount?: number
-  paymentMethod: string
+  
+  // 前端显示字段（不发送到后端）
+  orderType?: string
+  expectedDeliveryDate?: string
+  currency?: string
+  specialRequirements?: string
+  deliveryAddress?: string
+  deliveryContact?: string
+  deliveryPhone?: string
+  discountAmount?: string
+  shippingAmount?: string
+  taxAmount?: string
+  finalAmount?: string
+  paymentMethod?: string
+  platformOrderId?: string
 }
 
 // 更新订单请求类型
 export interface OrderUpdateRequest {
-  customerId: number
-  orderType: string
-  expectedDeliveryDate: string
-  currency: string
-  specialRequirements?: string
-  deliveryAddress: string
-  deliveryContact: string
-  deliveryPhone: string
+  customerId?: number
   remarks?: string
-  orderItems: OrderItemCreateRequest[]
-  discountAmount?: number
-  shippingAmount?: number
-  taxAmount?: number
-  finalAmount?: number
-  paymentMethod: string
+  extendedFields?: Record<string, any>
+  orderItems?: OrderItemUpdateRequest[]
+}
+
+// 更新订单项请求类型
+export interface OrderItemUpdateRequest {
+  id?: number
+  productId: number
+  quantity: number
+  unitPrice: string
+  remarks?: string
+  extendedFields?: Record<string, any>
 }
 
 // 创建订单项请求类型
 export interface OrderItemCreateRequest {
+  // 后端必需字段
   productId: number
-  productSpecifications?: string
   quantity: number
-  unitPrice: number
-  subtotal?: number
+  unitPrice: string
+  remarks?: string
+  extendedFields?: Record<string, any>
+  
+  // 前端显示字段（不发送到后端）
+  productName?: string
+  productSku?: string
+  productSpecifications?: string
+  unit?: string
+  subtotal?: string
 }
 
 // 订单列表请求类型

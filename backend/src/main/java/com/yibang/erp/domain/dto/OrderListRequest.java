@@ -23,7 +23,7 @@ public class OrderListRequest {
     /**
      * 平台订单号
      */
-    private String platformOrderNo;
+    private String platformOrderId;
 
     /**
      * 销售订单ID
@@ -44,6 +44,11 @@ public class OrderListRequest {
      * 客户ID
      */
     private Long customerId;
+
+    private String orderStatus;
+
+    private String orderSource;
+
 
     /**
      * 客户姓名

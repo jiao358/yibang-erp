@@ -37,7 +37,7 @@ public class OrderCreateRequest {
     /**
      * 客户ID
      */
-    @NotNull(message = "客户ID不能为空")
+    //@NotNull(message = "客户ID不能为空")
     private Long customerId;
 
     /**

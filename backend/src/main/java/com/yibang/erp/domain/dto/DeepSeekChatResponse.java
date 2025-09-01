@@ -1,7 +1,6 @@
 package com.yibang.erp.domain.dto;
 
 import lombok.Data;
-import java.util.List;
 
 /**
  * DeepSeek聊天响应DTO
@@ -52,8 +51,8 @@ public class DeepSeekChatResponse {
         /**
          * 消息
          */
-        private Message message;
-        
+//        private Message message;
+        private DeepSeekChatRequest.DeepSeekMessage message;
         /**
          * 完成原因
          */

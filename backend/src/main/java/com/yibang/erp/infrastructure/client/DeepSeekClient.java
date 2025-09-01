@@ -6,6 +6,9 @@ import com.yibang.erp.domain.dto.DeepSeekChatRequest;
 import com.yibang.erp.domain.dto.DeepSeekChatResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -26,7 +29,23 @@ public class DeepSeekClient {
     private final AIConfig aiConfig;
     private final ObjectMapper objectMapper;
     private final WebClient.Builder webClientBuilder;
-    
+    @Autowired
+    @Lazy
+    private WebClient webClient;
+    @Lazy
+    @Bean
+    public WebClient deepSeekWebClient() {
+        if (!aiConfig.getEnabled()) {
+            return null;
+        }
+
+        return webClientBuilder
+                .baseUrl(aiConfig.getBaseUrl())
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + aiConfig.getApiKey())
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .build();
+    }
+
     /**
      * 发送聊天请求到DeepSeek
      * @param request 聊天请求
@@ -36,15 +55,11 @@ public class DeepSeekClient {
         if (!aiConfig.getEnabled()) {
             return Mono.error(new RuntimeException("AI功能未启用"));
         }
-        
-        WebClient webClient = webClientBuilder
-            .baseUrl(aiConfig.getBaseUrl())
-            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + aiConfig.getApiKey())
-            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .build();
+
+
         
         return webClient.post()
-            .uri("/v1/chat/completions")
+            .uri("/chat/completions")
             .bodyValue(request)
             .retrieve()
             .bodyToMono(DeepSeekChatResponse.class)
@@ -60,7 +75,16 @@ public class DeepSeekClient {
     public Mono<Boolean> testConnection() {
         DeepSeekChatRequest testRequest = new DeepSeekChatRequest();
         testRequest.setModel(aiConfig.getDefaultModel());
-        testRequest.setMessages(new String[]{"Hello, this is a test message."});
+
+
+//        testRequest.setMessages(new String[]{"Hello, this is a test message."});
+
+        DeepSeekChatRequest.DeepSeekMessage message = new DeepSeekChatRequest.DeepSeekMessage();
+        message.setRole("user");
+        message.setContent("Hello, this is a test message.");
+        testRequest.setMessages(new DeepSeekChatRequest.DeepSeekMessage[]{message});
+
+
         testRequest.setMaxTokens(10);
         testRequest.setTemperature(0.1);
         
@@ -80,7 +104,16 @@ public class DeepSeekClient {
         
         DeepSeekChatRequest request = new DeepSeekChatRequest();
         request.setModel(aiConfig.getDefaultModel());
-        request.setMessages(new String[]{prompt});
+//        request.setMessages(new String[]{prompt});
+
+        // 修正消息格式
+        DeepSeekChatRequest.DeepSeekMessage message = new DeepSeekChatRequest.DeepSeekMessage();
+        message.setRole("user");
+        message.setContent(prompt);
+        request.setMessages(new DeepSeekChatRequest.DeepSeekMessage[]{message});
+
+
+
         request.setMaxTokens(aiConfig.getMaxTokens());
         request.setTemperature(aiConfig.getTemperature());
         
@@ -107,6 +140,62 @@ public class DeepSeekClient {
         prompt.append("3. 语言要简洁、清晰\n");
         prompt.append("4. 考虑业务实际情况\n\n");
         prompt.append("请开始分析：");
+        
+        return prompt.toString();
+    }
+    
+    /**
+     * 地址解析处理
+     * @param address 原始地址
+     * @return 地址解析结果
+     */
+    public Mono<String> parseAddress(String address) {
+        String prompt = buildAddressParsePrompt(address);
+        
+        DeepSeekChatRequest request = new DeepSeekChatRequest();
+        request.setModel(aiConfig.getDefaultModel());
+//        request.setMessages(new String[]{prompt});
+        // 修正消息格式
+        DeepSeekChatRequest.DeepSeekMessage message = new DeepSeekChatRequest.DeepSeekMessage();
+        message.setRole("user");
+        message.setContent(prompt);
+        request.setMessages(new DeepSeekChatRequest.DeepSeekMessage[]{message});
+
+
+
+        request.setMaxTokens(500);
+        request.setTemperature(0.1);
+        
+        return chat(request)
+            .map(response -> response.getChoices()[0].getMessage().getContent())
+            .onErrorReturn("AI地址解析失败，请检查配置或稍后重试");
+    }
+    
+    /**
+     * 构建地址解析提示词
+     * @param address 原始地址
+     * @return 提示词
+     */
+    private String buildAddressParsePrompt(String address) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("你是一个专业的地址解析AI助手。请将以下地址解析为结构化的信息：\n\n");
+        prompt.append("原始地址：").append(address).append("\n\n");
+        prompt.append("请严格按照以下JSON格式返回结果，不要包含任何其他文字：\n");
+        prompt.append("{\n");
+        prompt.append("  \"provinceName\": \"省份名称\",\n");
+        prompt.append("  \"cityName\": \"城市名称\",\n");
+        prompt.append("  \"districtName\": \"区域名称\",\n");
+        prompt.append("  \"confidence\": 0.95,\n");
+        prompt.append("  \"fixAddress\": \"修复后的完整地址\"\n");
+        prompt.append("}\n\n");
+        prompt.append("要求：\n");
+        prompt.append("1. 省份名称要准确，如：广东省、北京市、上海市等\n");
+        prompt.append("2. 城市名称要准确，如：深圳市、广州市、杭州市等\n");
+        prompt.append("3. 区域名称要准确，如：南山区、天河区、西湖区等\n");
+        prompt.append("4. 置信度范围0-1，表示解析的准确程度\n");
+        prompt.append("5. 修复后的地址要完整、规范\n");
+        prompt.append("6. 如果无法解析某个字段，请设为null\n\n");
+        prompt.append("请开始解析：");
         
         return prompt.toString();
     }

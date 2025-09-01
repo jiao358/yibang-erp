@@ -1,9 +1,6 @@
 package com.yibang.erp.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
@@ -210,6 +207,18 @@ public class Order {
      */
     @TableField("updated_by")
     private Long updatedBy;
+
+    @TableField("province_name")
+    private String provinceName;
+
+
+    @TableField("city_name")
+    private String cityName;
+
+    @TableField("district_name")
+    private String  districtName;
+
+
 
     /**
      * 是否删除

@@ -19,7 +19,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/brands")
-@PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER_ADMIN')")
+@PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER_ADMIN','SALES','SUPPLIER_OPERATOR')")
 public class BrandController {
 
     @Autowired

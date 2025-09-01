@@ -1,12 +1,14 @@
 package com.yibang.erp.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.yibang.erp.common.util.JwtUtil;
 import com.yibang.erp.domain.dto.*;
 import com.yibang.erp.domain.entity.OrderStatusLog;
 import com.yibang.erp.domain.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -22,7 +24,8 @@ public class OrderController {
 
     @Autowired
     private OrderService orderService;
-
+    @Autowired
+    private  JwtUtil jwtUtil;
     /**
      * 创建订单
      */
@@ -83,11 +86,74 @@ public class OrderController {
      * 分页查询订单列表
      */
     @GetMapping
-    public ResponseEntity<IPage<OrderResponse>> getOrderList(OrderListRequest request) {
-        IPage<OrderResponse> response = orderService.getOrderList(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<IPage<OrderResponse>> getOrderList(OrderListRequest request,@RequestHeader("Authorization") String authorization) {
+        //这里面就要做后端逻辑了，销售只能看到自己的订单
+        //供应商只能看到推送到自己的订单
+        //1. 获取当前用户信息
+        Long userId = getUserId(authorization);
+        boolean isAdmin=  SecurityContextHolder.getContext().getAuthentication().getAuthorities().
+                stream().anyMatch(x->x.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
+        if(isAdmin){
+            IPage<OrderResponse> response = orderService.getOrderList(request);
+            return ResponseEntity.ok(response);
+        }
+        //如果是销售 只能看到自己的订单
+
+        boolean isSales=  SecurityContextHolder.getContext().getAuthentication().getAuthorities().
+                stream().anyMatch(x->x.getAuthority().equals("ROLE_SALES"));
+
+        if(isSales){
+            request.setSalesUserId(userId);
+            IPage<OrderResponse> response  = orderService.getOrderSalesList(request);
+            return ResponseEntity.ok(response);
+        }
+
+        boolean isSupplier=  SecurityContextHolder.getContext().getAuthentication().getAuthorities().
+                stream().anyMatch(x->x.getAuthority().equals("ROLE_SUPPLIER_ADMIN")) || SecurityContextHolder.getContext().getAuthentication().getAuthorities().
+                stream().anyMatch(x->x.getAuthority().equals("ROLE_SUPPLIER_OPERATOR"));
+
+        if(isSupplier){
+            Long companyId= getCompanyId(authorization);
+            request.setSupplierCompanyId(companyId);
+            IPage<OrderResponse> response  = orderService.getOrderSuplierList(request);
+            return ResponseEntity.ok(response);
+
+        }
+
+
+
+
+
+
+
+        return null;
     }
 
+
+    private Long getCompanyId(String authHeader) {
+        try {
+            String token = authHeader.substring(7);
+            Long companyId= jwtUtil.getCompanyIdFromToken(token);
+
+            return companyId;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 从JWT中提取公司ID
+     */
+    private Long getUserId(String authHeader) {
+        try {
+            String token = authHeader.substring(7);
+            Long userId= jwtUtil.getUserIdFromToken(token);
+
+            return userId;
+        } catch (Exception e) {
+            return null;
+        }
+    }
     /**
      * 更新订单状态
      */
