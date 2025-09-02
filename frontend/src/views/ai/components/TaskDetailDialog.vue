@@ -2,7 +2,7 @@
   <el-dialog
     v-model="dialogVisible"
     :title="`任务详情 - ${taskDetail?.fileName || ''}`"
-    width="1000px"
+    width="1200px"
     :before-close="handleClose"
     :close-on-click-modal="false"
     :close-on-press-escape="true"
@@ -13,6 +13,10 @@
     top="5vh"
   >
     <div v-if="taskDetail" class="task-detail-content">
+      <!-- 标签页导航 -->
+      <el-tabs v-model="activeTab" class="task-detail-tabs">
+        <el-tab-pane label="基本信息" name="basic">
+          <div class="tab-content">
       <!-- 基本信息 -->
       <el-card class="info-card" shadow="never">
         <template #header>
@@ -50,37 +54,52 @@
           </el-descriptions-item>
         </el-descriptions>
       </el-card>
+          </div>
+        </el-tab-pane>
 
-      <!-- 处理结果统计 -->
-      <el-card class="stats-card" shadow="never">
-        <template #header>
-          <span class="card-title">处理结果统计</span>
-        </template>
-        
-        <el-row :gutter="20">
-          <el-col :span="6">
-            <div class="stat-card total">
-              <div class="stat-icon">
-                <el-icon><Document /></el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-number">{{ taskDetail.totalRows }}</div>
-                <div class="stat-label">总行数</div>
-              </div>
-            </div>
-          </el-col>
-          
-          <el-col :span="6">
-            <div class="stat-card success">
-              <div class="stat-icon">
-                <el-icon><CircleCheck /></el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-number">{{ taskDetail.successRows }}</div>
-                <div class="stat-label">成功处理</div>
-              </div>
-            </div>
-          </el-col>
+        <!-- 失败订单标签页 -->
+        <el-tab-pane label="失败订单" name="failed-orders">
+          <div class="tab-content">
+            <FailedOrdersList 
+              :task-id="taskDetail.taskId"
+              @retry-order="handleRetryOrder"
+              @refresh="handleRefreshFailedOrders"
+            />
+          </div>
+        </el-tab-pane>
+
+        <!-- 处理进度标签页 -->
+        <el-tab-pane label="处理进度" name="progress">
+          <div class="tab-content">
+            <el-card class="stats-card" shadow="never">
+              <template #header>
+                <span class="card-title">处理结果统计</span>
+              </template>
+              
+              <el-row :gutter="20">
+                <el-col :span="6">
+                  <div class="stat-card total">
+                    <div class="stat-icon">
+                      <el-icon><Document /></el-icon>
+                    </div>
+                    <div class="stat-content">
+                      <div class="stat-number">{{ taskDetail.totalRows }}</div>
+                      <div class="stat-label">总行数</div>
+                    </div>
+                  </div>
+                </el-col>
+                
+                <el-col :span="6">
+                  <div class="stat-card success">
+                    <div class="stat-icon">
+                      <el-icon><CircleCheck /></el-icon>
+                    </div>
+                    <div class="stat-content">
+                      <div class="stat-number">{{ taskDetail.successRows }}</div>
+                      <div class="stat-label">成功处理</div>
+                    </div>
+                  </div>
+                </el-col>
           
           <el-col :span="6">
             <div class="stat-card failed">
@@ -106,76 +125,45 @@
             </div>
           </el-col>
         </el-row>
-      </el-card>
-
-      <!-- 进度详情 -->
-      <el-card class="progress-card" shadow="never" v-if="taskDetail.status === 'PROCESSING'">
-        <template #header>
-          <span class="card-title">实时进度</span>
-        </template>
-        
-        <div class="progress-details">
-          <el-progress 
-            :percentage="getProgressPercentage()"
-            :status="getProgressStatus()"
-            :stroke-width="12"
-            :show-text="false"
-            class="main-progress"
-          />
-          <div class="progress-text">
-            {{ getProgressText() }}
+            </el-card>
           </div>
-          
-          <div class="progress-stats">
-            <div class="progress-stat-item">
-              <span class="stat-label">已处理:</span>
-              <span class="stat-value">{{ getProcessedRows() }}</span>
-            </div>
-            <div class="progress-stat-item">
-              <span class="stat-label">剩余:</span>
-              <span class="stat-value">{{ getRemainingRows() }}</span>
-            </div>
-            <div class="progress-stat-item">
-              <span class="stat-label">预计剩余时间:</span>
-              <span class="stat-value">{{ getEstimatedTime() }}</span>
-            </div>
-          </div>
-        </div>
-      </el-card>
+        </el-tab-pane>
 
-      <!-- 操作按钮 -->
-      <el-card class="actions-card" shadow="never">
-        <template #header>
-          <span class="card-title">操作</span>
-        </template>
-        
-        <div class="action-buttons">
-          <el-button 
-            type="primary" 
-            @click="viewResults"
-          >
-            <el-icon><View /></el-icon>
-            查看结果
-          </el-button>
-          
-          <el-button 
-            v-if="canRetry(taskDetail.status)"
-            type="success" 
-            @click="retryTask"
-          >
-            <el-icon><Refresh /></el-icon>
-            重新处理
-          </el-button>
-          
-          <el-button 
-            type="info" 
-            @click="downloadResults"
-          >
-            <el-icon><Download /></el-icon>
-            下载结果
-          </el-button>
-          
-          <el-button 
+        <!-- 操作按钮标签页 -->
+        <el-tab-pane label="操作" name="actions">
+          <div class="tab-content">
+            <el-card class="actions-card" shadow="never">
+              <template #header>
+                <span class="card-title">任务操作</span>
+              </template>
+              
+              <div class="action-buttons">
+                <el-button 
+                  type="primary" 
+                  @click="viewResults"
+                >
+                  <el-icon><View /></el-icon>
+                  查看结果
+                </el-button>
+                
+                <el-button 
+                  v-if="canRetry(taskDetail.status)"
+                  type="success" 
+                  @click="retryTask"
+                >
+                  <el-icon><Refresh /></el-icon>
+                  重新处理
+                </el-button>
+                
+                <el-button 
+                  type="info" 
+                  @click="downloadResults"
+                >
+                  <el-icon><Download /></el-icon>
+                  下载结果
+                </el-button>
+                
+                          <el-button 
             type="warning" 
             @click="viewLogs"
           >
@@ -191,7 +179,10 @@
             删除任务
           </el-button>
         </div>
-      </el-card>
+            </el-card>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
     </div>
     
     <template #footer>
@@ -203,7 +194,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Document, 
@@ -216,6 +207,7 @@ import {
   Delete 
 } from '@element-plus/icons-vue'
 import type { TaskHistoryItem } from '@/types/ai'
+import FailedOrdersList from './FailedOrdersList.vue'
 
 // Props
 interface Props {
@@ -235,6 +227,9 @@ const emit = defineEmits<{
   deleteTask: [taskId: string]
   close: []
 }>()
+
+// 响应式数据
+const activeTab = ref('basic')
 
 // 计算属性
 const dialogVisible = computed({
@@ -321,6 +316,15 @@ const getProgressStatus = () => {
 const getProgressText = () => {
   const percentage = getProgressPercentage()
   return `${percentage}%`
+}
+
+// 失败订单相关方法
+const handleRetryOrder = (orderId: number) => {
+  ElMessage.info('重试失败订单功能开发中...')
+}
+
+const handleRefreshFailedOrders = () => {
+  ElMessage.success('失败订单列表已刷新')
 }
 
 const getProcessedRows = () => {
@@ -436,6 +440,20 @@ const deleteTask = async () => {
 .task-detail-dialog {
   position: relative;
   z-index: 2001;
+}
+
+.task-detail-tabs {
+  margin-bottom: 20px;
+}
+
+.tab-content {
+  padding: 20px 0;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .task-detail-content {

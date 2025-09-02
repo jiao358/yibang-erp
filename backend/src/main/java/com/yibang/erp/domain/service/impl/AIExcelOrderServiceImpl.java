@@ -419,6 +419,103 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
         }
     }
 
+    @Override
+    public FailedOrdersResponse getFailedOrders(String taskId, Integer page, Integer size, String sortBy, String sortOrder) {
+        try {
+            log.info("查询失败订单列表，任务ID: {}, 页码: {}, 大小: {}, 排序: {} {}", 
+                    taskId, page, size, sortBy, sortOrder);
+
+            // 参数验证
+            if (taskId == null || taskId.trim().isEmpty()) {
+                log.warn("任务ID为空");
+                return FailedOrdersResponse.error("任务ID不能为空");
+            }
+
+            // 获取所有错误订单
+            List<ErrorOrderInfo> allErrorOrders = errorOrderService.getErrorOrdersByTaskId(taskId);
+            
+            if (allErrorOrders == null) {
+                allErrorOrders = new ArrayList<>();
+            }
+            
+            log.info("查询到错误订单数量: {}", allErrorOrders.size());
+            
+            // 手动分页和排序
+            List<ErrorOrderInfo> sortedOrders = allErrorOrders.stream()
+                .sorted((a, b) -> {
+                    if (a.getExcelRowNumber() == null) return -1;
+                    if (b.getExcelRowNumber() == null) return 1;
+                    
+                    if ("desc".equalsIgnoreCase(sortOrder)) {
+                        return b.getExcelRowNumber().compareTo(a.getExcelRowNumber());
+                    } else {
+                        return a.getExcelRowNumber().compareTo(b.getExcelRowNumber());
+                    }
+                })
+                .collect(Collectors.toList());
+            
+            // 计算分页
+            int total = sortedOrders.size();
+            int totalPages = (int) Math.ceil((double) total / size);
+            int startIndex = (page - 1) * size;
+            int endIndex = Math.min(startIndex + size, total);
+            
+            List<ErrorOrderInfo> pageOrders = sortedOrders.subList(startIndex, endIndex);
+
+            // 转换为DTO
+            List<FailedOrdersResponse.FailedOrderInfo> failedOrderInfos = pageOrders.stream().map(errorOrder -> {
+                FailedOrdersResponse.FailedOrderInfo info = new FailedOrdersResponse.FailedOrderInfo();
+                info.setId(errorOrder.getId());
+                info.setTaskId(errorOrder.getTaskId());
+                info.setExcelRowNumber(errorOrder.getExcelRowNumber());
+                
+                // 安全处理rawData
+                if (errorOrder.getRawData() != null) {
+                    try {
+                        info.setRawData(errorOrder.getRawData().toString());
+                    } catch (Exception e) {
+                        log.warn("转换rawData失败: {}", e.getMessage());
+                        info.setRawData("数据转换失败");
+                    }
+                } else {
+                    info.setRawData("");
+                }
+                
+                info.setErrorType(errorOrder.getErrorType());
+                info.setErrorMessage(errorOrder.getErrorMessage());
+                info.setSuggestedAction(errorOrder.getSuggestedAction());
+                info.setStatus(errorOrder.getStatus());
+                
+                // 时间格式化
+                if (errorOrder.getCreatedAt() != null) {
+                    info.setCreatedAt(errorOrder.getCreatedAt().toString());
+                }
+                if (errorOrder.getUpdatedAt() != null) {
+                    info.setUpdatedAt(errorOrder.getUpdatedAt().toString());
+                }
+                
+                return info;
+            }).collect(Collectors.toList());
+
+            // 构建响应
+            FailedOrdersResponse response = FailedOrdersResponse.success();
+            response.setContent(failedOrderInfos);
+            response.setTotalElements((long) total);
+            response.setTotalPages(totalPages);
+            response.setCurrentPage(page);
+            response.setSize(size);
+
+            log.info("查询完成，任务ID: {}, 总失败订单数: {}, 当前页: {}, 每页大小: {}", 
+                    taskId, total, page, size);
+
+            return response;
+
+        } catch (Exception e) {
+            log.error("查询失败订单列表失败，任务ID: {}", taskId, e);
+            return FailedOrdersResponse.error("查询失败订单列表失败: " + e.getMessage());
+        }
+    }
+
     /**
      * 异步启动处理任务
      */

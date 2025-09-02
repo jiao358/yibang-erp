@@ -6,6 +6,7 @@ import com.yibang.erp.domain.dto.AIExcelProcessRequest;
 import com.yibang.erp.domain.dto.AIExcelProcessResponse;
 import com.yibang.erp.domain.dto.TaskListResponse;
 import com.yibang.erp.domain.dto.TaskStatisticsResponse;
+import com.yibang.erp.domain.dto.FailedOrdersResponse;
 import com.yibang.erp.domain.service.AIExcelOrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -174,6 +175,33 @@ public class AIExcelOrderController {
         } catch (Exception e) {
             log.error("获取任务统计信息失败", e);
             TaskStatisticsResponse errorResponse = TaskStatisticsResponse.error("获取统计信息失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+
+    /**
+     * 获取失败订单列表
+     */
+    @GetMapping("/{taskId}/failed-orders")
+    public ResponseEntity<FailedOrdersResponse> getFailedOrders(
+            @PathVariable String taskId,
+            @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
+            @RequestParam(value = "size", required = false, defaultValue = "20") Integer size,
+            @RequestParam(value = "sortBy", required = false, defaultValue = "excelRowNumber") String sortBy,
+            @RequestParam(value = "sortOrder", required = false, defaultValue = "asc") String sortOrder) {
+        try {
+            log.info("获取失败订单列表，任务ID: {}, 页码: {}, 大小: {}, 排序: {} {}", 
+                    taskId, page, size, sortBy, sortOrder);
+            
+            FailedOrdersResponse response = aiExcelOrderService.getFailedOrders(taskId, page, size, sortBy, sortOrder);
+            
+            log.info("返回失败订单列表: 总数={}, 当前页={}, 每页大小={}", 
+                    response.getTotalElements(), response.getCurrentPage(), response.getSize());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("获取失败订单列表失败，任务ID: {}", taskId, e);
+            FailedOrdersResponse errorResponse = FailedOrdersResponse.error("获取失败订单列表失败: " + e.getMessage());
             return ResponseEntity.badRequest().body(errorResponse);
         }
     }

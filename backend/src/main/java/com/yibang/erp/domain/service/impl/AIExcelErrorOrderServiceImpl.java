@@ -1,5 +1,6 @@
 package com.yibang.erp.domain.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -76,10 +77,23 @@ public class AIExcelErrorOrderServiceImpl extends ServiceImpl<AIExcelErrorOrderR
 
     @Override
     public List<ErrorOrderInfo> getErrorOrdersByTaskId(String taskId) {
-        List<AIExcelErrorOrder> entities = errorOrderRepository.selectByTaskId(taskId);
-        return entities.stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
+        try {
+            // 使用MyBatis-Plus的QueryWrapper来查询
+            QueryWrapper<AIExcelErrorOrder> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("task_id", taskId);
+            queryWrapper.orderByAsc("excel_row_number");
+            
+            List<AIExcelErrorOrder> entities = errorOrderRepository.selectList(queryWrapper);
+            log.info("查询到错误订单实体数量: {}", entities.size());
+            
+            return entities.stream()
+                    .map(this::convertToDto)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("查询错误订单失败，任务ID: {}", taskId, e);
+            return new ArrayList<>();
+        }
     }
 
     @Override

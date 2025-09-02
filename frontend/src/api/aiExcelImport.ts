@@ -100,6 +100,37 @@ export const aiExcelImportApi = {
   },
 
   /**
+   * 获取失败订单列表
+   */
+  getFailedOrders: (taskId: string, params?: {
+    page?: number
+    size?: number
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
+  }) => {
+    return request.get<{
+      content: Array<{
+        id: number
+        taskId: string
+        excelRowNumber: number
+        rawData: string
+        errorType: string
+        errorMessage: string
+        suggestedAction: string
+        status: string
+        createdAt: string
+        updatedAt: string
+      }>
+      totalElements: number
+      totalPages: number
+      currentPage: number
+      size: number
+      status: string
+      message: string
+    }>(`/api/ai-excel-orders/${taskId}/failed-orders`, { params })
+  },
+
+  /**
    * 重新处理任务
    */
   retryTask: (taskId: string) => {
