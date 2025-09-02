@@ -8,6 +8,8 @@ import com.yibang.erp.domain.dto.OrderStatusUpdateRequest;
 import com.yibang.erp.domain.dto.OrderConflictResolutionRequest;
 import com.yibang.erp.domain.dto.OrderBatchProcessRequest;
 import com.yibang.erp.domain.dto.OrderBatchProcessResponse;
+import com.yibang.erp.domain.dto.SupplierRejectRequest;
+import com.yibang.erp.domain.dto.SupplierShipRequest;
 
 import java.util.List;
 
@@ -73,7 +75,12 @@ public interface OrderService {
     /**
      * 供应商发货
      */
-    OrderResponse supplierShipOrder(Long orderId);
+    OrderResponse supplierShipOrder(Long orderId, SupplierShipRequest request);
+
+    /**
+     * 供应商拒绝订单
+     */
+    OrderResponse supplierRejectOrder(Long orderId, SupplierRejectRequest request);
 
     /**
      * 处理订单冲突

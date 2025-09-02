@@ -2,11 +2,7 @@ package com.yibang.erp.controller;
 
 import com.yibang.erp.common.util.JwtUtil;
 import com.yibang.erp.common.util.UserSecurityUtils;
-import com.yibang.erp.domain.dto.AIExcelProcessRequest;
-import com.yibang.erp.domain.dto.AIExcelProcessResponse;
-import com.yibang.erp.domain.dto.TaskListResponse;
-import com.yibang.erp.domain.dto.TaskStatisticsResponse;
-import com.yibang.erp.domain.dto.FailedOrdersResponse;
+import com.yibang.erp.domain.dto.*;
 import com.yibang.erp.domain.service.AIExcelOrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -182,7 +178,7 @@ public class AIExcelOrderController {
     /**
      * 获取失败订单列表
      */
-    @GetMapping("/{taskId}/failed-orders")
+        @GetMapping("/{taskId}/failed-orders")
     public ResponseEntity<FailedOrdersResponse> getFailedOrders(
             @PathVariable String taskId,
             @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
@@ -190,18 +186,67 @@ public class AIExcelOrderController {
             @RequestParam(value = "sortBy", required = false, defaultValue = "excelRowNumber") String sortBy,
             @RequestParam(value = "sortOrder", required = false, defaultValue = "asc") String sortOrder) {
         try {
-            log.info("获取失败订单列表，任务ID: {}, 页码: {}, 大小: {}, 排序: {} {}", 
+            log.info("获取失败订单列表，任务ID: {}, 页码: {}, 大小: {}, 排序: {} {}",
                     taskId, page, size, sortBy, sortOrder);
-            
+
             FailedOrdersResponse response = aiExcelOrderService.getFailedOrders(taskId, page, size, sortBy, sortOrder);
-            
-            log.info("返回失败订单列表: 总数={}, 当前页={}, 每页大小={}", 
+
+            log.info("返回失败订单列表: 总数={}, 当前页={}, 每页大小={}",
                     response.getTotalElements(), response.getCurrentPage(), response.getSize());
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("获取失败订单列表失败，任务ID: {}", taskId, e);
             FailedOrdersResponse errorResponse = FailedOrdersResponse.error("获取失败订单列表失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+
+    @GetMapping("/{taskId}/success-orders")
+    public ResponseEntity<SuccessOrdersResponse> getSuccessOrders(
+            @PathVariable String taskId,
+            @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
+            @RequestParam(value = "size", required = false, defaultValue = "20") Integer size,
+            @RequestParam(value = "sortBy", required = false, defaultValue = "created_at") String sortBy,
+            @RequestParam(value = "sortOrder", required = false, defaultValue = "asc") String sortOrder) {
+        try {
+            log.info("获取成功订单列表，任务ID: {}, 页码: {}, 大小: {}, 排序: {} {}",
+                    taskId, page, size, sortBy, sortOrder);
+
+            SuccessOrdersResponse response = aiExcelOrderService.getSuccessOrders(taskId, page, size, sortBy, sortOrder);
+
+            log.info("返回成功订单列表: 总数={}, 当前页={}, 每页大小={}",
+                    response.getTotalElements(), response.getCurrentPage(), response.getSize());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("获取成功订单列表失败，任务ID: {}", taskId, e);
+            SuccessOrdersResponse errorResponse = SuccessOrdersResponse.error("获取成功订单列表失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+
+    @GetMapping("/{taskId}/processing-logs")
+    public ResponseEntity<ProcessingLogsResponse> getProcessingLogs(
+            @PathVariable String taskId,
+            @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
+            @RequestParam(value = "size", required = false, defaultValue = "20") Integer size,
+            @RequestParam(value = "level", required = false) String level,
+            @RequestParam(value = "sortBy", required = false, defaultValue = "timestamp") String sortBy,
+            @RequestParam(value = "sortOrder", required = false, defaultValue = "desc") String sortOrder) {
+        try {
+            log.info("获取处理日志列表，任务ID: {}, 页码: {}, 大小: {}, 级别: {}, 排序: {} {}",
+                    taskId, page, size, level, sortBy, sortOrder);
+
+            ProcessingLogsResponse response = aiExcelOrderService.getProcessingLogs(taskId, page, size, level, sortBy, sortOrder);
+
+            log.info("返回处理日志列表: 总数={}, 当前页={}, 每页大小={}",
+                    response.getTotalElements(), response.getCurrentPage(), response.getSize());
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("获取处理日志列表失败，任务ID: {}", taskId, e);
+            ProcessingLogsResponse errorResponse = ProcessingLogsResponse.error("获取处理日志列表失败: " + e.getMessage());
             return ResponseEntity.badRequest().body(errorResponse);
         }
     }

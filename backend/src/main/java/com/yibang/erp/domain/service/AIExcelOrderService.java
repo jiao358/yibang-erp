@@ -5,6 +5,8 @@ import com.yibang.erp.domain.dto.AIExcelProcessResponse;
 import com.yibang.erp.domain.dto.TaskStatisticsResponse;
 import com.yibang.erp.domain.dto.TaskListResponse;
 import com.yibang.erp.domain.dto.FailedOrdersResponse;
+import com.yibang.erp.domain.dto.SuccessOrdersResponse;
+import com.yibang.erp.domain.dto.ProcessingLogsResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -71,4 +73,27 @@ public interface AIExcelOrderService {
      * @return 失败订单列表响应
      */
     FailedOrdersResponse getFailedOrders(String taskId, Integer page, Integer size, String sortBy, String sortOrder);
+
+    /**
+     * 获取成功订单列表
+     * @param taskId 任务ID
+     * @param page 页码
+     * @param size 每页大小
+     * @param sortBy 排序字段（可选）
+     * @param sortOrder 排序方向（可选）
+     * @return 成功订单列表响应
+     */
+    SuccessOrdersResponse getSuccessOrders(String taskId, Integer page, Integer size, String sortBy, String sortOrder);
+
+    /**
+     * 获取处理日志列表
+     * @param taskId 任务ID
+     * @param page 页码
+     * @param size 每页大小
+     * @param level 日志级别（可选）
+     * @param sortBy 排序字段（可选）
+     * @param sortOrder 排序方向（可选）
+     * @return 处理日志列表响应
+     */
+    ProcessingLogsResponse getProcessingLogs(String taskId, Integer page, Integer size, String level, String sortBy, String sortOrder);
 }

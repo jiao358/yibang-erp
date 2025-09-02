@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.dto.*;
 import com.yibang.erp.domain.entity.AIExcelProcessTask;
 import com.yibang.erp.domain.entity.AIExcelProcessTaskDetail;
@@ -16,6 +17,7 @@ import com.yibang.erp.domain.entity.OrderItem;
 import com.yibang.erp.domain.service.*;
 import com.yibang.erp.infrastructure.repository.*;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -255,7 +257,7 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 
                 // 设置上传用户
                 if (task.getCreatedBy() != null) {
-                    info.setUploadUser("用户" + task.getCreatedBy());
+                    info.setUploadUser("用户:" +  UserSecurityUtils.getCurrentUsername());
                 }
                 
                 // 设置供应商信息（暂时设置为默认值）
@@ -513,6 +515,183 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
         } catch (Exception e) {
             log.error("查询失败订单列表失败，任务ID: {}", taskId, e);
             return FailedOrdersResponse.error("查询失败订单列表失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public SuccessOrdersResponse getSuccessOrders(String taskId, Integer page, Integer size, String sortBy, String sortOrder) {
+        try {
+            log.info("查询成功订单列表，任务ID: {}, 页码: {}, 大小: {}, 排序: {} {}", 
+                    taskId, page, size, sortBy, sortOrder);
+
+            // 参数验证
+            if (taskId == null || taskId.trim().isEmpty()) {
+                log.warn("任务ID为空");
+                return SuccessOrdersResponse.error("任务ID不能为空");
+            }
+
+
+            QueryWrapper<AIExcelProcessTaskDetail> taskSuccessDetails = new QueryWrapper<>();
+            taskSuccessDetails.eq("task_id",taskId);
+            taskSuccessDetails.eq("process_status","SUCCESS");
+            taskSuccessDetails.eq("processing_notes","订单创建成功");
+            taskSuccessDetails.isNotNull("order_id");
+
+
+
+
+            List<AIExcelProcessTaskDetail> taskSuccessDetailsList = taskDetailRepository.selectList(taskSuccessDetails);
+            if(CollectionUtils.isEmpty(taskSuccessDetailsList)){
+                log.debug("查询不到任何订单成功的记录 taskId: {}",taskId);
+                //没有任何成功订单
+                return SuccessOrdersResponse.success();
+            }
+
+
+            //根据task 在 ai_excel_process_task_details 数据表中获取成功的订单
+
+            // 构建查询条件 - 查询该任务相关的成功订单
+            QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+            queryWrapper.in("platform_order_id", taskSuccessDetailsList.stream().map(x->x.getOrderId()).toList()
+            );
+            queryWrapper.eq("ai_processed", true); // 查询AI处理的订单
+
+
+            // 排序处理 - 验证排序字段
+            String validSortBy = sortBy;
+            if (!"id".equals(sortBy) && !"platform_order_id".equals(sortBy) && 
+                !"created_at".equals(sortBy) && !"updated_at".equals(sortBy)) {
+                validSortBy = "id"; // 默认按ID排序
+            }
+            
+            if ("desc".equalsIgnoreCase(sortOrder)) {
+                queryWrapper.orderByDesc(validSortBy);
+            } else {
+                queryWrapper.orderByAsc(validSortBy);
+            }
+
+            // 分页查询
+            Page<Order> pageParam = new Page<>(page, size);
+            Page<Order> orderPage = orderRepository.selectPage(pageParam, queryWrapper);
+            long count = orderRepository.selectCount(queryWrapper);
+            
+            // 转换为DTO
+            List<SuccessOrdersResponse.SuccessOrderInfo> successOrderInfos = orderPage.getRecords().stream().map(order -> {
+                SuccessOrdersResponse.SuccessOrderInfo info = new SuccessOrdersResponse.SuccessOrderInfo();
+                info.setId(order.getId());
+                info.setOrderId(order.getPlatformOrderId()); // 使用platformOrderId作为订单编号
+                info.setTaskId(taskId);
+                info.setExcelRowNumber(null); // 暂时设为null，后续可以从扩展字段获取
+                info.setCustomerName(null); // 暂时设为null，后续需要关联customer表获取
+                info.setCustomerId(order.getCustomerId());
+                info.setProductName(null); // 暂时设为null，后续需要关联product表获取
+                info.setProductId(null); // 暂时设为null，后续需要关联product表获取
+                info.setQuantity(null); // 暂时设为null，后续需要关联order_items表获取
+                info.setUnitPrice(0.0); // 暂时设为0，后续需要关联order_items表获取
+                info.setAmount(order.getTotalAmount() != null ? order.getTotalAmount().doubleValue() : 0.0);
+                info.setStatus(order.getOrderStatus());
+                info.setRemark(order.getRemarks());
+                
+                // 时间格式化
+                if (order.getCreatedAt() != null) {
+                    info.setCreatedAt(order.getCreatedAt().toString());
+                }
+                if (order.getUpdatedAt() != null) {
+                    info.setUpdatedAt(order.getUpdatedAt().toString());
+                }
+                
+                return info;
+            }).collect(Collectors.toList());
+
+            // 构建响应
+            SuccessOrdersResponse response = SuccessOrdersResponse.success();
+            response.setContent(successOrderInfos);
+            response.setTotalElements(count);
+            response.setTotalPages((int) orderPage.getPages());
+            response.setCurrentPage(page);
+            response.setSize(size);
+
+            log.info("查询完成，任务ID: {}, 总成功订单数: {}, 当前页: {}, 每页大小: {}", 
+                    taskId, orderPage.getTotal(), page, size);
+
+            return response;
+
+        } catch (Exception e) {
+            log.error("查询成功订单列表失败，任务ID: {}", taskId, e);
+            return SuccessOrdersResponse.error("查询成功订单列表失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ProcessingLogsResponse getProcessingLogs(String taskId, Integer page, Integer size, String level, String sortBy, String sortOrder) {
+        try {
+            log.info("查询处理日志列表，任务ID: {}, 页码: {}, 大小: {}, 级别: {}, 排序: {} {}", 
+                    taskId, page, size, level, sortBy, sortOrder);
+
+            // 参数验证
+            if (taskId == null || taskId.trim().isEmpty()) {
+                log.warn("任务ID为空");
+                return ProcessingLogsResponse.error("任务ID不能为空");
+            }
+
+            // 构建查询条件 - 查询该任务相关的处理日志
+            QueryWrapper<AIExcelProcessTaskDetail> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("task_id", taskId);
+            
+            // 日志级别筛选
+            if (level != null && !level.trim().isEmpty()) {
+                queryWrapper.eq("process_status", level);
+            }
+            
+            // 排序处理 - 验证排序字段
+            String validSortBy = sortBy;
+            if (!"id".equals(sortBy) && !"created_at".equals(sortBy) && !"updated_at".equals(sortBy)) {
+                validSortBy = "created_at"; // 默认按创建时间排序
+            }
+            
+            if ("desc".equalsIgnoreCase(sortOrder)) {
+                queryWrapper.orderByDesc(validSortBy);
+            } else {
+                queryWrapper.orderByAsc(validSortBy);
+            }
+
+            // 分页查询
+            Page<AIExcelProcessTaskDetail> pageParam = new Page<>(page, size);
+            Page<AIExcelProcessTaskDetail> logPage = taskDetailRepository.selectPage(pageParam, queryWrapper);
+            
+            // 转换为DTO
+            List<ProcessingLogsResponse.LogInfo> logInfos = logPage.getRecords().stream().map(detail -> {
+                ProcessingLogsResponse.LogInfo info = new ProcessingLogsResponse.LogInfo();
+                info.setId(detail.getId());
+                info.setTaskId(taskId);
+                info.setTimestamp(detail.getCreatedAt() != null ? detail.getCreatedAt().toString() : "");
+                info.setLevel(detail.getProcessStatus());
+                info.setMessage(detail.getProcessingNotes());
+                info.setDetails(detail.getErrorMessage());
+                info.setExcelRowNumber(detail.getExcelRowNumber());
+                info.setStep(detail.getProcessStatus());
+                info.setExecutionTime(null); // 暂时设为null，后续可以从其他字段计算
+                info.setCreatedAt(detail.getCreatedAt() != null ? detail.getCreatedAt().toString() : "");
+                
+                return info;
+            }).collect(Collectors.toList());
+
+            // 构建响应
+            ProcessingLogsResponse response = ProcessingLogsResponse.success();
+            response.setContent(logInfos);
+            response.setTotalElements(logPage.getTotal());
+            response.setTotalPages((int) logPage.getPages());
+            response.setCurrentPage(page);
+            response.setSize(size);
+
+            log.info("查询完成，任务ID: {}, 总日志数: {}, 当前页: {}, 每页大小: {}", 
+                    taskId, logPage.getTotal(), page, size);
+
+            return response;
+
+        } catch (Exception e) {
+            log.error("查询处理日志列表失败，任务ID: {}", taskId, e);
+            return ProcessingLogsResponse.error("查询处理日志列表失败: " + e.getMessage());
         }
     }
 
@@ -867,23 +1046,31 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
 
                     //order 金额计算
                     orderServiceImpl.calculateOrderTotal(order.getId());
+
+                    //还要保存订单单号Id  和excel 对应的行数据
                     // 保存成功详情
-                    saveTaskDetail(taskId, processedData.getRowNumber(), "SUCCESS",
-                            "订单创建成功", null, order.getId(), processedData.getConfidence());
+                    saveTaskDetailAllData(taskId, processedData.getRowNumber(), "SUCCESS",
+                            "订单创建成功", null, order.getPlatformOrderId(),
+                            processedData.getConfidence(),new JSONObject(processedData.rawData).toString());
+
+
+
+
 
                 } else if ("MANUAL_PROCESS".equals(processedData.getStatus())) {
                     manualProcessCount++;
 
+
                     // 保存需要人工处理的详情
-                    saveTaskDetail(taskId, processedData.getRowNumber(), "MANUAL_PROCESS",
-                            "需要人工处理", processedData.getErrorMessage(), null, processedData.getConfidence());
+                    saveTaskDetailAllData(taskId, processedData.getRowNumber(), "MANUAL_PROCESS",
+                            "需要人工处理", processedData.getErrorMessage(), null, processedData.getConfidence(),new JSONObject(processedData.rawData).toString());
 
                 } else {
                     failedCount++;
 
                     // 保存失败详情
-                    saveTaskDetail(taskId, processedData.getRowNumber(), "FAILED",
-                            "处理失败", processedData.getErrorMessage(), null, processedData.getConfidence());
+                    saveTaskDetailAllData(taskId, processedData.getRowNumber(), "FAILED",
+                            "处理失败", processedData.getErrorMessage(), null, processedData.getConfidence(),new JSONObject(processedData.rawData).toString());
                 }
 
             } catch (Exception e) {
@@ -891,8 +1078,8 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 failedCount++;
 
                 // 保存错误详情
-                saveTaskDetail(taskId, processedData.getRowNumber(), "FAILED",
-                        "创建订单异常", e.getMessage(), null, 0.0);
+                saveTaskDetailAllData(taskId, processedData.getRowNumber(), "FAILED",
+                        "创建订单异常", e.getMessage(), null, 0.0,new JSONObject(processedData.rawData).toString());
             }
         }
 
@@ -1273,6 +1460,29 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
         }
     }
 
+
+    private void saveTaskDetailAllData(String taskId, Integer rowNumber, String status, String message,
+                                       String errorMessage, String orderId, Double confidence,String rowData){
+        try {
+            AIExcelProcessTaskDetail detail = new AIExcelProcessTaskDetail();
+            detail.setTaskId(taskId);
+            detail.setRawData(rowData);
+            detail.setExcelRowNumber(rowNumber);
+            detail.setProcessStatus(status);
+            detail.setProcessingNotes(message);
+            detail.setErrorMessage(errorMessage);
+            detail.setConfidence(confidence);
+            detail.setOrderId(orderId);
+            detail.setCreatedAt(LocalDateTime.now());
+            detail.setUpdatedAt(LocalDateTime.now());
+            taskDetailRepository.insert(detail);
+        } catch (Exception e) {
+            log.error("保存任务详情失败", e);
+        }
+
+
+
+    }
     private void saveTaskDetail(String taskId, Integer rowNumber, String status, String message,
                                 String errorMessage, Long orderId, Double confidence) {
         try {

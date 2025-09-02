@@ -65,7 +65,7 @@
       
       <el-button @click="$emit('viewAll')">
         <el-icon><View /></el-icon>
-        查看任务列表
+        查看详情
       </el-button>
     </div>
   </div>

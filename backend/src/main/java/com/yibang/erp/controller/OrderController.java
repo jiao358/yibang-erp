@@ -201,8 +201,22 @@ public class OrderController {
      */
     @PostMapping("/{orderId}/supplier-ship")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER_ADMIN')")
-    public ResponseEntity<OrderResponse> supplierShipOrder(@PathVariable Long orderId) {
-        OrderResponse response = orderService.supplierShipOrder(orderId);
+    public ResponseEntity<OrderResponse> supplierShipOrder(
+            @PathVariable Long orderId,
+            @RequestBody SupplierShipRequest request) {
+        OrderResponse response = orderService.supplierShipOrder(orderId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 供应商拒绝订单
+     */
+    @PostMapping("/{orderId}/supplier-reject")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER_ADMIN')")
+    public ResponseEntity<OrderResponse> supplierRejectOrder(
+            @PathVariable Long orderId,
+            @RequestBody SupplierRejectRequest request) {
+        OrderResponse response = orderService.supplierRejectOrder(orderId, request);
         return ResponseEntity.ok(response);
     }
 

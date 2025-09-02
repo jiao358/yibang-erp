@@ -213,6 +213,16 @@
             />
           </div>
         </el-tab-pane>
+
+        <!-- 处理日志标签页 -->
+        <el-tab-pane label="处理日志" name="processing-logs">
+          <div class="tab-content">
+            <ProcessingLogsList 
+              :task-id="taskDetail.taskId"
+              @refresh="handleRefreshLogs"
+            />
+          </div>
+        </el-tab-pane>
       </el-tabs>
     </div>
     
@@ -240,6 +250,7 @@ import {
 import type { TaskHistoryItem } from '@/types/ai'
 import FailedOrdersList from './FailedOrdersList.vue'
 import SuccessOrdersList from './SuccessOrdersList.vue'
+import ProcessingLogsList from './ProcessingLogsList.vue'
 
 // Props
 interface Props {
@@ -366,6 +377,10 @@ const handleViewOrder = (orderId: string) => {
 
 const handleRefreshSuccessOrders = () => {
   ElMessage.success('成功订单列表已刷新')
+}
+
+const handleRefreshLogs = () => {
+  ElMessage.success('处理日志已刷新')
 }
 
 const getProcessedRows = () => {

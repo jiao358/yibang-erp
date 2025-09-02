@@ -97,4 +97,10 @@ public class AIExcelProcessTaskDetail {
      */
     @TableField("updated_at")
     private LocalDateTime updatedAt;
+
+    /**
+     * 订单ID
+     */
+    @TableField("order_id")
+    private String orderId;
 }

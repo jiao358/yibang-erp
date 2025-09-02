@@ -57,6 +57,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     private OrderNumberGeneratorService orderNumberGeneratorService;
 
     @Autowired
+    private LogisticsInfoRepository logisticsInfoRepository;
+
+    @Autowired
     private DeepSeekClient deepSeekClient;
 
     private OrderAddressDTO aiModelHandleAddress(String address){
@@ -576,13 +579,89 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     }
 
     @Override
-    public OrderResponse supplierShipOrder(Long orderId) {
-        OrderStatusUpdateRequest request = new OrderStatusUpdateRequest();
-        //todo 只有供应商才能操作，并且订单必须为Approved 才可以发货
-        request.setTargetStatus("SHIPPED");
-        request.setReason("供应商发货");
-        request.setOperatorId(getCurrentUserId());
-        return updateOrderStatus(orderId, request);
+    public OrderResponse supplierShipOrder(Long orderId, SupplierShipRequest request) {
+        Order order = getOrderEntityById(orderId);
+
+        // 验证状态转换
+        if (!isValidStatusTransition(order.getOrderStatus(), "SHIPPED")) {
+            throw new IllegalStateException("无效的状态转换: " + order.getOrderStatus() + " -> SHIPPED");
+        }
+
+        // 记录状态变更日志
+        OrderStatusLog log = new OrderStatusLog();
+        log.setOrderId(orderId);
+        log.setFromStatus(order.getOrderStatus());
+        log.setToStatus("SHIPPED");
+        log.setChangeReason("供应商发货 - 物流单号: " + request.getTrackingNumber());
+        log.setOperatorId(request.getOperatorId());
+        log.setOperatorType("USER");
+        log.setCreatedAt(LocalDateTime.now());
+        orderStatusLogRepository.insert(log);
+
+        // 更新订单状态和物流信息
+        order.setOrderStatus("SHIPPED");
+        order.setLogisticsOrderNumber(request.getTrackingNumber());
+        order.setLogisticsCompany(request.getCarrier());
+        order.setUpdatedAt(LocalDateTime.now());
+        order.setUpdatedBy(request.getOperatorId());
+        orderRepository.updateById(order);
+
+        // 创建物流信息记录
+        LogisticsInfo logisticsInfo = new LogisticsInfo();
+        logisticsInfo.setOrderId(orderId);
+        logisticsInfo.setTrackingNumber(request.getTrackingNumber());
+        logisticsInfo.setCarrier(request.getCarrier());
+        logisticsInfo.setCarrierCode(request.getCarrierCode());
+        logisticsInfo.setShippingMethod(request.getShippingMethod());
+        logisticsInfo.setShippingDate(LocalDateTime.now());
+        logisticsInfo.setShippingAddress(order.getDeliveryAddress()); // 使用订单中的发货地址
+        logisticsInfo.setDeliveryAddress(order.getDeliveryAddress());
+        logisticsInfo.setShippingContact(order.getDeliveryContact());
+        logisticsInfo.setDeliveryContact(order.getDeliveryContact());
+        logisticsInfo.setShippingPhone(order.getDeliveryPhone());
+        logisticsInfo.setDeliveryPhone(order.getDeliveryPhone());
+        logisticsInfo.setShippingNotes(request.getShippingNotes());
+        logisticsInfo.setStatus("SHIPPED");
+        logisticsInfo.setCreatedAt(LocalDateTime.now());
+        logisticsInfo.setUpdatedAt(LocalDateTime.now());
+        logisticsInfo.setCreatedBy(request.getOperatorId());
+        logisticsInfo.setUpdatedBy(request.getOperatorId());
+        logisticsInfoRepository.insert(logisticsInfo);
+
+        return getOrderById(orderId);
+    }
+
+    @Override
+    public OrderResponse supplierRejectOrder(Long orderId, SupplierRejectRequest request) {
+        Order order = getOrderEntityById(orderId);
+
+        // 验证状态转换
+        if (!isValidStatusTransition(order.getOrderStatus(), "REJECTED")) {
+            throw new IllegalStateException("无效的状态转换: " + order.getOrderStatus() + " -> REJECTED");
+        }
+
+        // 记录状态变更日志
+        OrderStatusLog log = new OrderStatusLog();
+        log.setOrderId(orderId);
+        log.setFromStatus(order.getOrderStatus());
+        log.setToStatus("REJECTED");
+        log.setChangeReason(request.getRejectReason());
+        log.setOperatorId(request.getOperatorId());
+        log.setOperatorType("USER");
+        log.setCreatedAt(LocalDateTime.now());
+        orderStatusLogRepository.insert(log);
+
+        // 更新订单状态和审核信息
+        order.setOrderStatus("REJECTED");
+        order.setApprovalStatus("REJECTED");
+        order.setApprovalComment(request.getRejectReason()); // 将拒绝原因保存到审核意见字段
+        order.setApprovalBy(request.getOperatorId());
+        order.setApprovalAt(LocalDateTime.now());
+        order.setUpdatedAt(LocalDateTime.now());
+        order.setUpdatedBy(request.getOperatorId());
+        orderRepository.updateById(order);
+
+        return getOrderById(orderId);
     }
 
     @Override
@@ -658,7 +737,44 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
     @Override
     public List<OrderStatusLog> getOrderStatusHistory(Long orderId) {
-        return orderStatusLogRepository.selectByOrderId(orderId);
+        List<OrderStatusLog> logs = orderStatusLogRepository.selectByOrderId(orderId);
+        
+        // 数据丰富化：设置扩展字段
+        for (OrderStatusLog log : logs) {
+            // 设置操作时间
+            log.setOperatedAt(log.getCreatedAt());
+            
+            // 设置是否为系统操作
+            log.setIsSystemOperation("SYSTEM".equals(log.getOperatorType()));
+            
+            // 设置操作来源
+            if ("SYSTEM".equals(log.getOperatorType())) {
+                log.setOperationSource("SYSTEM");
+            } else if ("USER".equals(log.getOperatorType())) {
+                log.setOperationSource("MANUAL");
+            } else {
+                log.setOperationSource("API");
+            }
+            
+            // 设置备注（使用变更原因）
+            log.setRemarks(log.getChangeReason());
+            
+            // 如果有操作人ID，查询操作人信息
+            if (log.getOperatorId() != null) {
+                try {
+                    User operator = userRepository.selectById(log.getOperatorId());
+                    if (operator != null) {
+                        log.setOperatorName(operator.getUsername());
+                        log.setOperatorRole(operator.getRole());
+                    }
+                } catch (Exception e) {
+                    // 忽略查询用户信息失败的情况
+                    log.setOperatorName("未知用户");
+                }
+            }
+        }
+        
+        return logs;
     }
 
     @Override
@@ -880,6 +996,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setDeliveryContact(order.getDeliveryContact());
         response.setDeliveryPhone(order.getDeliveryPhone());
         response.setExpectedDeliveryDate(order.getExpectedDeliveryDate());
+        
+        // 设置审核相关字段
+        response.setApprovalComment(order.getApprovalComment());
+        response.setApprovalAt(order.getApprovalAt());
+        response.setApprovalBy(order.getApprovalBy());
 
         // 获取客户信息
         if (order.getCustomerId() != null && order.getCustomerId().longValue()!=0L) {

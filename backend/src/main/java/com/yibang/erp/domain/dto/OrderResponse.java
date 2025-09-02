@@ -158,6 +158,21 @@ public class OrderResponse {
     private String remarks;
 
     /**
+     * 审核意见
+     */
+    private String approvalComment;
+
+    /**
+     * 审核时间
+     */
+    private LocalDateTime approvalAt;
+
+    /**
+     * 审核人ID
+     */
+    private Long approvalBy;
+
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;

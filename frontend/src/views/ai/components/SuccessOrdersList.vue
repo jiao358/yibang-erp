@@ -129,6 +129,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { User, Goods } from '@element-plus/icons-vue'
+import aiExcelImportApi from '@/api/aiExcelImport'
 
 // Props
 interface Props {
@@ -155,56 +156,47 @@ const pageSize = ref(20)
 const orderDetailDialogVisible = ref(false)
 const selectedOrder = ref<any>(null)
 
-// 模拟数据 - 后续替换为真实API
-const loadSuccessOrders = async () => {
-  if (!props.taskId) return
-  
-  try {
-    loading.value = true
-    console.log('📋 开始加载成功订单列表，任务ID:', props.taskId)
-    
-    // 模拟API调用 - 后续替换为真实API
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // 模拟数据
-    const mockOrders = [
-      {
-        id: 1,
-        orderId: 'ORD001',
-        customerName: '张三超市',
-        productName: '青岛啤酒',
-        quantity: 10,
-        amount: 200.00,
-        status: 'CREATED',
-        createdAt: '2024-01-15T14:35:12',
-        excelRowNumber: 1
-      },
-      {
-        id: 2,
-        orderId: 'ORD002',
-        customerName: '李四便利店',
-        productName: '雪花啤酒',
-        quantity: 5,
-        amount: 100.00,
-        status: 'CREATED',
-        createdAt: '2024-01-15T14:36:15',
-        excelRowNumber: 2
+    // 加载成功订单列表
+    const loadSuccessOrders = async () => {
+      if (!props.taskId) return
+      
+      try {
+        loading.value = true
+        console.log('📋 开始加载成功订单列表，任务ID:', props.taskId)
+        
+        const response = await aiExcelImportApi.getSuccessOrders(props.taskId, {
+          page: currentPage.value,
+          size: pageSize.value,
+          sortBy: 'created_at',
+          sortOrder: 'desc'
+        })
+        
+        console.log('📊 成功订单API响应:', response)
+        
+        if (response && response.content) {
+          successOrders.value = response.content
+          totalSuccessOrders.value = response.totalElements
+          console.log('✅ 成功订单列表加载成功，总数:', response.totalElements)
+        } else if (response && Array.isArray(response)) {
+          // 如果响应直接是数组
+          successOrders.value = response
+          totalSuccessOrders.value = response.length
+          console.log('✅ 成功订单列表加载成功（数组格式），总数:', response.length)
+        } else {
+          successOrders.value = []
+          totalSuccessOrders.value = 0
+          console.warn('⚠️ 成功订单列表响应格式异常:', response)
+        }
+        
+      } catch (error: any) {
+        console.error('❌ 加载成功订单列表失败:', error)
+        ElMessage.error(`加载成功订单列表失败: ${error.message || '未知错误'}`)
+        successOrders.value = []
+        totalSuccessOrders.value = 0
+      } finally {
+        loading.value = false
       }
-    ]
-    
-    successOrders.value = mockOrders
-    totalSuccessOrders.value = mockOrders.length
-    console.log('✅ 成功订单列表加载成功，总数:', mockOrders.length)
-    
-  } catch (error: any) {
-    console.error('❌ 加载成功订单列表失败:', error)
-    ElMessage.error(`加载成功订单列表失败: ${error.message || '未知错误'}`)
-    successOrders.value = []
-    totalSuccessOrders.value = 0
-  } finally {
-    loading.value = false
-  }
-}
+    }
 
 // 查看订单详情
 const viewOrder = (order: any) => {

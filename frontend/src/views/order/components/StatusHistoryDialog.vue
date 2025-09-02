@@ -20,14 +20,14 @@
             v-for="(item, index) in statusHistory"
             :key="index"
             :timestamp="formatDateTime(item.operatedAt)"
-            :type="getTimelineItemType(item.orderStatus)"
-            :color="getTimelineItemColor(item.orderStatus)"
+            :type="getTimelineItemType(item.toStatus)"
+            :color="getTimelineItemColor(item.toStatus)"
             :hollow="item.isSystemOperation"
           >
             <div class="timeline-content">
               <div class="status-header">
-                <el-tag :type="getStatusTagType(item.orderStatus)">
-                  {{ getStatusText(item.orderStatus) }}
+                <el-tag :type="getStatusTagType(item.toStatus)">
+                  {{ getStatusText(item.toStatus) }}
                 </el-tag>
                 <span class="operator-info">
                   {{ item.operatorName || '系统' }}
@@ -128,9 +128,10 @@ const getTimelineItemType = (status: string) => {
   const typeMap: Record<string, string> = {
     DRAFT: 'primary',
     SUBMITTED: 'warning',
-    SUPPLIER_CONFIRMED: 'success',
+    PENDING_APPROVAL: 'warning',
+    APPROVED: 'success',
+    PROCESSING: 'primary',
     SHIPPED: 'info',
-    IN_TRANSIT: 'info',
     DELIVERED: 'success',
     COMPLETED: 'success',
     CANCELLED: 'danger',
@@ -144,9 +145,10 @@ const getTimelineItemColor = (status: string) => {
   const colorMap: Record<string, string> = {
     DRAFT: '#409eff',
     SUBMITTED: '#e6a23c',
-    SUPPLIER_CONFIRMED: '#67c23a',
+    PENDING_APPROVAL: '#e6a23c',
+    APPROVED: '#67c23a',
+    PROCESSING: '#409eff',
     SHIPPED: '#909399',
-    IN_TRANSIT: '#909399',
     DELIVERED: '#67c23a',
     COMPLETED: '#67c23a',
     CANCELLED: '#f56c6c',
@@ -160,9 +162,10 @@ const getStatusTagType = (status: string) => {
   const typeMap: Record<string, string> = {
     DRAFT: '',
     SUBMITTED: 'warning',
-    SUPPLIER_CONFIRMED: 'success',
+    PENDING_APPROVAL: 'warning',
+    APPROVED: 'success',
+    PROCESSING: 'primary',
     SHIPPED: 'primary',
-    IN_TRANSIT: 'info',
     DELIVERED: 'success',
     COMPLETED: 'success',
     CANCELLED: 'danger',
@@ -176,9 +179,10 @@ const getStatusText = (status: string) => {
   const textMap: Record<string, string> = {
     DRAFT: '草稿',
     SUBMITTED: '已提交',
-    SUPPLIER_CONFIRMED: '供应商确认',
+    PENDING_APPROVAL: '待审核',
+    APPROVED: '已审核',
+    PROCESSING: '处理中',
     SHIPPED: '已发货',
-    IN_TRANSIT: '运输中',
     DELIVERED: '已送达',
     COMPLETED: '已完成',
     CANCELLED: '已取消',
@@ -285,11 +289,11 @@ const exportHistory = () => {
 }
 
 :deep(.el-timeline-item__node) {
-  background-color: v-bind('getTimelineItemColor(statusHistory[0]?.orderStatus)');
+  background-color: v-bind('getTimelineItemColor(statusHistory[0]?.toStatus)');
 }
 
 :deep(.el-timeline-item__node--hollow) {
   background-color: transparent;
-  border-color: v-bind('getTimelineItemColor(statusHistory[0]?.orderStatus)');
+  border-color: v-bind('getTimelineItemColor(statusHistory[0]?.toStatus)');
 }
 </style>

@@ -142,9 +142,13 @@ export interface OrderListRequest {
 
 // 订单状态更新请求类型
 export interface OrderStatusUpdateRequest {
-  orderStatus: string
-  changeReason?: string
-  remarks?: string
+  targetStatus: string      // 目标状态
+  reason?: string          // 状态变更原因
+  remarks?: string         // 状态变更备注
+  operatorId: number       // 操作人ID (必填)
+  operatorName?: string    // 操作人姓名
+  operatorRole?: string    // 操作人角色
+  forceUpdate?: boolean    // 是否强制更新
 }
 
 // 订单冲突解决请求类型
@@ -165,7 +169,8 @@ export interface OrderBatchProcessRequest {
 export interface OrderStatusLog {
   id: number
   orderId: number
-  orderStatus: string
+  fromStatus?: string        // 变更前状态
+  toStatus: string          // 变更后状态（对应前端的orderStatus）
   changeReason?: string
   operatorType: string
   operatorId?: number
@@ -176,7 +181,7 @@ export interface OrderStatusLog {
   operationSource: string
   remarks?: string
   createdAt: string
-  updatedAt: string
+  updatedAt?: string
 }
 
 // 订单审批日志类型

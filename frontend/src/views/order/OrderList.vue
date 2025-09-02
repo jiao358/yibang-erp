@@ -107,15 +107,15 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="拒绝原因" width="150">
+        <el-table-column label="供应链备注" width="150">
           <template #default="{ row }">
             <el-tooltip 
-              v-if="row.orderStatus === 'REJECTED' && row.extendedFields?.rejectReason" 
-              :content="row.extendedFields.rejectReason" 
+              v-if="row.orderStatus === 'REJECTED' && row.approvalComment" 
+              :content="row.approvalComment" 
               placement="top"
             >
               <el-tag type="danger" size="small">
-                {{ row.extendedFields.rejectReason?.substring(0, 10) }}{{ row.extendedFields.rejectReason?.length > 10 ? '...' : '' }}
+                {{ row.approvalComment?.substring(0, 10) }}{{ row.approvalComment?.length > 10 ? '...' : '' }}
               </el-tag>
             </el-tooltip>
             <span v-else-if="row.orderStatus === 'REJECTED'">已拒绝</span>
@@ -303,11 +303,7 @@
       @success="handleDialogSuccess"
     />
 
-    <!-- 批量导入对话框 -->
-    <ImportDialog
-      v-model="importDialogVisible"
-      @success="handleImportSuccess"
-    />
+    <!-- 导入功能已移至AI Excel导入模块 -->
 
     <!-- 状态历史对话框 -->
     <StatusHistoryDialog
@@ -321,11 +317,14 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Upload, Search, Refresh, ArrowDown, Warning } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
 import OrderDialog from './components/OrderDialog.vue'
-import ImportDialog from './components/ImportDialog.vue'
 import StatusHistoryDialog from './components/StatusHistoryDialog.vue'
 import { orderApi } from '@/api/order'
 import type { OrderResponse, OrderListRequest } from '@/types/order'
+
+// 路由实例
+const router = useRouter()
 
 // 响应式数据
 const loading = ref(false)
@@ -333,7 +332,6 @@ const orderList = ref<OrderResponse[]>([])
 const dialogVisible = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const currentOrder = ref<OrderResponse | null>(null)
-const importDialogVisible = ref(false)
 const historyDialogVisible = ref(false)
 const currentOrderId = ref<number | null>(null)
 
@@ -453,9 +451,10 @@ const deleteOrder = async (order: OrderResponse) => {
   }
 }
 
-// 显示导入对话框
+// 显示导入对话框 - 跳转到AI Excel导入模块
 const showImportDialog = () => {
-  importDialogVisible.value = true
+  // 跳转到AI Excel导入模块
+  router.push('/ai-excel-import')
 }
 
 // 显示状态历史对话框
@@ -515,8 +514,8 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
         ElMessage.success('订单确认成功')
         break
       case 'ship':
-        await orderApi.supplierShipOrder(order.id)
-        ElMessage.success('订单发货成功')
+        // 这个case应该使用新的发货逻辑，暂时保留兼容性
+        ElMessage.warning('请使用"供应商发货"功能，需要填写物流信息')
         break
       case 'supplierConfirm':
         try {
@@ -540,16 +539,42 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
         break
       case 'supplierShip':
         try {
-          await ElMessageBox.confirm(
-            `确定要发货订单 ${order.platformOrderNo} 吗？发货后将进入运输阶段。`,
+          // 显示发货信息输入对话框
+          const shipInfo = await ElMessageBox.prompt(
+            '请输入发货信息：',
             '供应商发货',
             {
               confirmButtonText: '确定发货',
               cancelButtonText: '取消',
-              type: 'warning'
+              type: 'warning',
+              inputType: 'textarea',
+              inputPlaceholder: '物流单号：\n物流公司：\n运输方式（可选）：\n发货备注（可选）：',
+              inputPattern: /物流单号：.*\n物流公司：.*/,
+              inputErrorMessage: '请按格式填写物流单号和物流公司'
             }
           )
-          await orderApi.supplierShipOrder(order.id)
+          
+          // 解析用户输入
+          const lines = shipInfo.value.split('\n')
+          const trackingNumber = lines[0]?.replace('物流单号：', '').trim()
+          const carrier = lines[1]?.replace('物流公司：', '').trim()
+          const shippingMethod = lines[2]?.replace('运输方式：', '').trim() || ''
+          const shippingNotes = lines[3]?.replace('发货备注：', '').trim() || ''
+          
+          if (!trackingNumber || !carrier) {
+            ElMessage.error('物流单号和物流公司不能为空')
+            return
+          }
+          
+          await orderApi.supplierShipOrder(order.id, {
+            trackingNumber,
+            carrier,
+            shippingMethod,
+            shippingNotes,
+            operatorId: getCurrentUserId(),
+            operatorName: getCurrentUserName(),
+            operatorRole: getUserRole()
+          })
           ElMessage.success('供应商发货成功')
         } catch (error) {
           if (error === 'cancel') {
@@ -571,19 +596,12 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
               inputErrorMessage: '拒绝原因不能为空'
             }
           )
-          // 先更新订单状态为"已拒绝"
-          await orderApi.updateOrderStatus(order.id, { 
-            orderStatus: 'REJECTED', 
-            changeReason: rejectReason.value 
-          })
-          
-          // 将拒绝原因保存到扩展字段中
-          await orderApi.updateOrder(order.id, {
-            extendedFields: {
-              rejectReason: rejectReason.value,
-              rejectedAt: new Date().toISOString(),
-              rejectedBy: getUserRole()
-            }
+          // 使用新的供应商拒绝接口
+          await orderApi.supplierRejectOrder(order.id, {
+            rejectReason: rejectReason.value,
+            operatorId: getCurrentUserId(),
+            operatorName: getCurrentUserName(),
+            operatorRole: getUserRole()
           })
           ElMessage.success('订单已拒绝，等待销售端重新处理')
         } catch (error) {
@@ -617,11 +635,7 @@ const handleDialogSuccess = () => {
   loadOrderList()
 }
 
-// 导入成功回调
-const handleImportSuccess = () => {
-  importDialogVisible.value = false
-  loadOrderList()
-}
+// 导入功能已移至AI Excel导入模块
 
 // 获取当前用户角色
 const getUserRole = () => {
@@ -693,6 +707,36 @@ const getUserRole = () => {
   } catch (error) {
     console.error('获取用户角色失败:', error)
     return 'SALES' // 出错时默认为销售角色
+  }
+}
+
+// 获取当前用户ID
+const getCurrentUserId = () => {
+  try {
+    const userInfo = localStorage.getItem('userInfo')
+    if (userInfo) {
+      const parsed = JSON.parse(userInfo)
+      return parsed.id || parsed.userId || parsed.user_id || 0
+    }
+    return 0
+  } catch (error) {
+    console.error('获取用户ID失败:', error)
+    return 0
+  }
+}
+
+// 获取当前用户名
+const getCurrentUserName = () => {
+  try {
+    const userInfo = localStorage.getItem('userInfo')
+    if (userInfo) {
+      const parsed = JSON.parse(userInfo)
+      return parsed.username || parsed.name || parsed.userName || '未知用户'
+    }
+    return '未知用户'
+  } catch (error) {
+    console.error('获取用户名失败:', error)
+    return '未知用户'
   }
 }
 

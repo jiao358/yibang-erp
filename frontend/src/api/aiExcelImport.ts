@@ -131,6 +131,74 @@ export const aiExcelImportApi = {
   },
 
   /**
+   * 获取成功订单列表
+   */
+  getSuccessOrders: (taskId: string, params?: {
+    page?: number
+    size?: number
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
+  }) => {
+    return request.get<{
+      content: Array<{
+        id: number
+        taskId: string
+        excelRowNumber: number
+        orderId: string
+        customerName: string
+        customerId: number
+        productName: string
+        productId: number
+        quantity: number
+        unitPrice: number
+        amount: number
+        status: string
+        createdAt: string
+        updatedAt: string
+        remark: string
+      }>
+      totalElements: number
+      totalPages: number
+      currentPage: number
+      size: number
+      status: string
+      message: string
+    }>(`/api/ai-excel-orders/${taskId}/success-orders`, { params })
+  },
+
+  /**
+   * 获取处理日志列表
+   */
+  getProcessingLogs: (taskId: string, params?: {
+    page?: number
+    size?: number
+    level?: string
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
+  }) => {
+    return request.get<{
+      content: Array<{
+        id: number
+        taskId: string
+        timestamp: string
+        level: string
+        message: string
+        details: string
+        excelRowNumber: number
+        step: string
+        executionTime: number
+        createdAt: string
+      }>
+      totalElements: number
+      totalPages: number
+      currentPage: number
+      size: number
+      status: string
+      message: string
+    }>(`/api/ai-excel-orders/${taskId}/processing-logs`, { params })
+  },
+
+  /**
    * 重新处理任务
    */
   retryTask: (taskId: string) => {

@@ -6,8 +6,7 @@ import type {
   OrderListRequest,
   OrderStatusUpdateRequest,
   OrderConflictResolutionRequest,
-  OrderBatchProcessRequest,
-  OrderBatchProcessResponse
+  OrderBatchProcessRequest
 } from '@/types/order'
 
 export const orderApi = {
@@ -62,8 +61,13 @@ export const orderApi = {
   },
 
   // 供应商发货
-  supplierShipOrder(id: number): Promise<OrderResponse> {
-    return request.post(`/api/orders/${id}/supplier-ship`)
+  supplierShipOrder(id: number, data: { trackingNumber: string; carrier: string; carrierCode?: string; shippingMethod?: string; shippingNotes?: string; operatorId: number; operatorName?: string; operatorRole?: string }): Promise<OrderResponse> {
+    return request.post(`/api/orders/${id}/supplier-ship`, data)
+  },
+
+  // 供应商拒绝订单
+  supplierRejectOrder(id: number, data: { rejectReason: string; operatorId: number; operatorName?: string; operatorRole?: string }): Promise<OrderResponse> {
+    return request.post(`/api/orders/${id}/supplier-reject`, data)
   },
 
   // 解决订单冲突
@@ -72,7 +76,7 @@ export const orderApi = {
   },
 
   // 批量处理订单
-  batchProcessOrders(data: OrderBatchProcessRequest): Promise<OrderBatchProcessResponse> {
+  batchProcessOrders(data: OrderBatchProcessRequest): Promise<any> {
     return request.post('/api/orders/batch-process', data)
   },
 
@@ -123,7 +127,7 @@ export const orderApi = {
   },
 
   // Excel批量导入
-  importExcelOrders(file: File, templateId?: number): Promise<OrderBatchProcessResponse> {
+  importExcelOrders(file: File, templateId?: number): Promise<any> {
     const formData = new FormData()
     formData.append('file', file)
     if (templateId) {

@@ -82,21 +82,15 @@
         :before-close="handleCloseUploadDialog"
       >
         <div class="upload-dialog-content">
-          <FileUpload 
-            @fileSelected="handleFileSelected"
-            @uploadSuccess="handleUploadSuccess"
-            @uploadError="handleUploadError"
-          />
+        <FileUpload 
+          @fileSelected="handleFileSelected"
+          @uploadSuccess="handleUploadSuccess"
+          @uploadError="handleUploadError"
+        />
           
-          <div v-if="selectedFile" class="ai-config-section">
-            <h4>AI配置</h4>
-            <AIConfigPanel 
-              v-model:config="aiConfig"
-              @config-change="handleConfigChange"
-            />
-          </div>
-        </div>
-        
+          <!-- AI配置已移至管理员页面，普通用户使用默认配置 -->
+      </div>
+
         <template #footer>
           <div class="dialog-footer">
             <el-button @click="handleCloseUploadDialog">取消</el-button>
@@ -107,7 +101,7 @@
             >
               开始处理
             </el-button>
-          </div>
+      </div>
         </template>
       </el-dialog>
 
@@ -141,7 +135,7 @@
             >
               确定
             </el-button>
-          </div>
+      </div>
         </template>
       </el-dialog>
     </div>
@@ -156,14 +150,13 @@ import TaskFilter from './components/TaskFilter.vue'
 import TaskTable from './components/TaskTable.vue'
 import TaskDetailDialog from './components/TaskDetailDialog.vue'
 import FileUpload from './components/FileUpload.vue'
-import AIConfigPanel from './components/AIConfigPanel.vue'
+// AI配置已移至管理员页面
 import ProcessingProgress from './components/ProcessingProgress.vue'
 import { aiExcelImportApi } from '@/api/aiExcelImport'
 import type { 
-  AIExcelConfig, 
   ProcessingProgress as ProcessingProgressType, 
-  TaskHistoryItem,
-  TaskFilterForm
+  TaskHistoryItem, 
+  TaskFilterForm 
 } from '@/types/ai'
 
 // 响应式数据
@@ -199,17 +192,7 @@ const filterForm = reactive<TaskFilterForm>({
   processingDuration: ''
 })
 
-// AI配置
-const aiConfig = reactive<AIExcelConfig>({
-  modelType: 'deepseek',
-  confidenceThreshold: 0.8,
-  autoMatchStrategy: 'smart',
-  enableFallback: true,
-  maxRetries: 3,
-  temperature: 0.1,
-  maxTokens: 2000,
-  timeout: 30
-})
+// AI配置已移至管理员页面，使用默认配置
 
 // 计算属性
 const filteredTasks = computed(() => {
@@ -287,9 +270,7 @@ const handleUploadError = (error: string) => {
   ElMessage.error(`文件上传失败: ${error}`)
 }
 
-const handleConfigChange = (config: AIExcelConfig) => {
-  console.log('AI配置已更新:', config)
-}
+// AI配置相关方法已移除
 
 const handleFilterChange = (filters: TaskFilterForm) => {
   console.log('筛选条件已更新:', filters)
@@ -323,7 +304,7 @@ const startProcessing = async () => {
     formData.append('salesCompanyId', getCurrentCompanyId().toString())
     formData.append('priority', '3')
     formData.append('enableAIProductMatching', 'true')
-    formData.append('minConfidenceThreshold', aiConfig.confidenceThreshold.toString())
+    formData.append('minConfidenceThreshold', '0.8') // 使用默认置信度阈值
     formData.append('autoCreateCustomer', 'false')
     formData.append('autoCreateProduct', 'false')
     formData.append('remarks', 'AI Excel导入')
@@ -367,8 +348,8 @@ const startProgressPolling = (taskId: string) => {
         }
       }
       } catch (error: any) {
-    console.error('获取进度失败:', error)
-  }
+      console.error('获取进度失败:', error)
+    }
   }, 2000) // 每2秒轮询一次
 }
 

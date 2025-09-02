@@ -157,10 +157,14 @@
 - **前端组件**: `FailedOrdersList.vue` - 完整的失败订单列表展示
 - **功能特性**: 
   - 分页显示失败订单
-  - 按Excel行号排序
+  - 按Excel行号排序（前端自动+1显示，符合用户习惯）
   - 显示错误类型、错误信息、处理建议
   - 支持查看原始数据
-  - 支持重试失败订单
+  - 支持手动添加订单（跳转订单管理模块）
+- **用户体验优化**:
+  - Excel行号显示优化：服务端从0开始，前端显示+1
+  - 操作按钮优化：重试改为手动添加，更符合实际使用场景
+  - 功能说明清晰：详细解释手动添加订单的用途和流程
 
 ### 4. 失败原因统计接口
 - **接口**: `GET /api/ai-excel-orders/{taskId}/error-statistics`
@@ -346,7 +350,7 @@ interface ErrorTypeStat {
 
 ### 高优先级（必须实现）
 1. 任务统计接口 ✅ 已实现
-2. 成功订单查询接口
+2. 成功订单查询接口 ✅ 已实现
 3. 失败订单查询接口 ✅ 已实现
 4. 失败原因统计接口
 
@@ -385,19 +389,31 @@ interface ErrorTypeStat {
 3. **失败订单查询接口** (`GET /api/ai-excel-orders/{taskId}/failed-orders`)
    - 后端实现：`AIExcelOrderServiceImpl.getFailedOrders()`
    - 前端集成：`FailedOrdersList.vue` 组件
-   - 功能：分页查询失败订单，支持排序、查看原始数据、重试等
+   - 功能：分页查询失败订单，支持排序、查看原始数据、手动添加订单等
+   - 用户体验优化：Excel行号显示优化、操作按钮优化、功能说明清晰
 
-4. **任务详情弹窗**
+4. **成功订单查询接口** (`GET /api/ai-excel-orders/{taskId}/success-orders`)
+   - 后端实现：`AIExcelOrderServiceImpl.getSuccessOrders()`
+   - 前端集成：`SuccessOrdersList.vue` 组件
+   - 功能：分页查询成功订单，支持排序、查看订单详情等
+   - 数据关联：通过`ai_excel_process_task_details`表关联成功订单
+
+5. **任务详情弹窗**
    - 前端实现：`TaskDetailDialog.vue` 组件
    - 功能：标签页展示基本信息、失败订单、处理进度、操作按钮
    - 特性：弹窗位置固定、主页面锁定、智能滚动恢复
+
+6. **AI配置权限优化**
+   - 移除上传dialog中的AI配置模块
+   - AI配置统一在管理员页面的"AI管理"模块中配置
+   - 普通用户使用系统默认的AI配置
+   - 权限控制：只有`SYSTEM_ADMIN`角色可以访问AI配置
 
 ### 🔄 进行中的功能
 - 无
 
 ### 📋 待实现的功能
-1. **成功订单查询接口** (`GET /api/ai-excel-orders/{taskId}/success-orders`)
-2. **失败原因统计接口** (`GET /api/ai-excel-orders/{taskId}/error-statistics`)
+1. **失败原因统计接口** (`GET /api/ai-excel-orders/{taskId}/error-statistics`)
 3. **原始数据查询接口** (`GET /api/ai-excel-orders/{taskId}/raw-data`)
 4. **字段映射信息接口** (`GET /api/ai-excel-orders/{taskId}/field-mapping`)
 5. **处理日志查询接口** (`GET /api/ai-excel-orders/{taskId}/processing-logs`)
@@ -407,9 +423,9 @@ interface ErrorTypeStat {
 
 ### 📊 实现统计
 - **总接口数**: 22个
-- **已完成**: 3个 (13.6%)
+- **已完成**: 4个 (18.2%)
 - **进行中**: 0个 (0%)
-- **待实现**: 19个 (86.4%)
+- **待实现**: 18个 (81.8%)
 
 ## 测试建议
 

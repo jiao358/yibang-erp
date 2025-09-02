@@ -106,6 +106,15 @@ public class Order {
     @TableField("tax_amount")
     private BigDecimal taxAmount;
 
+    @TableField("logistics_order_number")
+    private String logisticsOrderNumber;
+
+    /**
+     * 物流公司
+     */
+    @TableField("logistics_company")
+    private String logisticsCompany;
+
     /**
      * 运费
      */
