@@ -113,17 +113,16 @@ public class ProductController {
             Page<Product> pageParam = new Page<>(page, size);
             Page<Product> result = productRepository.selectPage(pageParam, queryWrapper);
 
-            long total = productRepository.selectCount(queryWrapper);
             // 构建返回结果
             PageResult<Product> pageResult = new PageResult<>();
             pageResult.setRecords(result.getRecords());
-            pageResult.setTotal(total);
+            pageResult.setTotal(result.getTotal());
             pageResult.setCurrent(result.getCurrent());
             pageResult.setSize(result.getSize());
             pageResult.setPages(result.getPages());
 
 
-            log.info("商品列表查询成功，总数: {}, 当前页: {}", total, page);
+            log.info("商品列表查询成功，总数: {}, 当前页: {}", result.getTotal(), page);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
