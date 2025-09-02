@@ -31,6 +31,11 @@ public class OrderListRequest {
     private String salesOrderId;
 
     /**
+     * 来源订单号
+     */
+    private String sourceOrderNo;
+
+    /**
      * 销售人ID
      */
     private Long salesUserId;

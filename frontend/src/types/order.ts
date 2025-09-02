@@ -132,6 +132,7 @@ export interface OrderListRequest {
   size: number
   platformOrderNo?: string
   customerName?: string
+  sourceOrderNo?: string
   orderStatus?: string
   source?: string
   dateRange?: string[]

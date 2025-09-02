@@ -356,6 +356,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             queryWrapper.eq("platform_order_id", request.getPlatformOrderNo());
         }
         
+        if(org.apache.commons.lang3.StringUtils.isNotEmpty(request.getSourceOrderNo())){
+            queryWrapper.eq("source_order_id", request.getSourceOrderNo());
+        }
+        
         if (request.getCustomerId() != null) {
             queryWrapper.eq("customer_id", request.getCustomerId());
         }

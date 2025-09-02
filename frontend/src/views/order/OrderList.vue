@@ -31,8 +31,15 @@
             clearable
           />
         </el-form-item>
+        <el-form-item label="来源订单号">
+          <el-input
+            v-model="searchForm.sourceOrderNo"
+            placeholder="请输入来源订单号"
+            clearable
+          />
+        </el-form-item>
         <el-form-item label="订单状态">
-          <el-select v-model="searchForm.orderStatus" placeholder="请选择状态" clearable>
+          <el-select v-model="searchForm.orderStatus" placeholder="请选择状态" clearable style="width: 150px;">
             <el-option label="草稿" value="DRAFT" />
             <el-option label="已提交" value="SUBMITTED" />
             <el-option label="供应商确认" value="SUPPLIER_CONFIRMED" />
@@ -45,7 +52,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="订单来源">
-          <el-select v-model="searchForm.source" placeholder="请选择来源" clearable>
+          <el-select v-model="searchForm.source" placeholder="请选择来源" clearable style="width: 150px;">
             <el-option label="手动创建" value="MANUAL" />
             <el-option label="Excel导入" value="EXCEL_IMPORT" />
             <el-option label="API接口" value="API" />
@@ -341,6 +348,7 @@ const searchForm = reactive<OrderListRequest>({
   size: 20,
   platformOrderNo: '',
   customerName: '',
+  sourceOrderNo: '',
   orderStatus: '',
   source: '',
   dateRange: []
