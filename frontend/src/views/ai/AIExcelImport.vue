@@ -31,23 +31,35 @@
         @view-all="scrollToTable"
       />
 
-      <!-- 任务筛选 -->
+      <!-- 任务列表 - 提前显示，减少用户滚动 -->
+      <div class="task-section">
+        <div class="section-header">
+          <h3>任务列表</h3>
+          <div class="section-actions">
+            <el-button @click="loadTaskHistory" :loading="loading">
+              <el-icon><Refresh /></el-icon>
+              刷新
+            </el-button>
+          </div>
+        </div>
+        
+        <TaskTable 
+          :tasks="filteredTasks"
+          :loading="loading"
+          :total-tasks="totalTasks"
+          @refresh="loadTaskHistory"
+          @export="exportTasks"
+          @view-detail="viewTaskDetail"
+          @retry-task="retryTask"
+          @delete-task="deleteTask"
+          @selection-change="handleSelectionChange"
+        />
+      </div>
+
+      <!-- 任务筛选 - 移到任务列表下方 -->
       <TaskFilter 
         v-model="filterForm"
         @filter-change="handleFilterChange"
-      />
-
-      <!-- 任务列表 -->
-      <TaskTable 
-        :tasks="filteredTasks"
-        :loading="loading"
-        :total-tasks="totalTasks"
-        @refresh="loadTaskHistory"
-        @export="exportTasks"
-        @view-detail="viewTaskDetail"
-        @retry-task="retryTask"
-        @delete-task="deleteTask"
-        @selection-change="handleSelectionChange"
       />
 
       <!-- 任务详情弹窗 -->
@@ -59,6 +71,7 @@
         @download-results="downloadResults"
         @view-logs="viewLogs"
         @delete-task="deleteTask"
+        @close="handleDetailDialogClose"
       />
 
       <!-- 文件上传弹窗 -->
@@ -136,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import TaskOverview from './components/TaskOverview.vue'
 import TaskFilter from './components/TaskFilter.vue'
@@ -564,6 +577,86 @@ const viewTaskDetail = (taskId: string) => {
   if (task) {
     selectedTask.value = task
     detailDialogVisible.value = true
+    
+    // 记录当前滚动位置
+    const currentScrollY = window.scrollY
+    selectedTask.value.currentScrollPosition = currentScrollY
+    
+    // 锁定主页面滚动 - 使用更强力的方法
+    const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth
+    
+    // 保存原始样式
+    const originalStyle = {
+      overflow: document.body.style.overflow,
+      paddingRight: document.body.style.paddingRight,
+      position: document.body.style.position
+    }
+    
+    // 设置锁定样式
+    document.body.style.overflow = 'hidden'
+    document.body.style.paddingRight = `${scrollBarWidth}px`
+    document.body.style.position = 'relative'
+    
+    // 保存原始样式到任务对象中，以便恢复
+    selectedTask.value.originalBodyStyle = originalStyle
+    
+    // 添加更强力的滚动阻止 - 通过事件监听器
+    const preventScroll = (e: Event) => {
+      e.preventDefault()
+      e.stopPropagation()
+      return false
+    }
+    
+    // 保存事件监听器引用，以便移除
+    selectedTask.value.scrollPreventer = preventScroll
+    
+    // 添加事件监听器到多个元素
+    document.addEventListener('wheel', preventScroll, { passive: false })
+    document.addEventListener('touchmove', preventScroll, { passive: false })
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'PageUp' || e.key === 'PageDown' || e.key === 'Home' || e.key === 'End') {
+        e.preventDefault()
+        return false
+      }
+    })
+  }
+}
+
+const handleDetailDialogClose = () => {
+  // 弹窗关闭后恢复主页面滚动位置和状态
+  if (selectedTask.value?.currentScrollPosition !== undefined) {
+    const scrollPosition = selectedTask.value.currentScrollPosition
+    const originalStyle = selectedTask.value.originalBodyStyle
+    
+    // 恢复body样式
+    if (originalStyle) {
+      document.body.style.overflow = originalStyle.overflow
+      document.body.style.paddingRight = originalStyle.paddingRight
+      document.body.style.position = originalStyle.position
+    } else {
+      // 如果没有保存的样式，使用默认值
+      document.body.style.overflow = ''
+      document.body.style.paddingRight = ''
+      document.body.style.position = ''
+    }
+    
+    // 恢复滚动位置
+    setTimeout(() => {
+      window.scrollTo(0, scrollPosition)
+    }, 50)
+    
+    // 移除事件监听器
+    if (selectedTask.value.scrollPreventer) {
+      document.removeEventListener('wheel', selectedTask.value.scrollPreventer)
+      document.removeEventListener('touchmove', selectedTask.value.scrollPreventer)
+      // 移除键盘事件监听器
+      document.removeEventListener('keydown', selectedTask.value.scrollPreventer)
+    }
+    
+    // 清理临时数据
+    selectedTask.value.currentScrollPosition = undefined
+    selectedTask.value.originalBodyStyle = undefined
+    selectedTask.value.scrollPreventer = undefined
   }
 }
 
@@ -608,10 +701,10 @@ const viewLogs = (taskId: string) => {
 }
 
 const scrollToTable = () => {
-  // 滚动到表格区域
-  const tableElement = document.querySelector('.task-table-container')
-  if (tableElement) {
-    tableElement.scrollIntoView({ behavior: 'smooth' })
+  // 滚动到任务列表区域
+  const taskSection = document.querySelector('.task-section')
+  if (taskSection) {
+    taskSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
 
@@ -671,6 +764,14 @@ const getCurrentCompanyId = (): number => {
     return 1
   }
 }
+
+// 监听弹窗状态变化，确保弹窗关闭时恢复滚动位置
+watch(detailDialogVisible, (newValue) => {
+  if (!newValue && selectedTask.value?.currentScrollPosition !== undefined) {
+    // 弹窗关闭时自动恢复滚动位置
+    handleDetailDialogClose()
+  }
+})
 
 // 生命周期
 onMounted(() => {
@@ -740,6 +841,34 @@ const handleDevModeChange = (value: boolean) => {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.task-section {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.section-actions {
+  display: flex;
+  gap: 12px;
 }
 
 .upload-dialog-content {

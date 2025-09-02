@@ -4,7 +4,13 @@
     :title="`任务详情 - ${taskDetail?.fileName || ''}`"
     width="1000px"
     :before-close="handleClose"
+    :close-on-click-modal="false"
+    :close-on-press-escape="true"
+    :lock-scroll="false"
+    :append-to-body="true"
+    :destroy-on-close="false"
     class="task-detail-dialog"
+    top="5vh"
   >
     <div v-if="taskDetail" class="task-detail-content">
       <!-- 基本信息 -->
@@ -227,6 +233,7 @@ const emit = defineEmits<{
   downloadResults: [taskId: string]
   viewLogs: [taskId: string]
   deleteTask: [taskId: string]
+  close: []
 }>()
 
 // 计算属性
@@ -348,6 +355,8 @@ const canRetry = (status: string) => {
 
 const handleClose = () => {
   dialogVisible.value = false
+  // 触发close事件，通知父组件弹窗已关闭
+  emit('close')
 }
 
 const viewResults = () => {
@@ -398,6 +407,35 @@ const deleteTask = async () => {
 <style scoped>
 .task-detail-dialog {
   max-height: 90vh;
+}
+
+/* 确保弹窗在视口中心显示，不受主页面滚动影响 */
+:deep(.el-dialog) {
+  position: fixed !important;
+  top: 5vh !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  margin: 0 !important;
+  max-height: 90vh;
+  overflow: hidden;
+  z-index: 2000 !important;
+}
+
+:deep(.el-dialog__body) {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* 弹窗遮罩层也固定位置 */
+:deep(.el-overlay) {
+  position: fixed !important;
+  z-index: 1999 !important;
+}
+
+/* 确保弹窗内容不受主页面影响 */
+.task-detail-dialog {
+  position: relative;
+  z-index: 2001;
 }
 
 .task-detail-content {

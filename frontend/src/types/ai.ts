@@ -276,6 +276,16 @@ export interface TaskHistoryItem {
   uploadUser?: string
   startedAt?: string
   manualProcessRows?: number
+  // 弹窗滚动位置记录
+  currentScrollPosition?: number
+  // 原始body样式记录
+  originalBodyStyle?: {
+    overflow: string
+    paddingRight: string
+    position: string
+  }
+  // 滚动阻止器引用
+  scrollPreventer?: (e: Event) => boolean
 }
 
 // AI Excel处理请求类型
