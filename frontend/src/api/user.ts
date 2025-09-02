@@ -5,7 +5,7 @@ import type { User, Role, Company } from '@/types/user'
 export const userApi = {
   // 分页获取用户列表
   getUserList(params: {
-    page: number
+    current: number
     size: number
     username?: string
     personalCompanyName?: string

@@ -260,7 +260,7 @@ const fetchUserList = async () => {
   loading.value = true
   try {
     const params: any = {
-      page: pagination.current,
+      current: pagination.current,
       size: pagination.size
     }
     
