@@ -301,7 +301,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     @Override
     public PageResult<InventoryListDTO> getInventoryListPage(int page, int size, Long productId, Long warehouseId,
-                                                           String productName, String warehouseName, Long companyId) {
+                                                           String productName, String productSku, String warehouseName, Long companyId) {
         // 构建基础查询条件
         QueryWrapper<ProductInventory> queryWrapper = new QueryWrapper<>();
         
@@ -310,6 +310,22 @@ public class InventoryServiceImpl implements InventoryService {
         }
         if (warehouseId != null) {
             queryWrapper.eq("warehouse_id", warehouseId);
+        }
+
+        // 如果提供了商品SKU，先查询对应的商品ID
+        if (StringUtils.hasText(productSku)) {
+            QueryWrapper<Product> productQueryWrapper = new QueryWrapper<>();
+            productQueryWrapper.like("sku", productSku.trim());
+            if (companyId != null) {
+                productQueryWrapper.eq("company_id", companyId);
+            }
+            List<Product> products = productRepository.selectList(productQueryWrapper);
+            if (products.isEmpty()) {
+                // 如果没有找到匹配的商品，返回空结果
+                return PageResult.of(new ArrayList<>(), 0L, page, size);
+            }
+            List<Long> productIds = products.stream().map(Product::getId).collect(Collectors.toList());
+            queryWrapper.in("product_id", productIds);
         }
 
         // 实现公司级别的数据隔离

@@ -237,6 +237,7 @@ public class InventoryController {
             @RequestParam(required = false) Long productId,
             @RequestParam(required = false) Long warehouseId,
             @RequestParam(required = false) String productName,
+            @RequestParam(required = false) String productSku,
             @RequestParam(required = false) String warehouseName,
             @RequestHeader("Authorization") String authHeader) {
         try {
@@ -244,7 +245,7 @@ public class InventoryController {
             Long currentUserCompanyId = extractCompanyIdFromJWT(authHeader);
             
             PageResult<InventoryListDTO> pageResult = inventoryService.getInventoryListPage(page, size, productId, warehouseId,
-                                                             productName, warehouseName, currentUserCompanyId);
+                                                             productName, productSku, warehouseName, currentUserCompanyId);
             
             PageResult<InventoryListDTO> result = new PageResult<>();
             result.setRecords(pageResult.getRecords());

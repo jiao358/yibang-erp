@@ -311,7 +311,10 @@ public class OrderController {
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            headers.setContentDispositionFormData("attachment", "订单导出.xlsx");
+            
+            // 使用英文文件名避免编码问题
+            String filename = "orders_export.xlsx";
+            headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
             
             return ResponseEntity.ok()
                 .headers(headers)
@@ -336,7 +339,10 @@ public class OrderController {
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            headers.setContentDispositionFormData("attachment", "发货模板.xlsx");
+            
+            // 使用英文文件名避免编码问题
+            String filename = "shipping_template.xlsx";
+            headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
             
             return ResponseEntity.ok()
                 .headers(headers)

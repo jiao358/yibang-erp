@@ -137,8 +137,24 @@ public class WarehouseServiceImpl implements WarehouseService {
 
         queryWrapper.orderByDesc("created_at");
 
-        Page<Warehouse> pageParam = new Page<>(page, size);
-        return warehouseRepository.selectPage(pageParam, queryWrapper);
+        // 手动分页：先查询总数
+        Long total = warehouseRepository.selectCount(queryWrapper);
+        
+        // 计算偏移量
+        int offset = (page - 1) * size;
+        
+        // 应用LIMIT子句
+        queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+        
+        // 查询数据
+        List<Warehouse> records = warehouseRepository.selectList(queryWrapper);
+        
+        // 手动构建Page对象
+        Page<Warehouse> pageResult = new Page<>(page, size);
+        pageResult.setRecords(records);
+        pageResult.setTotal(total);
+        
+        return pageResult;
     }
 
     @Override

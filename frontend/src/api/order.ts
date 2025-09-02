@@ -61,7 +61,7 @@ export const orderApi = {
   },
 
   // 供应商发货
-  supplierShipOrder(id: number, data: { trackingNumber: string; carrier: string; carrierCode?: string; shippingMethod?: string; shippingNotes?: string; operatorId: number; operatorName?: string; operatorRole?: string }): Promise<OrderResponse> {
+  supplierShipOrder(id: number, data: { warehouseId: number; warehouseName?: string; trackingNumber: string; carrier: string; carrierCode?: string; shippingMethod?: string; shippingNotes?: string; operatorId: number; operatorName?: string; operatorRole?: string }): Promise<OrderResponse> {
     return request.post(`/api/orders/${id}/supplier-ship`, data)
   },
 

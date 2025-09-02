@@ -23,6 +23,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -112,26 +113,38 @@ public class PriceTierServiceImpl implements PriceTierService {
 
     @Override
     public PageResult<PriceTierResponse> getPriceTierPage(PriceTierQueryRequest request) {
-        Page<PriceTier> page = new Page<>(request.getPage(), request.getSize());
+        boolean isAdmin = SecurityContextHolder.getContext().getAuthentication().getAuthorities().
+                stream().anyMatch(x -> x.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
 
-
-
-        boolean isAdmin=  SecurityContextHolder.getContext().getAuthentication().getAuthorities().
-                stream().anyMatch(x->x.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
-
-
-        if(isAdmin){
+        if (isAdmin) {
             request.setCompanyId(null);
         }
 
         LambdaQueryWrapper<PriceTier> wrapper = buildQueryWrapper(request);
-        IPage<PriceTier> result = priceTierRepository.selectPage(page, wrapper);
         
-        List<PriceTierResponse> records = result.getRecords().stream()
+        // 手动分页：先查询总数
+        Long total = priceTierRepository.selectCount(wrapper);
+        
+        if (total == 0) {
+            return new PageResult<>(new ArrayList<>(), 0L, request.getPage(), request.getSize());
+        }
+        
+        // 计算偏移量
+        int offset = (request.getPage() - 1) * request.getSize();
+        
+        // 应用LIMIT子句
+        wrapper.last(String.format("LIMIT %d, %d", offset, request.getSize()));
+        
+        // 查询数据
+        List<PriceTier> records = priceTierRepository.selectList(wrapper);
+        
+        // 转换为响应对象
+        List<PriceTierResponse> responseRecords = records.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
         
-        return new PageResult<>(records, result.getTotal(), result.getCurrent(), result.getSize());
+        // 手动构建PageResult对象
+        return new PageResult<>(responseRecords, total, request.getPage(), request.getSize());
     }
 
     @Override

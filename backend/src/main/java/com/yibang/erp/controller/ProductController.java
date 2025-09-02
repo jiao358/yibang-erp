@@ -1,7 +1,6 @@
 package com.yibang.erp.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yibang.erp.common.response.PageResult;
 import com.yibang.erp.common.util.JwtUtil;
 import com.yibang.erp.domain.dto.ProductAuditRequest;
@@ -25,10 +24,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -74,11 +70,11 @@ public class ProductController {
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) String categoryId,
             @RequestParam(required = false) String name,
-
-
+            @RequestParam(required = false) String sku,
             @RequestHeader("Authorization") String authHeader) {
 
-        log.info("获取商品列表，页码: {}, 每页大小: {}, 状态: {}, 公司ID: {}", page, size, status, companyId);
+        log.info("获取商品列表，页码: {}, 每页大小: {}, 状态: {}, 公司ID: {}, 商品名称: {}, 品牌: {}, SKU: {}", 
+                 page, size, status, companyId, name, brand, sku);
 
         try {
             // 构建查询条件
@@ -106,6 +102,24 @@ public class ProductController {
 
             // 只查询未删除的商品
             queryWrapper.eq("deleted", false);
+
+            // 添加搜索条件
+            if (name != null && !name.trim().isEmpty()) {
+                queryWrapper.like("name", name.trim());
+            }
+            if (brand != null && !brand.trim().isEmpty()) {
+                QueryWrapper<Brand> brandQueryWrapper = new QueryWrapper<>();
+
+                brandQueryWrapper.eq("name",brand);
+                List<Brand> brands=brandRepository.selectList(brandQueryWrapper);
+                if(CollectionUtils.isNotEmpty(brands)){
+                    queryWrapper.like("brand_id", brands.get(0).getId());
+                }
+
+            }
+            if (sku != null && !sku.trim().isEmpty()) {
+                queryWrapper.like("sku", sku.trim());
+            }
 
             // 按创建时间倒序
             queryWrapper.orderByDesc("created_at");
@@ -453,9 +467,21 @@ public class ProductController {
                 queryWrapper.like("name", name.trim());
             }
 
-            // 添加品牌过滤
+            // 添加品牌过滤 品牌是需要id的
+
+
             if (brand != null && !brand.trim().isEmpty()) {
-                queryWrapper.like("brand", brand.trim());
+
+                QueryWrapper<Brand> brandQueryWrapper = new QueryWrapper<>();
+
+                brandQueryWrapper.eq("name",brand);
+                List<Brand> brands=brandRepository.selectList(brandQueryWrapper);
+                if(CollectionUtils.isNotEmpty(brands)){
+                    queryWrapper.like("brand_id", brands.get(0).getId());
+                }
+
+
+
             }
 
             // 添加分类过滤
@@ -479,20 +505,28 @@ public class ProductController {
             // 按创建时间倒序
             queryWrapper.orderByDesc("created_at");
 
-            // 执行分页查询
-            Page<Product> pageParam = new Page<>(page, size);
-            Page<Product> result = productRepository.selectPage(pageParam, queryWrapper);
-            long countData= productRepository.selectCount(queryWrapper);
-            if (CollectionUtils.isEmpty(result.getRecords())) {
+            // 手动分页：先查询总数
+            long countData = productRepository.selectCount(queryWrapper);
+            
+            if (countData == 0) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
-                response.put("data", PageResult.of(null, result.getTotal(), page, size));
+                response.put("data", PageResult.of(new ArrayList<>(), 0, page, size));
                 response.put("timestamp", System.currentTimeMillis());
-                return ResponseEntity.badRequest().body(response);
+                return ResponseEntity.ok(response);
             }
+            
+            // 计算偏移量
+            int offset = (page - 1) * size;
+            
+            // 应用LIMIT子句
+            queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+            
+            // 查询数据
+            List<Product> products = productRepository.selectList(queryWrapper);
 
             //先查询品牌内容
-            Set<Long> bandIds = result.getRecords().stream().map(x -> {
+            Set<Long> bandIds = products.stream().map(x -> {
                 return x.getBrandId();
             }).collect(Collectors.toSet());
 
@@ -514,7 +548,7 @@ public class ProductController {
             List<ProductPriceTierConfigResponse> productPriceTierConfigs = Lists.newArrayList();
             if (priceTierId != null) {
                 //如果具备价格分层，则对查询出来的商品进行查询价格
-                List<Long> productIds = result.getRecords().stream().map(x -> {
+                List<Long> productIds = products.stream().map(x -> {
                     return x.getId();
 
                 }).toList();
@@ -530,8 +564,16 @@ public class ProductController {
             final Map<Long, ProductPriceTierConfigResponse> productPriceTierConfigMap = productPriceTierConfigs.stream().collect(Collectors.toMap(ProductPriceTierConfigResponse::getProductId, x -> x));
             ;
 
+            // 批量获取商品主图信息
+            List<Long> productIds = products.stream().map(Product::getId).toList();
+            List<ProductImage> primaryImages = productImageRepository.selectPrimaryByProductIds(productIds);
+            
+            // 创建主图映射
+            Map<Long, String> imageMap = primaryImages.stream()
+                .collect(Collectors.toMap(ProductImage::getProductId, ProductImage::getImageUrl));
+
             // 为每个商品添加供应商公司名称
-            List<Map<String, Object>> productsWithCompany = result.getRecords().stream()
+            List<Map<String, Object>> productsWithCompany = products.stream()
                     .map(product -> {
                         Map<String, Object> productMap = new HashMap<>();
                         productMap.put("id", product.getId());
@@ -562,6 +604,10 @@ public class ProductController {
                         productMap.put("status", product.getStatus());
                         productMap.put("companyId", product.getCompanyId());
                         productMap.put("approvalStatus", product.getApprovalStatus());
+                        
+                        // 添加商品图片信息
+                        String imageUrl = imageMap.get(product.getId());
+                        productMap.put("image", imageUrl);
 
                         try {
                             // 查询供应商公司信息

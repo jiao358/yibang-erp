@@ -117,6 +117,18 @@ public class LogisticsInfo {
     private String deliveryNotes;
 
     /**
+     * 发货仓库ID
+     */
+    @TableField("warehouse_id")
+    private Long warehouseId;
+
+    /**
+     * 发货仓库名称
+     */
+    @TableField("warehouse_name")
+    private String warehouseName;
+
+    /**
      * 物流状态
      */
     @TableField("status")

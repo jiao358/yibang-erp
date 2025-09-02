@@ -12,6 +12,17 @@ import jakarta.validation.constraints.NotNull;
 public class SupplierShipRequest {
 
     /**
+     * 发货仓库ID
+     */
+    @NotNull(message = "发货仓库不能为空")
+    private Long warehouseId;
+
+    /**
+     * 发货仓库名称
+     */
+    private String warehouseName;
+
+    /**
      * 物流单号
      */
     @NotBlank(message = "物流单号不能为空")

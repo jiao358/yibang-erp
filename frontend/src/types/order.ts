@@ -219,6 +219,8 @@ export interface LogisticsInfo {
   shippingNotes?: string
   deliveryNotes?: string
   status: string
+  warehouseId?: number
+  warehouseName?: string
   createdAt: string
   updatedAt: string
   platformOrderId?: string

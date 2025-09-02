@@ -20,6 +20,14 @@
             style="width: 150px"
           />
         </el-form-item>
+        <el-form-item label="商品编码">
+          <el-input
+            v-model="searchForm.productSku"
+            placeholder="请输入商品编码"
+            clearable
+            style="width: 150px"
+          />
+        </el-form-item>
         <el-form-item label="仓库">
           <el-select
             v-model="searchForm.warehouseId"
@@ -117,56 +125,22 @@
       >
         <el-form-item label="选择商品" prop="productId">
           <div style="width: 100%">
-            <el-input
-              v-model="productSearchKeyword"
-              placeholder="输入商品名称、SKU或编码搜索"
-              @input="handleProductSearch"
-              style="width: 100%; margin-bottom: 10px;"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            
-            <!-- 商品搜索结果列表 -->
-            <div v-if="productSearchResults.length > 0" class="product-search-results">
-              <div
-                v-for="product in productSearchResults"
-                :key="product.id"
-                class="product-item"
-                :class="{ 'selected': stockInForm.productId === product.id }"
-                @click="selectProduct(product)"
-              >
-                <div class="product-info">
-                  <div class="product-sku">{{ product.sku }}</div>
-                  <div class="product-name">{{ product.name }}</div>
-                  <div class="product-unit">{{ product.unit }}</div>
-                </div>
-                <div class="product-status">
-                  <el-tag :type="product.status === 'ACTIVE' ? 'success' : 'warning'" size="small">
-                    {{ product.status === 'ACTIVE' ? '已上架' : '未上架' }}
-                  </el-tag>
-                </div>
-              </div>
-              
-              <!-- 分页 -->
-              <div v-if="productSearchTotal > 10" class="product-pagination">
-                <el-pagination
-                  :current-page="productSearchPage"
-                  :page-size="10"
-                  :total="productSearchTotal"
-                  layout="prev, pager, next"
-                  @current-change="handleProductPageChange"
-                />
-              </div>
-            </div>
-            
             <!-- 已选择的商品显示 -->
             <div v-if="stockInForm.productId && selectedProduct" class="selected-product">
               <el-tag type="success" closable @close="clearSelectedProduct">
                 已选择: {{ selectedProduct.sku }} - {{ selectedProduct.name }}
               </el-tag>
             </div>
+            
+            <!-- 商品选择按钮 -->
+            <el-button 
+              type="primary" 
+              @click="showProductSelector" 
+              style="width: 100%; margin-top: 10px;"
+            >
+              <el-icon><Search /></el-icon>
+              {{ stockInForm.productId ? '重新选择商品' : '选择商品' }}
+            </el-button>
           </div>
         </el-form-item>
         <el-form-item label="仓库" prop="warehouseId">
@@ -314,56 +288,22 @@
       >
         <el-form-item label="选择商品" prop="productId">
           <div style="width: 100%">
-            <el-input
-              v-model="productSearchKeyword"
-              placeholder="输入商品名称、SKU或编码搜索"
-              @input="handleProductSearch"
-              style="width: 100%; margin-bottom: 10px;"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            
-            <!-- 商品搜索结果列表 -->
-            <div v-if="productSearchResults.length > 0" class="product-search-results">
-              <div
-                v-for="product in productSearchResults"
-                :key="product.id"
-                class="product-item"
-                :class="{ 'selected': stockOutForm.productId === product.id }"
-                @click="selectProductForOut(product)"
-              >
-                <div class="product-info">
-                  <div class="product-sku">{{ product.sku }}</div>
-                  <div class="product-name">{{ product.name }}</div>
-                  <div class="product-unit">{{ product.unit }}</div>
-                </div>
-                <div class="product-status">
-                  <el-tag :type="product.status === 'ACTIVE' ? 'success' : 'warning'" size="small">
-                    {{ product.status === 'ACTIVE' ? '已上架' : '未上架' }}
-                  </el-tag>
-                </div>
-              </div>
-              
-              <!-- 分页 -->
-              <div v-if="productSearchTotal > 10" class="product-pagination">
-                <el-pagination
-                  :current-page="productSearchPage"
-                  :page-size="10"
-                  :total="productSearchTotal"
-                  layout="prev, pager, next"
-                  @current-change="handleProductPageChange"
-                />
-              </div>
-            </div>
-            
             <!-- 已选择的商品显示 -->
             <div v-if="stockOutForm.productId && selectedProduct" class="selected-product">
               <el-tag type="success" closable @close="clearSelectedProductForOut">
                 已选择: {{ selectedProduct.sku }} - {{ selectedProduct.name }}
               </el-tag>
             </div>
+            
+            <!-- 商品选择按钮 -->
+            <el-button 
+              type="primary" 
+              @click="showProductSelectorForOut" 
+              style="width: 100%; margin-top: 10px;"
+            >
+              <el-icon><Search /></el-icon>
+              {{ stockOutForm.productId ? '重新选择商品' : '选择商品' }}
+            </el-button>
           </div>
         </el-form-item>
         <el-form-item label="仓库" prop="warehouseId">
@@ -466,6 +406,118 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 商品选择器对话框（入库） -->
+    <ProductSelectorDialog
+      v-model="productSelectorVisible"
+      :multiple="false"
+      :max-selection="1"
+      @confirm="handleProductSelection"
+    />
+
+    <!-- 商品选择器对话框（出库） -->
+    <ProductSelectorDialog
+      v-model="productSelectorForOutVisible"
+      :multiple="false"
+      :max-selection="1"
+      @confirm="handleProductSelectionForOut"
+    />
+
+    <!-- 设置预警线对话框 -->
+    <el-dialog
+      v-model="alertLevelDialogVisible"
+      title="设置库存预警线"
+      width="600px"
+      append-to-body
+      z-index="9999"
+      :close-on-click-modal="true"
+      :close-on-press-escape="true"
+    >
+      <el-form
+        ref="alertLevelFormRef"
+        :model="alertLevelForm"
+        :rules="alertLevelRules"
+        label-width="120px"
+      >
+        <el-form-item label="商品信息">
+          <div class="product-info-display">
+            <div><strong>商品编码：</strong>{{ alertLevelForm.productSku }}</div>
+            <div><strong>商品名称：</strong>{{ alertLevelForm.productName }}</div>
+            <div><strong>仓库名称：</strong>{{ alertLevelForm.warehouseName }}</div>
+          </div>
+        </el-form-item>
+        
+        <el-form-item label="当前最低库存">
+          <el-input-number 
+            v-model="alertLevelForm.currentMinStockLevel" 
+            :min="0" 
+            :disabled="true"
+            style="width: 100%"
+          />
+        </el-form-item>
+        
+        <el-form-item label="设置最低库存" prop="minStockLevel">
+          <el-input-number 
+            v-model="alertLevelForm.minStockLevel" 
+            :min="0" 
+            style="width: 100%"
+          />
+          <div class="form-tip">当库存低于此数量时触发预警</div>
+        </el-form-item>
+        
+        <el-form-item label="当前最高库存">
+          <el-input-number 
+            v-model="alertLevelForm.currentMaxStockLevel" 
+            :min="0" 
+            :disabled="true"
+            style="width: 100%"
+          />
+        </el-form-item>
+        
+        <el-form-item label="设置最高库存" prop="maxStockLevel">
+          <el-input-number 
+            v-model="alertLevelForm.maxStockLevel" 
+            :min="0" 
+            style="width: 100%"
+          />
+          <div class="form-tip">当库存高于此数量时触发预警</div>
+        </el-form-item>
+        
+        <el-form-item label="当前补货点">
+          <el-input-number 
+            v-model="alertLevelForm.currentReorderPoint" 
+            :min="0" 
+            :disabled="true"
+            style="width: 100%"
+          />
+        </el-form-item>
+        
+        <el-form-item label="设置补货点" prop="reorderPoint">
+          <el-input-number 
+            v-model="alertLevelForm.reorderPoint" 
+            :min="0" 
+            style="width: 100%"
+          />
+          <div class="form-tip">当库存低于此数量时建议补货</div>
+        </el-form-item>
+        
+        <el-form-item label="设置原因" prop="reason">
+          <el-input 
+            v-model="alertLevelForm.reason" 
+            type="textarea" 
+            :rows="3"
+            placeholder="请输入设置预警线的原因"
+          />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <el-button @click="alertLevelDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitAlertLevel" :loading="submitting">
+          确定设置
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -555,33 +607,46 @@
   color: #212529;
   margin-right: 8px;
 }
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  line-height: 1.4;
+}
 </style>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { getInventoryPage, stockIn, stockOut, adjustStock, adjustStockComplete } from '@/api/inventory'
+import { getInventoryPage, stockIn, stockOut, adjustStock, adjustStockComplete, setStockAlertLevel } from '@/api/inventory'
 import { getWarehouseList } from '@/api/warehouse'
 import { getProductList } from '@/api/product'
 import type { ProductInventory, StockOperationRequest, StockAdjustmentRequest } from '@/types/inventory'
 import type { Warehouse } from '@/types/warehouse'
+import ProductSelectorDialog from './components/ProductSelectorDialog.vue'
 
 // 响应式数据
 const loading = ref(false)
 const submitting = ref(false)
 const stockInDialogVisible = ref(false)
+const productSelectorVisible = ref(false)
+const productSelectorForOutVisible = ref(false)
 const stockOutDialogVisible = ref(false)
 const adjustDialogVisible = ref(false)
 const adjustStockDialogVisible = ref(false)
+const alertLevelDialogVisible = ref(false)
 const formRef = ref<FormInstance>()
 const stockInFormRef = ref<FormInstance>()
 const stockOutFormRef = ref<FormInstance>()
 const adjustFormRef = ref<FormInstance>()
 const adjustStockFormRef = ref<FormInstance>()
+const alertLevelFormRef = ref<FormInstance>()
 
 const searchForm = reactive({
   productName: '',
+  productSku: '',
   warehouseId: undefined as number | undefined,
   stockStatus: ''
 })
@@ -649,6 +714,22 @@ const adjustStockForm = reactive({
   remark: ''
 })
 
+// 预警线设置表单
+const alertLevelForm = reactive({
+  productId: 0,
+  warehouseId: 0,
+  productSku: '',
+  productName: '',
+  warehouseName: '',
+  currentMinStockLevel: 0,
+  minStockLevel: 0,
+  currentMaxStockLevel: 0,
+  maxStockLevel: 0,
+  currentReorderPoint: 0,
+  reorderPoint: 0,
+  reason: ''
+})
+
 const rules: FormRules = {
   productId: [
     { required: true, message: '请选择商品', trigger: 'change' }
@@ -682,6 +763,25 @@ const adjustStockRules: FormRules = {
   ],
   reason: [
     { required: true, message: '请输入调整原因', trigger: 'blur' }
+  ]
+}
+
+// 预警线设置验证规则
+const alertLevelRules: FormRules = {
+  minStockLevel: [
+    { required: true, message: '请输入最低库存预警线', trigger: 'blur' },
+    { type: 'number', min: 0, message: '最低库存不能小于0', trigger: 'blur' }
+  ],
+  maxStockLevel: [
+    { required: true, message: '请输入最高库存预警线', trigger: 'blur' },
+    { type: 'number', min: 0, message: '最高库存不能小于0', trigger: 'blur' }
+  ],
+  reorderPoint: [
+    { required: true, message: '请输入补货点', trigger: 'blur' },
+    { type: 'number', min: 0, message: '补货点不能小于0', trigger: 'blur' }
+  ],
+  reason: [
+    { required: true, message: '请输入设置原因', trigger: 'blur' }
   ]
 }
 
@@ -846,6 +946,36 @@ const clearSelectedProductForOut = () => {
   selectedProduct.value = null
 }
 
+// 显示商品选择器
+const showProductSelector = () => {
+  productSelectorVisible.value = true
+}
+
+// 处理商品选择（入库）
+const handleProductSelection = (products: any[]) => {
+  if (products.length > 0) {
+    const product = products[0]
+    stockInForm.productId = product.id
+    selectedProduct.value = product
+    ElMessage.success(`已选择商品: ${product.sku} - ${product.name}`)
+  }
+}
+
+// 显示商品选择器（出库）
+const showProductSelectorForOut = () => {
+  productSelectorForOutVisible.value = true
+}
+
+// 处理商品选择（出库）
+const handleProductSelectionForOut = (products: any[]) => {
+  if (products.length > 0) {
+    const product = products[0]
+    stockOutForm.productId = product.id
+    selectedProduct.value = product
+    ElMessage.success(`已选择商品: ${product.sku} - ${product.name}`)
+  }
+}
+
 // 商品搜索分页
 const handleProductPageChange = (page: number) => {
   productSearchPage.value = page
@@ -860,6 +990,7 @@ const handleSearch = () => {
 const resetSearch = () => {
   Object.assign(searchForm, {
     productName: '',
+    productSku: '',
     warehouseId: undefined,
     stockStatus: ''
   })
@@ -990,8 +1121,47 @@ const submitAdjust = async () => {
 }
 
 const handleSetAlertLevel = (row: ProductInventory) => {
-  // TODO: 实现设置预警线功能
-  ElMessage.info('设置预警线功能待实现')
+  // 填充表单数据
+  alertLevelForm.productId = row.productId
+  alertLevelForm.warehouseId = row.warehouseId
+  alertLevelForm.productSku = row.productSku || ''
+  alertLevelForm.productName = row.productName || ''
+  alertLevelForm.warehouseName = row.warehouseName || ''
+  alertLevelForm.currentMinStockLevel = row.minStockLevel || 0
+  alertLevelForm.minStockLevel = row.minStockLevel || 0
+  alertLevelForm.currentMaxStockLevel = row.maxStockLevel || 0
+  alertLevelForm.maxStockLevel = row.maxStockLevel || 0
+  alertLevelForm.currentReorderPoint = row.reorderPoint || 0
+  alertLevelForm.reorderPoint = row.reorderPoint || 0
+  alertLevelForm.reason = ''
+  
+  alertLevelDialogVisible.value = true
+}
+
+// 提交预警线设置
+const submitAlertLevel = async () => {
+  if (!alertLevelFormRef.value) return
+  
+  await alertLevelFormRef.value.validate()
+  
+  submitting.value = true
+  try {
+    await setStockAlertLevel({
+      productId: alertLevelForm.productId,
+      warehouseId: alertLevelForm.warehouseId,
+      minStockLevel: alertLevelForm.minStockLevel,
+      maxStockLevel: alertLevelForm.maxStockLevel,
+      reorderPoint: alertLevelForm.reorderPoint
+    })
+    
+    ElMessage.success('预警线设置成功')
+    alertLevelDialogVisible.value = false
+    loadInventoryList() // 重新加载库存列表
+  } catch (error) {
+    ElMessage.error('预警线设置失败')
+  } finally {
+    submitting.value = false
+  }
 }
 
 const handleViewHistory = (row: ProductInventory) => {

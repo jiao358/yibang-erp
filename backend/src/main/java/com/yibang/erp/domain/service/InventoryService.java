@@ -67,7 +67,7 @@ public interface InventoryService {
      * 分页查询库存列表（包含商品和仓库信息）
      */
     PageResult<InventoryListDTO> getInventoryListPage(int page, int size, Long productId, Long warehouseId,
-                                          String productName, String warehouseName, Long companyId);
+                                          String productName, String productSku, String warehouseName, Long companyId);
 
     /**
      * 查询库存不足的商品

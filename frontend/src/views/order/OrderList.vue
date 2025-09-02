@@ -12,6 +12,7 @@
           批量导入
         </el-button>
         <el-button 
+          v-if="!isSalesUser()"
           type="success" 
           :disabled="selectedOrders.length === 0"
           @click="showExportDialog('selected')"
@@ -20,6 +21,7 @@
           导出选中 ({{ selectedOrders.length }})
         </el-button>
         <el-button 
+          v-if="!isSalesUser()"
           type="success" 
           :disabled="approvedOrdersCount === 0"
           @click="showExportDialog('all')"
@@ -28,6 +30,7 @@
           全部导出 ({{ approvedOrdersCount }})
         </el-button>
         <el-button 
+          v-if="!isSalesUser()"
           type="primary" 
           :disabled="approvedOrdersCount === 0"
           @click="downloadShipTemplate"
@@ -36,6 +39,7 @@
           下载发货模板
         </el-button>
         <el-button 
+          v-if="!isSalesUser()"
           type="warning" 
           @click="showImportShipDialog"
         >
@@ -491,7 +495,9 @@ import OrderDialog from './components/OrderDialog.vue'
 import OrderDetail from './components/OrderDetail.vue'
 import StatusHistoryDialog from './components/StatusHistoryDialog.vue'
 import { orderApi } from '@/api/order'
+import { getWarehousesByCompanyId } from '@/api/warehouse'
 import type { OrderResponse, OrderListRequest } from '@/types/order'
+import type { Warehouse } from '@/types/warehouse'
 
 // 路由实例
 const router = useRouter()
@@ -518,6 +524,10 @@ const uploadFile = ref<File | null>(null)
 const importPreviewData = ref<any[]>([])
 const importLoading = ref(false)
 
+// 仓库相关状态
+const warehouseList = ref<Warehouse[]>([])
+const warehouseLoading = ref(false)
+
 // 搜索表单
 const searchForm = reactive<OrderListRequest>({
   current: 1,
@@ -540,6 +550,7 @@ const pagination = reactive({
 // 生命周期
 onMounted(() => {
   loadOrderList()
+  loadWarehouseList()
 })
 
 // 计算属性
@@ -702,6 +713,28 @@ const loadOrderList = async () => {
     console.error('加载订单列表失败:', error)
   } finally {
     loading.value = false
+  }
+}
+
+// 加载仓库列表
+const loadWarehouseList = async () => {
+  try {
+    warehouseLoading.value = true
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    const companyId = userInfo.companyId || userInfo.company_id || 1
+    
+    const response = await getWarehousesByCompanyId(companyId)
+    if (response.success) {
+      warehouseList.value = response.data || []
+    } else {
+      console.error('加载仓库列表失败:', response.message)
+      warehouseList.value = []
+    }
+  } catch (error) {
+    console.error('加载仓库列表失败:', error)
+    warehouseList.value = []
+  } finally {
+    warehouseLoading.value = false
   }
 }
 
@@ -879,7 +912,16 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
             title: '供应商发货',
             customClass: 'ship-dialog',
             message: `
-              <div style="padding: 20px; width: 400px;">
+              <div style="padding: 20px; width: 500px;">
+                <div style="margin-bottom: 20px;">
+                  <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266;">发货仓库 <span style="color: #f56c6c;">*</span></label>
+                  <select id="warehouseId" style="width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
+                    <option value="">请选择发货仓库</option>
+                    ${warehouseList.value.map(warehouse => 
+                      `<option value="${warehouse.id}">${warehouse.warehouseName} (${warehouse.warehouseCode})</option>`
+                    ).join('')}
+                  </select>
+                </div>
                 <div style="margin-bottom: 20px;">
                   <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266;">物流单号 <span style="color: #f56c6c;">*</span></label>
                   <input id="trackingNumber" type="text" placeholder="请输入物流单号" style="width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; box-sizing: border-box;" />
@@ -896,17 +938,23 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
             cancelButtonText: '取消',
             beforeClose: (action, instance, done) => {
               if (action === 'confirm') {
+                const warehouseSelect = document.getElementById('warehouseId') as HTMLSelectElement
                 const trackingNumberInput = document.getElementById('trackingNumber') as HTMLInputElement
                 const carrierInput = document.getElementById('carrier') as HTMLInputElement
                 
-                if (!trackingNumberInput || !carrierInput) {
+                if (!warehouseSelect || !trackingNumberInput || !carrierInput) {
                   ElMessage.error('获取输入框失败')
                   return
                 }
                 
+                const warehouseId = warehouseSelect.value
                 const trackingNumber = trackingNumberInput.value.trim()
                 const carrier = carrierInput.value.trim()
                 
+                if (!warehouseId) {
+                  ElMessage.error('发货仓库不能为空')
+                  return
+                }
                 if (!trackingNumber) {
                   ElMessage.error('物流单号不能为空')
                   return
@@ -919,6 +967,11 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
                 instance.confirmButtonLoading = true
                 instance.confirmButtonText = '发货中...'
                 
+                // 获取选中的仓库信息
+                const selectedWarehouse = warehouseList.value.find(w => w.id.toString() === warehouseId)
+                
+                ;(instance as any).warehouseId = parseInt(warehouseId)
+                ;(instance as any).warehouseName = selectedWarehouse?.warehouseName || ''
                 ;(instance as any).trackingNumber = trackingNumber
                 ;(instance as any).carrier = carrier
                 done()
@@ -929,6 +982,8 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
           })
           
           await orderApi.supplierShipOrder(order.id, {
+            warehouseId: (result as any).warehouseId,
+            warehouseName: (result as any).warehouseName,
             trackingNumber: (result as any).trackingNumber,
             carrier: (result as any).carrier,
             shippingMethod: '',
@@ -1430,10 +1485,10 @@ const getRowClassName = ({ row }: { row: OrderResponse }) => {
 
 /* 发货对话框宽度控制 */
 :deep(.ship-dialog) {
-  width: 400px !important;
+  width: 500px !important;
 }
 
 :deep(.ship-dialog .el-message-box) {
-  width: 400px !important;
+  width: 500px !important;
 }
 </style>

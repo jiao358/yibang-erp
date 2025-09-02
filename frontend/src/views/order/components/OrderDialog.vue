@@ -772,64 +772,72 @@ const confirmProductSelection = () => {
 // 监听器
 watch(() => props.order, (newOrder) => {
   if (newOrder && props.mode === 'edit') {
-    // 从后端数据填充表单
-    Object.assign(form, {
-      customerId: newOrder.customerId,
-      orderType: newOrder.orderType,
-      expectedDeliveryDate: newOrder.expectedDeliveryDate,
-      currency: newOrder.currency,
-      specialRequirements: newOrder.specialRequirements,
-      deliveryAddress: newOrder.deliveryAddress,
-      deliveryContact: newOrder.deliveryContact,
-      deliveryPhone: newOrder.deliveryPhone,
-      remarks: '',
-      orderItems: newOrder.orderItems || [],
-      discountAmount: newOrder.discountAmount,
-      shippingAmount: newOrder.shippingAmount,
-      taxAmount: newOrder.taxAmount,
-      finalAmount: newOrder.finalAmount,
-      paymentMethod: newOrder.paymentMethod
-    })
-    
-    // 从extendedFields中恢复表单数据
-    if (newOrder.extendedFields) {
-      Object.assign(form, {
-        orderType: newOrder.extendedFields.orderType || form.orderType,
-        expectedDeliveryDate: newOrder.extendedFields.expectedDeliveryDate || form.expectedDeliveryDate,
-        currency: newOrder.extendedFields.currency || form.currency,
-        specialRequirements: newOrder.extendedFields.specialRequirements || form.specialRequirements,
-        deliveryAddress: newOrder.extendedFields.deliveryAddress || form.deliveryAddress,
-        deliveryContact: newOrder.extendedFields.deliveryContact || form.deliveryContact,
-        deliveryPhone: newOrder.extendedFields.deliveryPhone || form.deliveryPhone,
-        discountAmount: newOrder.extendedFields.discountAmount || form.discountAmount,
-        shippingAmount: newOrder.extendedFields.shippingAmount || form.shippingAmount,
-        taxAmount: newOrder.extendedFields.taxAmount || form.taxAmount,
-        finalAmount: newOrder.extendedFields.finalAmount || form.finalAmount,
-        paymentMethod: newOrder.extendedFields.paymentMethod || form.paymentMethod
-      })
-      
-      // 恢复省市区信息
-      if (newOrder.extendedFields.province || newOrder.extendedFields.city || newOrder.extendedFields.district) {
-        form.extendedFields = {
-          ...form.extendedFields,
-          province: newOrder.extendedFields.province,
-          city: newOrder.extendedFields.city,
-          district: newOrder.extendedFields.district
-        }
-      }
-    }
+    fillFormWithOrderData(newOrder)
   }
 }, { immediate: true })
 
-// 监听对话框关闭，自动重置表单
+// 监听对话框显示状态，确保编辑模式下数据正确填充
 watch(visible, (newVisible) => {
-  if (!newVisible) {
+  if (newVisible && props.mode === 'edit' && props.order) {
+    // 对话框打开时，确保编辑模式下的数据正确填充
+    fillFormWithOrderData(props.order)
+  } else if (!newVisible) {
     // 对话框关闭时，延迟重置表单，避免影响当前操作
     setTimeout(() => {
       resetForm()
     }, 100)
   }
 })
+
+// 填充表单数据的辅助方法
+const fillFormWithOrderData = (order: OrderResponse) => {
+  // 从后端数据填充表单
+  Object.assign(form, {
+    customerId: order.customerId,
+    orderType: order.orderType,
+    expectedDeliveryDate: order.expectedDeliveryDate,
+    currency: order.currency,
+    specialRequirements: order.specialRequirements,
+    deliveryAddress: order.deliveryAddress,
+    deliveryContact: order.deliveryContact,
+    deliveryPhone: order.deliveryPhone,
+    remarks: '',
+    orderItems: order.orderItems || [],
+    discountAmount: order.discountAmount,
+    shippingAmount: order.shippingAmount,
+    taxAmount: order.taxAmount,
+    finalAmount: order.finalAmount,
+    paymentMethod: order.paymentMethod
+  })
+  
+  // 从extendedFields中恢复表单数据
+  if (order.extendedFields) {
+    Object.assign(form, {
+      orderType: order.extendedFields.orderType || form.orderType,
+      expectedDeliveryDate: order.extendedFields.expectedDeliveryDate || form.expectedDeliveryDate,
+      currency: order.extendedFields.currency || form.currency,
+      specialRequirements: order.extendedFields.specialRequirements || form.specialRequirements,
+      deliveryAddress: order.extendedFields.deliveryAddress || form.deliveryAddress,
+      deliveryContact: order.extendedFields.deliveryContact || form.deliveryContact,
+      deliveryPhone: order.extendedFields.deliveryPhone || form.deliveryPhone,
+      discountAmount: order.extendedFields.discountAmount || form.discountAmount,
+      shippingAmount: order.extendedFields.shippingAmount || form.shippingAmount,
+      taxAmount: order.extendedFields.taxAmount || form.taxAmount,
+      finalAmount: order.extendedFields.finalAmount || form.finalAmount,
+      paymentMethod: order.extendedFields.paymentMethod || form.paymentMethod
+    })
+    
+    // 恢复省市区信息
+    if (order.extendedFields.province || order.extendedFields.city || order.extendedFields.district) {
+      form.extendedFields = {
+        ...form.extendedFields,
+        province: order.extendedFields.province,
+        city: order.extendedFields.city,
+        district: order.extendedFields.district
+      }
+    }
+  }
+}
 
 // 生命周期
 onMounted(() => {

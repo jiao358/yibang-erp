@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS `ai_excel_process_task_details` (
   `error_message` text COMMENT '错误信息',
   `suggestion` text COMMENT '处理建议',
   `processing_notes` text COMMENT '处理备注',
+  `order_id` VARCHAR(255) COMMENT '平台生成的订单id',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
@@ -56,6 +57,7 @@ CREATE TABLE IF NOT EXISTS `ai_excel_process_task_details` (
   KEY `idx_row_number` (`excel_row_number`),
   KEY `idx_process_status` (`process_status`),
   KEY `idx_confidence` (`confidence`),
+  KEY `idx_order_id` (`order_id`),
   KEY `idx_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI Excel处理任务详情表';
 

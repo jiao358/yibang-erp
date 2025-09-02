@@ -219,12 +219,18 @@ const searchForm = reactive({
   status: ''
 })
 
+// 获取当前用户公司ID
+const getUserCompanyId = () => {
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  return userInfo.companyId || 1
+}
+
 const form = reactive({
   id: null as number | null,
   warehouseCode: '',
   warehouseName: '',
   warehouseType: '',
-  companyId: 1, // 从用户信息获取
+  companyId: getUserCompanyId(),
   address: '',
   contactPerson: '',
   contactPhone: '',
@@ -264,11 +270,31 @@ const dialogTitle = computed(() => isEdit.value ? '编辑仓库' : '新增仓库
 const loadWarehouseList = async () => {
   loading.value = true
   try {
-    const response = await getWarehouseList({
+    // 获取当前用户公司ID
+    const currentCompanyId = getUserCompanyId()
+    
+    // 过滤空字符串，只传递有值的搜索参数
+    const searchParams: any = {
       page: pagination.current,
       size: pagination.size,
-      ...searchForm
-    })
+      companyId: currentCompanyId
+    }
+    
+    // 只添加非空的搜索参数
+    if (searchForm.warehouseCode && searchForm.warehouseCode.trim()) {
+      searchParams.warehouseCode = searchForm.warehouseCode.trim()
+    }
+    if (searchForm.warehouseName && searchForm.warehouseName.trim()) {
+      searchParams.warehouseName = searchForm.warehouseName.trim()
+    }
+    if (searchForm.warehouseType) {
+      searchParams.warehouseType = searchForm.warehouseType
+    }
+    if (searchForm.status) {
+      searchParams.status = searchForm.status
+    }
+    
+    const response = await getWarehouseList(searchParams)
     if (response.success) {
       warehouseList.value = response.data.records
       pagination.total = response.data.total
@@ -379,12 +405,17 @@ const resetForm = () => {
   if (formRef.value) {
     formRef.value.resetFields()
   }
+  
+  // 获取当前用户公司ID
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const currentCompanyId = userInfo.companyId || 1
+  
   Object.assign(form, {
     id: null,
     warehouseCode: '',
     warehouseName: '',
     warehouseType: '',
-    companyId: 1,
+    companyId: currentCompanyId,
     address: '',
     contactPerson: '',
     contactPhone: '',

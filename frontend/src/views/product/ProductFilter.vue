@@ -122,14 +122,19 @@
         
         <el-table-column prop="image" label="商品图片" width="100">
           <template #default="{ row }">
-            <el-image
-              v-if="row.image"
-              :src="row.image"
-              style="width: 60px; height: 60px"
-              fit="cover"
-              :preview-src-list="[row.image]"
-            />
-            <span v-else class="no-image">无图片</span>
+            <div class="product-image">
+              <el-image
+                v-if="row.image"
+                :src="row.image"
+                style="width: 60px; height: 60px"
+                fit="cover"
+                :preview-src-list="[row.image]"
+                :preview-teleported="true"
+                :z-index="999999"
+                :hide-on-click-modal="true"
+              />
+              <span v-else class="no-image">无图片</span>
+            </div>
           </template>
         </el-table-column>
         
@@ -248,6 +253,13 @@ const loadProductList = async () => {
     if (data.success && data.data) {
       productList.value = data.data.records || []
       pagination.total = data.data.total || 0
+      
+      // 调试：检查返回的数据结构
+      console.log('销售商品API返回数据:', data.data.records)
+      if (data.data.records && data.data.records.length > 0) {
+        console.log('第一个商品的数据结构:', data.data.records[0])
+        console.log('第一个商品的图片字段:', data.data.records[0].image)
+      }
     } else {
       productList.value = []
       pagination.total = 0

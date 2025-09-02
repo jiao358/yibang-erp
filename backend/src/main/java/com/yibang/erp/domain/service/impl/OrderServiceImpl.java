@@ -8,9 +8,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.dto.*;
-import com.yibang.erp.domain.dto.ShipImportPreviewResponse;
-import com.yibang.erp.domain.dto.ShipImportResultResponse;
-import com.yibang.erp.domain.dto.ShipTemplateData;
 import com.yibang.erp.domain.entity.*;
 import com.yibang.erp.domain.service.OrderNumberGeneratorService;
 import com.yibang.erp.domain.service.OrderService;
@@ -31,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -67,6 +65,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
     @Autowired
     private LogisticsInfoRepository logisticsInfoRepository;
+
+    @Autowired
+    private WarehouseRepository warehouseRepository;
+
+    @Autowired
+    private ProductInventoryRepository productInventoryRepository;
 
     @Autowired
     private DeepSeekClient deepSeekClient;
@@ -605,7 +609,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         log.setOrderId(orderId);
         log.setFromStatus(order.getOrderStatus());
         log.setToStatus("SHIPPED");
-        log.setChangeReason("供应商发货 - 物流单号: " + request.getTrackingNumber());
+        log.setChangeReason("供应商发货 - 仓库: " + request.getWarehouseName() + ", 物流单号: " + request.getTrackingNumber());
         log.setOperatorId(request.getOperatorId());
         log.setOperatorType("USER");
         log.setCreatedAt(LocalDateTime.now());
@@ -627,11 +631,39 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         logisticsInfo.setCarrierCode(request.getCarrierCode());
         logisticsInfo.setShippingMethod(request.getShippingMethod());
         logisticsInfo.setShippingDate(LocalDateTime.now());
-        logisticsInfo.setShippingAddress(order.getDeliveryAddress()); // 使用订单中的发货地址
+        
+        // 从订单的销售用户获取发货人信息
+        User salesUser = userRepository.selectById(order.getSalesId());
+        if (salesUser != null) {
+            // 发货联系人：使用销售用户的真实姓名
+            String shippingContact = salesUser.getRealName() != null ? 
+                salesUser.getRealName() : salesUser.getUsername();
+            logisticsInfo.setShippingContact(shippingContact);
+            
+            // 发货联系电话：使用销售用户的手机号
+            String shippingPhone = salesUser.getPhone() != null ? 
+                salesUser.getPhone() : "未知";
+            logisticsInfo.setShippingPhone(shippingPhone);
+            
+            // 发货地址：使用选择的仓库地址
+            String shippingAddress = "默认发货地址";
+            if (request.getWarehouseId() != null) {
+                Warehouse warehouse = warehouseRepository.selectById(request.getWarehouseId());
+                if (warehouse != null && warehouse.getAddress() != null && !warehouse.getAddress().trim().isEmpty()) {
+                    shippingAddress = warehouse.getAddress();
+                }
+            }
+            logisticsInfo.setShippingAddress(shippingAddress);
+        } else {
+            // 如果无法获取销售用户信息，使用默认值
+            logisticsInfo.setShippingAddress("默认发货地址");
+            logisticsInfo.setShippingContact("未知发货人");
+            logisticsInfo.setShippingPhone("未知");
+        }
+        
+        // 收货信息：使用订单中的收货信息
         logisticsInfo.setDeliveryAddress(order.getDeliveryAddress());
-        logisticsInfo.setShippingContact(order.getDeliveryContact());
         logisticsInfo.setDeliveryContact(order.getDeliveryContact());
-        logisticsInfo.setShippingPhone(order.getDeliveryPhone());
         logisticsInfo.setDeliveryPhone(order.getDeliveryPhone());
         logisticsInfo.setShippingNotes(request.getShippingNotes());
         logisticsInfo.setStatus("SHIPPED");
@@ -639,9 +671,78 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         logisticsInfo.setUpdatedAt(LocalDateTime.now());
         logisticsInfo.setCreatedBy(request.getOperatorId());
         logisticsInfo.setUpdatedBy(request.getOperatorId());
+        
+        // 添加仓库信息
+        logisticsInfo.setWarehouseId(request.getWarehouseId());
+        logisticsInfo.setWarehouseName(request.getWarehouseName());
+        
         logisticsInfoRepository.insert(logisticsInfo);
 
+        // 处理仓库库存扣减
+        warehouseProductOrderHandle(order, request.getWarehouseId());
+
         return getOrderById(orderId);
+    }
+
+    private void warehouseProductOrderHandle(Order order, Long warehouseId) {
+        try {
+            log.info("开始处理仓库库存扣减，订单ID: {}, 仓库ID: {}", order.getId(), warehouseId);
+            
+            // 1. 获取订单商品明细
+            QueryWrapper<OrderItem> orderItemWrapper = new QueryWrapper<>();
+            orderItemWrapper.eq("order_id", order.getId());
+            List<OrderItem> orderItems = orderItemRepository.selectList(orderItemWrapper);
+            
+            if (orderItems == null || orderItems.isEmpty()) {
+                log.warn("订单 {} 没有商品明细，跳过库存扣减", order.getId());
+                return;
+            }
+            
+            // 2. 批量扣减库存
+            for (OrderItem orderItem : orderItems) {
+                try {
+                    // 查询当前库存
+                    QueryWrapper<ProductInventory> inventoryWrapper = new QueryWrapper<>();
+                    inventoryWrapper.eq("product_id", orderItem.getProductId());
+                    inventoryWrapper.eq("warehouse_id", warehouseId);
+                    ProductInventory inventory = productInventoryRepository.selectOne(inventoryWrapper);
+                    
+                    if (inventory == null) {
+                        log.error("商品 {} 在仓库 {} 中没有库存记录", orderItem.getProductId(), warehouseId);
+                        continue;
+                    }
+                    
+                    // 检查库存是否充足
+                    if (inventory.getAvailableQuantity() < orderItem.getQuantity()) {
+                        log.error("商品 {} 在仓库 {} 中库存不足，需要: {}, 可用: {}", 
+                            orderItem.getProductId(), warehouseId, orderItem.getQuantity(), inventory.getAvailableQuantity());
+                        throw new RuntimeException("库存不足，无法发货");
+                    }
+                    
+                    // 扣减可用库存
+                    int newAvailableQuantity = inventory.getAvailableQuantity() - orderItem.getQuantity();
+                    inventory.setAvailableQuantity(newAvailableQuantity);
+                    inventory.setLastStockOut(LocalDateTime.now());
+                    inventory.setUpdatedAt(LocalDateTime.now());
+                    
+                    // 更新库存
+                    productInventoryRepository.updateById(inventory);
+                    
+                    log.info("商品 {} 在仓库 {} 中库存扣减成功，扣减数量: {}, 剩余可用库存: {}", 
+                        orderItem.getProductId(), warehouseId, orderItem.getQuantity(), newAvailableQuantity);
+                    
+                } catch (Exception e) {
+                    log.error("处理商品 {} 库存扣减失败: {}", orderItem.getProductId(), e.getMessage(), e);
+                    throw new RuntimeException("库存扣减失败: " + e.getMessage());
+                }
+            }
+            
+            log.info("订单 {} 在仓库 {} 中的库存扣减处理完成", order.getId(), warehouseId);
+            
+        } catch (Exception e) {
+            log.error("仓库库存扣减处理失败，订单ID: {}, 仓库ID: {}", order.getId(), warehouseId, e);
+            throw new RuntimeException("库存扣减处理失败: " + e.getMessage());
+        }
     }
 
     @Override
@@ -826,25 +927,40 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             if (approvedOrders.isEmpty()) {
                 throw new RuntimeException("没有可导出的已审批订单");
             }
-            
-            // 转换为导出数据
+
+            List<Long> saleIds= approvedOrders.stream().map(x->x.getSalesId()).toList();
+
+            List<User> saleUsers= userRepository.selectByIds(saleIds);
+
+            Map<Long, String> saleUsersMap = saleUsers.stream().collect(Collectors.toMap(User::getId, User::getUsername));
+
+
+
+
+            // 转换为导出数据  如果订单中有多个item 则导成多个订单
             List<OrderExportData> exportDataList = new ArrayList<>();
             for (Order order : approvedOrders) {
                 // 查询订单商品信息
                 List<OrderItem> orderItems = orderItemRepository.selectByOrderId(order.getId());
-                
+
+                String provinceName = order.getProvinceName();
+                String cityName = order.getCityName();
+                String districtName = order.getDistrictName();
+                Long salesId= order.getSalesId();
+                String saleName= saleUsersMap.get(salesId);
+
                 for (OrderItem item : orderItems) {
                     OrderExportData exportData = new OrderExportData();
                     exportData.setPlatformOrderNo(order.getPlatformOrderId());
                     exportData.setShopCode(""); // 空字段
                     exportData.setOrderType(""); // 空字段
-                    exportData.setCustomerName(""); // 需要从客户表查询
+                    exportData.setCustomerName(saleName); // 需要从客户表查询
                     exportData.setProductCode(item.getSku()); // 使用SKU作为商品编码
                     exportData.setProductName(item.getProductName());
                     exportData.setQuantity(item.getQuantity());
-                    exportData.setDeliveryProvince(""); // 空字段，需要解析地址
-                    exportData.setDeliveryCity(""); // 空字段，需要解析地址
-                    exportData.setDeliveryDistrict(""); // 空字段，需要解析地址
+                    exportData.setDeliveryProvince(provinceName); // 空字段，需要解析地址
+                    exportData.setDeliveryCity(cityName); // 空字段，需要解析地址
+                    exportData.setDeliveryDistrict(districtName); // 空字段，需要解析地址
                     exportData.setDeliveryAddress(order.getDeliveryAddress());
                     exportData.setDeliveryPhone(order.getDeliveryPhone());
                     exportData.setDeliveryTel(""); // 空字段
@@ -927,6 +1043,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                 item.setCarrier(data.getCarrier());
                 item.setShippingMethod(data.getShippingMethod());
                 item.setShippingNotes(data.getShippingNotes());
+                item.setWarehouseId(data.getWarehouseId());
                 
                 // 验证数据
                 String errorMessage = validateShipData(data);
@@ -1013,6 +1130,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                     statusLog.setOperatorRole(getCurrentUserRole());
                     orderStatusLogRepository.insert(statusLog);
                     
+                    // 处理仓库库存扣减
+                    warehouseProductOrderHandle(order, item.getWarehouseId());
+                    
                     successCount++;
                     
                 } catch (Exception e) {
@@ -1054,6 +1174,20 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         
         if (StringUtils.isEmpty(data.getCarrier())) {
             return "物流公司不能为空";
+        }
+        
+        if (data.getWarehouseId() == null) {
+            return "仓库ID不能为空";
+        }
+        
+        // 验证仓库是否存在
+        QueryWrapper<Warehouse> warehouseWrapper = new QueryWrapper<>();
+        warehouseWrapper.eq("id", data.getWarehouseId());
+        warehouseWrapper.eq("status", "ACTIVE");
+        Warehouse warehouse = warehouseRepository.selectOne(warehouseWrapper);
+        
+        if (warehouse == null) {
+            return "仓库不存在或状态无效";
         }
         
         // 验证订单是否存在且状态为已审批

@@ -100,7 +100,6 @@
         <el-icon><i class="el-icon-check"></i></el-icon>
         批量上架
       </el-button>
-     
     </div>
 
     <!-- 商品列表表格 -->
@@ -763,6 +762,8 @@ onUnmounted(() => {
   justify-content: center;
   padding: 24px 0;
 }
+
+
 
 /* 响应式设计 */
 @media (max-width: 768px) {

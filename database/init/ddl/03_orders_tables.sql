@@ -69,7 +69,8 @@ CREATE TABLE orders (
     ai_confidence DECIMAL(5,4) COMMENT 'AI处理置信度',
     ai_processed TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否经过AI处理：0-否，1-是',
     source_order_id VARCHAR(255) COMMENT '来源订单ID（存储其他系统的订单ID）',
-    
+    logistics_order_number VARCHAR(255) COMMENT '物流订单号',
+    logistics_company VARCHAR(255) COMMENT '物流公司',
     province_code VARCHAR(20) COMMENT '省份代码',
     province_name VARCHAR(50) COMMENT '省份名称',
     city_code VARCHAR(20) COMMENT '城市代码',
@@ -87,7 +88,8 @@ CREATE TABLE orders (
     FOREIGN KEY (sales_id) REFERENCES users(id),
     FOREIGN KEY (supplier_company_id) REFERENCES companies(id),
     FOREIGN KEY (approval_by) REFERENCES users(id),
-    
+
+    INDEX idx_logistics_order_number (logistics_order_number),
     INDEX idx_platform_order_id (platform_order_id),
     INDEX idx_customer_id (customer_id),
     INDEX idx_sales_id (sales_id),

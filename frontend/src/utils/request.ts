@@ -18,6 +18,7 @@ service.interceptors.request.use(
     const token = localStorage.getItem('token')
     console.log('请求拦截器 - Token:', token)
     console.log('请求拦截器 - URL:', config.url)
+    console.log('请求拦截器 - Params:', config.params)
     
     if (token) {
       config.headers.set('Authorization', `Bearer ${token}`)
