@@ -75,13 +75,25 @@ public class ProductImageServiceImpl implements ProductImageService {
             // 生成文件路径
             String fileName = generateFileName(file.getOriginalFilename());
             String relativePath = generateRelativePath(request.getProductId(), fileName);
-            String fullPath = uploadPath + relativePath;
+            
+            // 确保使用绝对路径
+            String fullPath;
+            if (uploadPath.startsWith("./")) {
+                // 相对路径转换为绝对路径
+                String currentDir = System.getProperty("user.dir");
+                fullPath = currentDir + "/" + uploadPath.substring(2) + relativePath;
+            } else {
+                fullPath = uploadPath + relativePath;
+            }
 
             // 创建目录
             createDirectoryIfNotExists(fullPath);
+            
+            log.info("上传文件路径: {}", fullPath);
 
-            // 保存文件
-            file.transferTo(new File(fullPath));
+            // 保存文件 - 使用绝对路径
+            File targetFile = new File(fullPath);
+            file.transferTo(targetFile);
 
             // 获取图片尺寸
             BufferedImage image = ImageIO.read(new File(fullPath));
@@ -268,7 +280,9 @@ public class ProductImageServiceImpl implements ProductImageService {
      */
     private String generateRelativePath(Long productId, String fileName) {
         String datePath = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM"));
-        return imagePath + productId + "/" + datePath + "/" + fileName;
+        String relativePath = imagePath + "/" + productId + "/" + datePath + "/" + fileName;
+        log.info("生成相对路径: {}", relativePath);
+        return relativePath;
     }
 
     /**
@@ -276,7 +290,19 @@ public class ProductImageServiceImpl implements ProductImageService {
      */
     private void createDirectoryIfNotExists(String fullPath) throws IOException {
         Path path = Paths.get(fullPath);
-        Files.createDirectories(path.getParent());
+        Path parentDir = path.getParent();
+        if (parentDir != null) {
+            log.info("创建目录: {}", parentDir.toAbsolutePath());
+            try {
+                Files.createDirectories(parentDir);
+                log.info("目录创建成功: {}", parentDir.toAbsolutePath());
+            } catch (IOException e) {
+                log.error("目录创建失败: {}, 错误: {}", parentDir.toAbsolutePath(), e.getMessage());
+                throw new IOException("无法创建上传目录: " + parentDir.toAbsolutePath() + ", 错误: " + e.getMessage(), e);
+            }
+        } else {
+            throw new IOException("无法确定父目录路径: " + fullPath);
+        }
     }
 
     /**

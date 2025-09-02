@@ -18,7 +18,7 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 const goHome = () => {
-  router.push('/dashboard')
+  router.push('/')
 }
 
 const goBack = () => {

@@ -133,12 +133,14 @@
           <template #default="{ row }">
             <div class="product-image">
               <el-image
-                v-if="row.images && row.images.length > 0"
-                :src="row.images[0]"
+                v-if="row.images"
+                :src="row.images"
                 style="width: 60px; height: 60px"
                 fit="cover"
-                :preview-src-list="row.images"
-                :initial-index="0"
+                :preview-src-list="[row.images]"
+                :preview-teleported="true"
+                :z-index="999999"
+                :hide-on-click-modal="true"
               />
               <span v-else class="no-image">无图片</span>
             </div>
@@ -231,6 +233,10 @@
       title="编辑商品"
       width="900px"
       class="product-edit-dialog"
+      append-to-body
+      :z-index="9999"
+      :close-on-click-modal="true"
+      :close-on-press-escape="true"
     >
       <ProductEdit 
         v-if="editDialogVisible" 
@@ -246,6 +252,10 @@
       title="商品审核"
       width="600px"
       class="product-audit-dialog"
+      append-to-body
+      :z-index="9999"
+      :close-on-click-modal="true"
+      :close-on-press-escape="true"
     >
       <ProductAudit 
         v-if="auditDialogVisible" 
@@ -261,6 +271,10 @@
       title="商品图片管理"
       width="800px"
       class="upload-image-dialog"
+      append-to-body
+      :z-index="9999"
+      :close-on-click-modal="true"
+      :close-on-press-escape="true"
     >
       <ProductImageUpload
         v-if="selectedProduct"
@@ -277,11 +291,13 @@
         </div>
       </template>
     </el-dialog>
+
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 // 使用Element Plus内置图标，避免@element-plus/icons-vue的导入问题
 import ProductDetail from './components/ProductDetail.vue'
@@ -301,6 +317,8 @@ const editDialogVisible = ref(false)
 const auditDialogVisible = ref(false)
 const uploadImageDialogVisible = ref(false)
 const selectedProduct = ref<Product | null>(null)
+
+
 
 // 搜索表单
 const searchForm = reactive({
@@ -641,11 +659,19 @@ const loadCategoryOptions = async () => {
   }
 }
 
+
+
 // 生命周期
 onMounted(() => {
   loadProductList()
   loadBrandOptions()
   loadCategoryOptions()
+})
+
+// 组件卸载时清理
+onUnmounted(() => {
+  // 确保恢复页面滚动
+  document.body.style.overflow = ''
 })
 </script>
 
@@ -757,4 +783,8 @@ onMounted(() => {
     width: 100%;
   }
 }
+
+
+
+
 </style>

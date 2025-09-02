@@ -32,8 +32,6 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     public IPage<Company> getCompanyPage(Page<Company> page, String name, String type, String status) {
-
-
         LambdaQueryWrapper<Company> queryWrapper = new LambdaQueryWrapper<>();
         
         // 添加查询条件
@@ -49,10 +47,32 @@ public class CompanyServiceImpl implements CompanyService {
         
         // 按创建时间倒序排列
         queryWrapper.orderByDesc(Company::getCreatedAt);
-        //增加count
-        Long totalCount= companyRepository.selectCount(queryWrapper);
+        
+        // 获取总记录数
+        Long totalCount = companyRepository.selectCount(queryWrapper);
+        
+        if (totalCount == 0) {
+            page.setRecords(List.of());
+            page.setTotal(0);
+            page.setCurrent(page.getCurrent());
+            page.setSize(page.getSize());
+            page.setPages(0);
+            return page;
+        }
+        
+        // 添加分页条件（手动实现分页）
+        int offset = (int) ((page.getCurrent() - 1) * page.getSize());
+        queryWrapper.last(String.format("LIMIT %d, %d", offset, page.getSize()));
+        
+        // 查询公司数据
+        List<Company> companies = companyRepository.selectList(queryWrapper);
+        
+        // 设置分页结果
+        page.setRecords(companies);
         page.setTotal(totalCount);
-        return companyRepository.selectPage(page, queryWrapper);
+        page.setPages((totalCount + page.getSize() - 1) / page.getSize());
+        
+        return page;
     }
 
     @Override

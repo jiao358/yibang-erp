@@ -4,6 +4,10 @@
     :title="product ? `${product.name} - 商品详情` : '商品详情'"
     width="800px"
     :before-close="handleClose"
+    append-to-body
+    :z-index="9999"
+    :close-on-click-modal="true"
+    :close-on-press-escape="true"
   >
     <div v-if="product" class="product-detail">
       <div class="detail-content">

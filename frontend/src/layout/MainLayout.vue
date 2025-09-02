@@ -12,9 +12,9 @@
           class="material-menu"
           router
         >
-          <el-menu-item index="/dashboard">
+          <el-menu-item index="/workspace">
             <el-icon><Monitor /></el-icon>
-            <span>仪表盘</span>
+            <span>工作台</span>
           </el-menu-item>
           
           <el-sub-menu index="/system" v-if="hasSystemManagePermission">
@@ -137,7 +137,7 @@
           </button>
           
           <el-breadcrumb class="breadcrumb">
-            <el-breadcrumb-item :to="{ path: '/' }">仪表盘</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
             <el-breadcrumb-item v-if="$route.meta.title">{{ $route.meta.title }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>

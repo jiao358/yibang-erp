@@ -280,14 +280,22 @@ public class InventoryServiceImpl implements InventoryService {
         
         queryWrapper.orderByDesc("updated_at");
 
-        Page<ProductInventory> pageParam = new Page<>(page, size);
+        // 获取总记录数
+        long total = productInventoryRepository.selectCount(queryWrapper);
         
-        // 使用标准的MyBatis Plus分页查询
-        Page<ProductInventory> result = productInventoryRepository.selectPage(pageParam, queryWrapper);
+        if (total == 0) {
+            return PageResult.of(new ArrayList<>(), 0L, page, size);
+        }
+        
+        // 添加分页条件（手动实现分页）
+        int offset = (page - 1) * size;
+        queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+        
+        // 查询库存数据
+        List<ProductInventory> inventories = productInventoryRepository.selectList(queryWrapper);
         //todo 1.0 根据result查询出对应的商品信息和仓库信息，进行数据封装返回
 
-
-        PageResult<ProductInventory> pageResult = PageResult.of(result.getRecords(), result.getTotal(), page, size);
+        PageResult<ProductInventory> pageResult = PageResult.of(inventories, total, page, size);
         return pageResult;
     }
 
@@ -318,17 +326,26 @@ public class InventoryServiceImpl implements InventoryService {
         
         queryWrapper.orderByDesc("updated_at");
 
-        Page<ProductInventory> pageParam = new Page<>(page, size);
+        // 获取总记录数
+        long total = productInventoryRepository.selectCount(queryWrapper);
         
-        // 使用标准的MyBatis Plus分页查询
-        Page<ProductInventory> result = productInventoryRepository.selectPage(pageParam, queryWrapper);
+        if (total == 0) {
+            return PageResult.of(new ArrayList<>(), 0L, page, size);
+        }
+        
+        // 添加分页条件（手动实现分页）
+        int offset = (page - 1) * size;
+        queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+        
+        // 查询库存数据
+        List<ProductInventory> inventories = productInventoryRepository.selectList(queryWrapper);
         
         // 转换为DTO并填充商品和仓库信息
-        List<InventoryListDTO> dtoList = result.getRecords().stream()
+        List<InventoryListDTO> dtoList = inventories.stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
 
-        return PageResult.of(dtoList, result.getTotal(), page, size);
+        return PageResult.of(dtoList, total, page, size);
     }
     
     /**

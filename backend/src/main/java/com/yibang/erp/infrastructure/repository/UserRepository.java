@@ -30,6 +30,7 @@ public interface UserRepository extends BaseMapper<User> {
      * @param email 邮箱
      * @return 用户对象
      */
+    @Select("SELECT * FROM users WHERE email = #{email}")
     User findByEmail(@Param("email") String email);
     
     /**
@@ -38,6 +39,7 @@ public interface UserRepository extends BaseMapper<User> {
      * @param phone 手机号
      * @return 用户对象
      */
+    @Select("SELECT * FROM users WHERE phone = #{phone}")
     User findByPhone(@Param("phone") String phone);
     
     /**
@@ -46,6 +48,7 @@ public interface UserRepository extends BaseMapper<User> {
      * @param companyId 公司ID
      * @return 用户列表
      */
+    @Select("SELECT * FROM users WHERE company_id = #{companyId} ORDER BY created_at DESC")
     java.util.List<User> findByCompanyId(@Param("companyId") Long companyId);
     
     /**
@@ -54,5 +57,8 @@ public interface UserRepository extends BaseMapper<User> {
      * @param roleId 角色ID
      * @return 用户列表
      */
+    @Select("SELECT u.* FROM users u " +
+            "JOIN user_roles ur ON u.id = ur.user_id " +
+            "WHERE ur.role_id = #{roleId} ORDER BY u.created_at DESC")
     java.util.List<User> findByRoleId(@Param("roleId") Long roleId);
 }

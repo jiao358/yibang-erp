@@ -2,9 +2,7 @@ package com.yibang.erp.infrastructure.repository;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.yibang.erp.domain.entity.ProductImage;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.*;
 
 import java.util.List;
 
@@ -30,6 +28,18 @@ public interface ProductImageRepository extends BaseMapper<ProductImage> {
     ProductImage selectPrimaryByProductId(@Param("productId") Long productId);
 
     /**
+     * 根据商品ID列表批量查询主图
+     */
+    @Select("<script>" +
+            "SELECT * FROM product_images WHERE product_id IN " +
+            "<foreach item='productId' collection='productIds' open='(' separator=',' close=')'>" +
+            "#{productId}" +
+            "</foreach>" +
+            " AND is_primary = 1 AND status = 1" +
+            "</script>")
+    List<ProductImage> selectPrimaryByProductIds(@Param("productIds") List<Long> productIds);
+
+    /**
      * 根据商品ID列表批量查询图片
      */
     @Select("<script>" +
@@ -50,12 +60,12 @@ public interface ProductImageRepository extends BaseMapper<ProductImage> {
     /**
      * 更新商品的所有图片为非主图
      */
-    @Select("UPDATE product_images SET is_primary = 0 WHERE product_id = #{productId}")
+    @Update("UPDATE product_images SET is_primary = 0 WHERE product_id = #{productId}")
     void clearPrimaryByProductId(@Param("productId") Long productId);
 
     /**
      * 软删除商品的所有图片
      */
-    @Select("UPDATE product_images SET status = 0 WHERE product_id = #{productId}")
+    @Update("UPDATE product_images SET status = 0 WHERE product_id = #{productId}")
     void deleteByProductId(@Param("productId") Long productId);
 }

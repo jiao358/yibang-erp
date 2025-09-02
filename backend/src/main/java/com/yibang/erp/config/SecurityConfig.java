@@ -110,6 +110,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/test/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 
+                // 静态资源公开访问
+                .requestMatchers("/static/**").permitAll()
+                
                 // 需要认证的接口（排除已公开的）
                 .requestMatchers("/api/protected/**").authenticated()
                 .requestMatchers("/api/admin/**").authenticated()

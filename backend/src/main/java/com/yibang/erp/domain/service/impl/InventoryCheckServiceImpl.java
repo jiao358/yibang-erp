@@ -129,8 +129,35 @@ public class InventoryCheckServiceImpl implements InventoryCheckService {
 
         queryWrapper.orderByDesc("created_at");
 
+        // 获取总记录数
+        long total = inventoryCheckRepository.selectCount(queryWrapper);
+        
         Page<InventoryCheck> pageParam = new Page<>(page, size);
-        return inventoryCheckRepository.selectPage(pageParam, queryWrapper);
+        
+        if (total == 0) {
+            pageParam.setRecords(List.of());
+            pageParam.setTotal(0);
+            pageParam.setCurrent(page);
+            pageParam.setSize(size);
+            pageParam.setPages(0);
+            return pageParam;
+        }
+        
+        // 添加分页条件（手动实现分页）
+        int offset = (page - 1) * size;
+        queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+        
+        // 查询盘点数据
+        List<InventoryCheck> checks = inventoryCheckRepository.selectList(queryWrapper);
+        
+        // 设置分页结果
+        pageParam.setRecords(checks);
+        pageParam.setTotal(total);
+        pageParam.setCurrent(page);
+        pageParam.setSize(size);
+        pageParam.setPages((total + size - 1) / size);
+        
+        return pageParam;
     }
 
     @Override

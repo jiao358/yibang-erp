@@ -20,10 +20,14 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        name: 'Dashboard',
-        component: () => import('@/views/dashboard/Dashboard.vue'),
+        redirect: '/workspace'
+      },
+      {
+        path: 'workspace',
+        name: 'Workspace',
+        component: () => import('@/views/workspace/Workspace.vue'),
         meta: {
-          title: '仪表盘',
+          title: '工作台',
           requiresAuth: true
         }
       },
@@ -250,7 +254,7 @@ router.beforeEach((to, from, next) => {
       )
       
       if (!hasPermission) {
-        next('/dashboard')
+        next('/')
         return
       }
     }

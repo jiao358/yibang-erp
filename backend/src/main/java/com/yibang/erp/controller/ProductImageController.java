@@ -79,7 +79,13 @@ public class ProductImageController {
             
         } catch (Exception e) {
             log.error("批量上传商品图片失败", e);
-            return ResponseEntity.badRequest().build();
+            /*Map<String, Object> errorResponse = new HashMap<>();
+            ProductImageResponse productImageResponse = new ProductImageResponse();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            errorResponse.put("error", e.getClass().getSimpleName());*/
+
+            return  ResponseEntity.badRequest(). build();
         }
     }
 

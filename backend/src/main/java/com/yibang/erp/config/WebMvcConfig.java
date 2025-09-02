@@ -31,7 +31,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/api/public/**",      // 排除公开接口
                 "/error",              // 排除错误页面
                 "/swagger-ui/**",      // 排除Swagger UI
-                "/v3/api-docs/**"      // 排除API文档
+                "/v3/api-docs/**",     // 排除API文档
+                "/static/**"           // 排除静态资源访问
             )
             .order(1); // 设置拦截器顺序
     }
@@ -39,8 +40,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // 配置静态资源访问
+        String resourcePath = uploadPath.startsWith("./") ? 
+            System.getProperty("user.dir") + "/" + uploadPath.substring(2) : uploadPath;
+        
         registry.addResourceHandler("/static/**")
-                .addResourceLocations("file:" + uploadPath)
+                .addResourceLocations("file:" + resourcePath)
                 .setCachePeriod(3600); // 缓存1小时
     }
 }

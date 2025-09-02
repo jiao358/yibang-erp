@@ -59,6 +59,8 @@ public class ProductController {
     private UserRepository userRepository;
     @Autowired
     private ProductPriceTierConfigRepository productPriceTierConfigRepository;
+    @Autowired
+    private ProductImageRepository productImageRepository;
 
     /**
      * 获取商品列表
@@ -109,20 +111,58 @@ public class ProductController {
             queryWrapper.orderByDesc("created_at");
 
 
-            // 执行分页查询
-            Page<Product> pageParam = new Page<>(page, size);
-            Page<Product> result = productRepository.selectPage(pageParam, queryWrapper);
-
+            // 获取总记录数
+            long total = productRepository.selectCount(queryWrapper);
+            
+            if (total == 0) {
+                PageResult<Product> emptyResult = new PageResult<>();
+                emptyResult.setRecords(List.of());
+                emptyResult.setTotal(0);
+                emptyResult.setCurrent(page);
+                emptyResult.setSize(size);
+                emptyResult.setPages(0);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("data", emptyResult);
+                response.put("message", "获取商品列表成功");
+                return ResponseEntity.ok(response);
+            }
+            
+            // 添加分页条件（手动实现分页）
+            int offset = (page - 1) * size;
+            queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+            
+            // 查询商品数据
+            List<Product> products = productRepository.selectList(queryWrapper);
+            
+            // 批量获取商品主图信息
+            if (!products.isEmpty()) {
+                List<Long> productIds = products.stream().map(Product::getId).toList();
+                List<ProductImage> primaryImages = productImageRepository.selectPrimaryByProductIds(productIds);
+                
+                // 创建主图映射
+                Map<Long, String> imageMap = primaryImages.stream()
+                    .collect(Collectors.toMap(ProductImage::getProductId, ProductImage::getImageUrl));
+                
+                // 设置商品主图
+                products.forEach(product -> {
+                    String imageUrl = imageMap.get(product.getId());
+                    if (imageUrl != null) {
+                        product.setImages(imageUrl);
+                    }
+                });
+            }
+            
             // 构建返回结果
             PageResult<Product> pageResult = new PageResult<>();
-            pageResult.setRecords(result.getRecords());
-            pageResult.setTotal(result.getTotal());
-            pageResult.setCurrent(result.getCurrent());
-            pageResult.setSize(result.getSize());
-            pageResult.setPages(result.getPages());
+            pageResult.setRecords(products);
+            pageResult.setTotal(total);
+            pageResult.setCurrent(page);
+            pageResult.setSize(size);
+            pageResult.setPages((total + size - 1) / size);
 
-
-            log.info("商品列表查询成功，总数: {}, 当前页: {}", result.getTotal(), page);
+            log.info("商品列表查询成功，总数: {}, 当前页: {}, 返回数据: {}", total, page, products.size());
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);

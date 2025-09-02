@@ -44,12 +44,31 @@ public class RoleServiceImpl implements RoleService {
         // 按创建时间倒序排列
         queryWrapper.orderByDesc(Role::getCreatedAt);
 
-
-        //增加count
-        Long totalCount= roleRepository.selectCount(queryWrapper);
+        // 获取总记录数
+        Long totalCount = roleRepository.selectCount(queryWrapper);
+        
+        if (totalCount == 0) {
+            page.setRecords(List.of());
+            page.setTotal(0);
+            page.setCurrent(page.getCurrent());
+            page.setSize(page.getSize());
+            page.setPages(0);
+            return page;
+        }
+        
+        // 添加分页条件（手动实现分页）
+        int offset = (int) ((page.getCurrent() - 1) * page.getSize());
+        queryWrapper.last(String.format("LIMIT %d, %d", offset, page.getSize()));
+        
+        // 查询角色数据
+        List<Role> roles = roleRepository.selectList(queryWrapper);
+        
+        // 设置分页结果
+        page.setRecords(roles);
         page.setTotal(totalCount);
+        page.setPages((totalCount + page.getSize() - 1) / page.getSize());
 
-        return roleRepository.selectPage(page, queryWrapper);
+        return page;
     }
 
     @Override
