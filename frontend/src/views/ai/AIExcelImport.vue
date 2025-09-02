@@ -2,97 +2,189 @@
   <div class="ai-excel-import-container">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h1 class="page-title">AI Excel订单导入</h1>
+      <h1 class="page-title">AI Excel任务管理中心</h1>
       <p class="page-description">
         使用AI智能识别Excel文件内容，自动匹配商品和客户信息，批量创建订单
       </p>
+      
+      <!-- 开发模式开关 -->
+      <div class="dev-mode-switch">
+        <el-switch
+          v-model="devMode"
+          active-text="开发模式"
+          inactive-text="生产模式"
+          @change="handleDevModeChange"
+        />
+        <span class="dev-mode-hint">
+          {{ devMode ? '当前使用模拟数据' : '当前使用真实API' }}
+        </span>
+      </div>
     </div>
 
     <!-- 主要内容区域 -->
     <div class="main-content">
-      <!-- 文件上传区域 -->
-      <div class="upload-section">
-        <h3 class="section-title">文件上传</h3>
-        <FileUpload 
-          @fileSelected="handleFileSelected"
-          @uploadSuccess="handleUploadSuccess"
-          @uploadError="handleUploadError"
-        />
-      </div>
+      <!-- 任务概览 -->
+      <TaskOverview 
+        :statistics="statistics"
+        @upload-new="showUploadDialog = true"
+        @refresh="loadTaskHistory"
+        @view-all="scrollToTable"
+      />
 
-      <!-- AI配置面板 -->
-      <div class="config-section" v-if="selectedFile">
-        <h3 class="section-title">AI配置</h3>
-        <AIConfigPanel 
-          v-model:config="aiConfig"
-          @config-change="handleConfigChange"
-        />
-      </div>
+      <!-- 任务筛选 -->
+      <TaskFilter 
+        v-model="filterForm"
+        @filter-change="handleFilterChange"
+      />
 
-      <!-- 处理进度 -->
-      <div class="progress-section" v-if="isProcessing">
-        <h3 class="section-title">处理进度</h3>
+      <!-- 任务列表 -->
+      <TaskTable 
+        :tasks="filteredTasks"
+        :loading="loading"
+        :total-tasks="totalTasks"
+        @refresh="loadTaskHistory"
+        @export="exportTasks"
+        @view-detail="viewTaskDetail"
+        @retry-task="retryTask"
+        @delete-task="deleteTask"
+        @selection-change="handleSelectionChange"
+      />
+
+      <!-- 任务详情弹窗 -->
+      <TaskDetailDialog 
+        v-model="detailDialogVisible"
+        :task-detail="selectedTask"
+        @view-results="viewTaskResults"
+        @retry-task="retryTask"
+        @download-results="downloadResults"
+        @view-logs="viewLogs"
+        @delete-task="deleteTask"
+      />
+
+      <!-- 文件上传弹窗 -->
+      <el-dialog
+        v-model="showUploadDialog"
+        title="上传Excel文件"
+        width="600px"
+        :before-close="handleCloseUploadDialog"
+      >
+        <div class="upload-dialog-content">
+          <FileUpload 
+            @fileSelected="handleFileSelected"
+            @uploadSuccess="handleUploadSuccess"
+            @uploadError="handleUploadError"
+          />
+          
+          <div v-if="selectedFile" class="ai-config-section">
+            <h4>AI配置</h4>
+            <AIConfigPanel 
+              v-model:config="aiConfig"
+              @config-change="handleConfigChange"
+            />
+          </div>
+        </div>
+        
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button @click="handleCloseUploadDialog">取消</el-button>
+            <el-button 
+              type="primary" 
+              :disabled="!selectedFile"
+              @click="startProcessing"
+            >
+              开始处理
+            </el-button>
+          </div>
+        </template>
+      </el-dialog>
+
+      <!-- 处理进度弹窗 -->
+      <el-dialog
+        v-model="showProgressDialog"
+        title="处理进度"
+        width="500px"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        :show-close="false"
+      >
         <ProcessingProgress 
           :progress="progress"
           :status="processingStatus"
           @cancel-processing="handleCancelProcessing"
         />
-      </div>
-
-      <!-- 结果展示 -->
-      <div class="result-section" v-if="processingResult">
-        <h3 class="section-title">处理结果</h3>
-        <ResultDisplay 
-          :result="processingResult"
-          @export-results="handleExportResults"
-          @retry-processing="handleRetryProcessing"
-        />
-      </div>
-
-      <!-- 错误订单展示 -->
-      <div class="error-section" v-if="errorOrders.length > 0">
-        <h3 class="section-title">错误订单</h3>
-        <ErrorOrderDisplay 
-          :task-id="currentTaskId || undefined"
-          :error-orders="errorOrders"
-          @refresh="loadErrorOrders"
-          @create-order="handleCreateOrderFromError"
-        />
-      </div>
-
-      <!-- 历史任务 -->
-      <div class="history-section">
-        <h3 class="section-title">历史任务</h3>
-        <TaskHistory 
-          :tasks="taskHistory"
-          @view-detail="handleViewTaskDetail"
-          @retry-task="handleRetryTask"
-        />
-      </div>
+        
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button 
+              v-if="processingStatus === 'PROCESSING'"
+              @click="handleCancelProcessing"
+            >
+              取消处理
+            </el-button>
+            <el-button 
+              v-else
+              type="primary" 
+              @click="showProgressDialog = false"
+            >
+              确定
+            </el-button>
+          </div>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import TaskOverview from './components/TaskOverview.vue'
+import TaskFilter from './components/TaskFilter.vue'
+import TaskTable from './components/TaskTable.vue'
+import TaskDetailDialog from './components/TaskDetailDialog.vue'
 import FileUpload from './components/FileUpload.vue'
 import AIConfigPanel from './components/AIConfigPanel.vue'
 import ProcessingProgress from './components/ProcessingProgress.vue'
-import ResultDisplay from './components/ResultDisplay.vue'
-import TaskHistory from './components/TaskHistory.vue'
-import ErrorOrderDisplay from './components/ErrorOrderDisplay.vue'
 import { aiExcelImportApi } from '@/api/aiExcelImport'
-import type { AIExcelConfig, ProcessingProgress as ProcessingProgressType, ProcessingResult, TaskHistoryItem, ErrorOrderInfo } from '@/types/ai'
+import type { 
+  AIExcelConfig, 
+  ProcessingProgress as ProcessingProgressType, 
+  TaskHistoryItem,
+  TaskFilterForm
+} from '@/types/ai'
 
 // 响应式数据
+const loading = ref(false)
+const showUploadDialog = ref(false)
+const showProgressDialog = ref(false)
 const selectedFile = ref<File | null>(null)
-const isProcessing = ref(false)
 const processingStatus = ref<string>('')
 const progress = ref<ProcessingProgressType | null>(null)
-const processingResult = ref<ProcessingResult | null>(null)
 const taskHistory = ref<TaskHistoryItem[]>([])
-const errorOrders = ref<ErrorOrderInfo[]>([])
+const totalTasks = ref(0)
+const detailDialogVisible = ref(false)
+const selectedTask = ref<TaskHistoryItem | null>(null)
+const devMode = ref(false) // 新增开发模式开关
+
+// 统计数据
+const statistics = ref({
+  totalTasks: 0,
+  processingTasks: 0,
+  completedTasks: 0,
+  failedTasks: 0
+})
+
+// 筛选表单
+const filterForm = reactive<TaskFilterForm>({
+  status: '',
+  dateRange: [],
+  fileName: '',
+  sortBy: 'createdAt',
+  minRows: undefined,
+  maxRows: undefined,
+  successRate: '',
+  processingDuration: ''
+})
 
 // AI配置
 const aiConfig = reactive<AIExcelConfig>({
@@ -106,31 +198,76 @@ const aiConfig = reactive<AIExcelConfig>({
   timeout: 30
 })
 
-// 事件处理
-const handleFileSelected = (file: File) => {
-  console.log('🎯 主页面收到 fileSelected 事件:', file)
-  console.log('📁 文件详情:', {
-    name: file.name,
-    size: file.size,
-    type: file.type,
-    lastModified: file.lastModified
+// 计算属性
+const filteredTasks = computed(() => {
+  let tasks = [...taskHistory.value]
+  
+  // 状态筛选
+  if (filterForm.status) {
+    tasks = tasks.filter(task => task.status === filterForm.status)
+  }
+  
+  // 文件名筛选
+  if (filterForm.fileName) {
+    tasks = tasks.filter(task => 
+      task.fileName.toLowerCase().includes(filterForm.fileName.toLowerCase())
+    )
+  }
+  
+  // 时间范围筛选
+  if (filterForm.dateRange && filterForm.dateRange.length === 2) {
+    const [startDate, endDate] = filterForm.dateRange
+    tasks = tasks.filter(task => {
+      const taskDate = new Date(task.createdAt)
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      return taskDate >= start && taskDate <= end
+    })
+  }
+  
+  // 行数筛选
+  if (filterForm.minRows !== undefined) {
+    tasks = tasks.filter(task => task.totalRows >= filterForm.minRows!)
+  }
+  if (filterForm.maxRows !== undefined) {
+    tasks = tasks.filter(task => task.totalRows <= filterForm.maxRows!)
+  }
+  
+  // 成功率筛选
+  if (filterForm.successRate) {
+    const rate = parseInt(filterForm.successRate.replace('+', ''))
+    tasks = tasks.filter(task => {
+      const successRate = (task.successRows / task.totalRows) * 100
+      return successRate >= rate
+    })
+  }
+  
+  // 排序
+  tasks.sort((a, b) => {
+    switch (filterForm.sortBy) {
+      case 'fileName':
+        return a.fileName.localeCompare(b.fileName)
+      case 'status':
+        return a.status.localeCompare(b.status)
+      case 'processingTime':
+        return (a.processingTime || 0) - (b.processingTime || 0)
+      case 'createdAt':
+      default:
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    }
   })
   
+  return tasks
+})
+
+// 事件处理
+const handleFileSelected = (file: File) => {
   selectedFile.value = file
-  console.log('📁 已设置主页面selectedFile:', selectedFile.value)
   ElMessage.success(`已选择文件: ${file.name}`)
 }
 
-const handleUploadSuccess = async (response: any) => {
-  console.log('🎯 主页面收到 uploadSuccess 事件:', response)
-  try {
-    ElMessage.success('文件上传成功，开始AI处理')
-    console.log('🚀 准备启动AI处理...')
-    await startAIProcessing()
-  } catch (error) {
-    console.error('❌ 启动AI处理失败:', error)
-    ElMessage.error('启动AI处理失败')
-  }
+const handleUploadSuccess = (response: any) => {
+  ElMessage.success('文件上传成功')
 }
 
 const handleUploadError = (error: string) => {
@@ -139,27 +276,34 @@ const handleUploadError = (error: string) => {
 
 const handleConfigChange = (config: AIExcelConfig) => {
   console.log('AI配置已更新:', config)
-  // 可以在这里保存配置到后端
 }
 
-const startAIProcessing = async () => {
-  console.log('🚀 startAIProcessing 开始执行')
-  
+const handleFilterChange = (filters: TaskFilterForm) => {
+  console.log('筛选条件已更新:', filters)
+  // 可以在这里添加额外的筛选逻辑
+}
+
+const handleSelectionChange = (selectedTasks: TaskHistoryItem[]) => {
+  console.log('选中的任务:', selectedTasks)
+}
+
+const handleCloseUploadDialog = () => {
+  showUploadDialog.value = false
+  selectedFile.value = null
+}
+
+const startProcessing = async () => {
   if (!selectedFile.value) {
-    console.error('❌ 没有选择文件，无法开始处理')
     ElMessage.error('请先选择文件')
     return
   }
   
-  console.log('📁 当前选择的文件:', selectedFile.value)
-      console.log('⚙️ 当前AI配置:', aiConfig)
-  
   try {
-    isProcessing.value = true
+    showUploadDialog.value = false
+    showProgressDialog.value = true
     processingStatus.value = 'PROCESSING'
-    console.log('🔄 设置处理状态为处理中')
     
-    // 创建FormData对象，包含文件和参数
+    // 创建FormData对象
     const formData = new FormData()
     formData.append('file', selectedFile.value)
     formData.append('salesUserId', getCurrentUserId().toString())
@@ -171,104 +315,20 @@ const startAIProcessing = async () => {
     formData.append('autoCreateProduct', 'false')
     formData.append('remarks', 'AI Excel导入')
     
-    console.log('📤 准备发送FormData，文件:', selectedFile.value.name)
-    
     // 调用后端API开始处理
-    console.log('🌐 调用 aiExcelImportApi.startProcessing...')
     const response = await aiExcelImportApi.startProcessing(formData)
-    console.log('📥 收到API响应:', response)
     
-    // 检查响应结构
     if (response && response.taskId) {
-      console.log('✅ 成功获取任务ID:', response.taskId)
       ElMessage.success('AI处理已启动')
-      // 开始轮询进度
       startProgressPolling(response.taskId)
     } else {
-      console.error('❌ 响应数据不完整:', response)
       throw new Error('启动处理失败：未获取到任务ID')
     }
     
-  } catch (error) {
-    console.error('❌ startAIProcessing 执行失败:', error)
-    isProcessing.value = false
+  } catch (error: any) {
+    console.error('启动AI处理失败:', error)
     processingStatus.value = 'FAILED'
-    ElMessage.error(`启动AI处理失败: ${error}`)
-  }
-}
-
-// 工具方法
-const getCurrentUserId = (): number => {
-  try {
-    // 优先从localStorage获取用户信息
-    const userInfo = localStorage.getItem('userInfo')
-    if (userInfo) {
-      const user = JSON.parse(userInfo)
-      if (user.id) {
-        console.log('📋 从localStorage获取到用户ID:', user.id)
-        return user.id
-      }
-    }
-    
-    // 从JWT token解析用户信息
-    const token = localStorage.getItem('token')
-    if (token) {
-      try {
-        const parts = token.split('.')
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]))
-          if (payload.userId) {
-            console.log('📋 从JWT获取到用户ID:', payload.userId)
-            return payload.userId
-          }
-        }
-      } catch (e) {
-        console.error('解析JWT失败:', e)
-      }
-    }
-    
-    console.warn('⚠️ 无法获取用户ID，使用默认值1')
-    return 1
-  } catch (error) {
-    console.error('获取用户ID失败:', error)
-    return 1
-  }
-}
-
-const getCurrentCompanyId = (): number => {
-  try {
-    // 优先从localStorage获取用户信息
-    const userInfo = localStorage.getItem('userInfo')
-    if (userInfo) {
-      const user = JSON.parse(userInfo)
-      if (user.companyId) {
-        console.log('📋 从localStorage获取到公司ID:', user.companyId)
-        return user.companyId
-      }
-    }
-    
-    // 从JWT token解析用户信息
-    const token = localStorage.getItem('token')
-    if (token) {
-      try {
-        const parts = token.split('.')
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]))
-          if (payload.companyId) {
-            console.log('📋 从JWT获取到公司ID:', payload.companyId)
-            return payload.companyId
-          }
-        }
-      } catch (e) {
-        console.error('解析JWT失败:', e)
-      }
-    }
-    
-    console.warn('⚠️ 无法获取公司ID，使用默认值1')
-    return 1
-  } catch (error) {
-    console.error('获取公司ID失败:', error)
-    return 1
+    ElMessage.error(`启动AI处理失败: ${error.message || error}`)
   }
 }
 
@@ -287,16 +347,15 @@ const startProgressPolling = (taskId: string) => {
         // 检查是否完成
         if (response.status === 'COMPLETED' || response.status === 'FAILED') {
           clearProgressPolling()
-          isProcessing.value = false
           processingStatus.value = response.status
           
-          // 获取处理结果
-          await loadProcessingResult(taskId)
+          // 重新加载任务历史
+          await loadTaskHistory()
         }
       }
-    } catch (error) {
-      console.error('获取进度失败:', error)
-    }
+      } catch (error: any) {
+    console.error('获取进度失败:', error)
+  }
   }, 2000) // 每2秒轮询一次
 }
 
@@ -307,108 +366,341 @@ const clearProgressPolling = () => {
   }
 }
 
-// 加载处理结果
-const loadProcessingResult = async (taskId: string) => {
-  console.log('📥 开始加载处理结果，任务ID:', taskId)
-  try {
-    const response = await aiExcelImportApi.getResult(taskId)
-    console.log('📥 获取到处理结果:', response)
-    processingResult.value = response
-  } catch (error) {
-    console.error('❌ 加载处理结果失败:', error)
-    ElMessage.error('加载处理结果失败')
-  }
-}
-
 const handleCancelProcessing = async () => {
   if (!currentTaskId) return
   
   try {
     await aiExcelImportApi.cancelProcessing(currentTaskId)
     clearProgressPolling()
-    isProcessing.value = false
     processingStatus.value = 'CANCELLED'
     ElMessage.info('处理已取消')
-  } catch (error) {
-    ElMessage.error('取消处理失败')
+  } catch (error: any) {
+    ElMessage.error(`取消处理失败: ${error.message || '未知错误'}`)
   }
 }
 
-const handleExportResults = () => {
-  // TODO: 实现结果导出
-  ElMessage.success('结果导出功能待实现')
-}
-
-const handleRetryProcessing = () => {
-  if (selectedFile.value) {
-    startAIProcessing()
+// 加载统计数据
+const loadStatistics = async () => {
+  try {
+    console.log('📊 开始加载统计数据...')
+    
+    if (devMode.value) {
+      console.log('🧪 使用模拟统计数据')
+      statistics.value = {
+        totalTasks: 12,
+        processingTasks: 3,
+        completedTasks: 8,
+        failedTasks: 1
+      }
+      return
+    }
+    
+    const response = await aiExcelImportApi.getTaskStatistics({})
+    console.log('📊 统计API响应:', response)
+    
+    if (response) {
+      statistics.value = {
+        totalTasks: response.totalTasks || 0,
+        processingTasks: response.processingTasks || 0,
+        completedTasks: response.completedTasks || 0,
+        failedTasks: response.failedTasks || 0
+      }
+      console.log('✅ 统计数据加载成功:', statistics.value)
+    }
+  } catch (error: any) {
+    console.error('❌ 加载统计数据失败:', error)
+    // 使用默认值
+    statistics.value = {
+      totalTasks: 0,
+      processingTasks: 0,
+      completedTasks: 0,
+      failedTasks: 0
+    }
   }
 }
 
-const handleViewTaskDetail = (taskId: string) => {
-  // TODO: 查看任务详情
-  console.log('查看任务详情:', taskId)
+// 任务管理相关
+const loadTaskHistory = async () => {
+  try {
+    console.log('🔄 开始加载任务历史...')
+    loading.value = true
+    
+    // 检查用户认证状态
+    const token = localStorage.getItem('token')
+    if (!token) {
+      console.warn('⚠️ 未找到用户Token')
+      ElMessage.warning('请先登录')
+      return
+    }
+    
+    console.log('🔐 Token验证通过，开始请求API...')
+    
+    // 同时加载任务历史和统计数据
+    const [taskResponse, statsResponse] = await Promise.all([
+      aiExcelImportApi.getTaskHistory({
+        page: 1,
+        size: 1000
+      }),
+      loadStatistics()
+    ])
+    
+    const response = taskResponse
+    
+    console.log('📥 API响应:', response)
+    
+    if (response && response.content) {
+      taskHistory.value = response.content
+      totalTasks.value = response.totalElements || 0
+      console.log(`✅ 成功加载 ${taskHistory.value.length} 个任务`)
+    } else {
+      console.warn('⚠️ API响应数据格式异常:', response)
+      taskHistory.value = []
+      totalTasks.value = 0
+      ElMessage.warning('任务数据格式异常，已显示空列表')
+    }
+  } catch (error: any) {
+    console.error('❌ 加载任务历史失败:', error)
+    
+    // 根据错误类型提供不同的错误信息
+    if (error.response) {
+      const { status, data } = error.response
+      console.error(`HTTP ${status}:`, data)
+      
+      switch (status) {
+        case 401:
+          ElMessage.error('登录已过期，请重新登录')
+          break
+        case 403:
+          ElMessage.error('没有权限访问此功能')
+          break
+        case 404:
+          ElMessage.error('任务历史接口不存在')
+          break
+        case 500:
+          ElMessage.error('服务器内部错误，请稍后重试')
+          break
+        default:
+          ElMessage.error(`请求失败 (${status}): ${data?.message || '未知错误'}`)
+      }
+    } else if (error.request) {
+      console.error('网络请求失败:', error.request)
+      ElMessage.error('网络连接失败，请检查网络设置')
+    } else {
+      console.error('其他错误:', error.message)
+      ElMessage.error(`加载失败: ${error.message}`)
+    }
+    
+    // 使用模拟数据确保界面能正常显示
+    console.log('📋 使用模拟数据...')
+    taskHistory.value = getMockTaskData()
+    totalTasks.value = taskHistory.value.length
+    ElMessage.info('当前显示模拟数据，请检查后端接口')
+  } finally {
+    loading.value = false
+    console.log('🏁 任务历史加载完成')
+  }
 }
 
-const handleRetryTask = (taskId: string) => {
-  // TODO: 重试任务
-  console.log('重试任务:', taskId)
+// 模拟数据生成函数
+const getMockTaskData = (): TaskHistoryItem[] => {
+  return [
+    {
+      taskId: 'mock-task-001',
+      fileName: '青岛啤酒订单.xlsx',
+      status: 'COMPLETED',
+      totalRows: 150,
+      successRows: 145,
+      failedRows: 5,
+      createdAt: '2024-01-15T10:00:00Z',
+      completedAt: '2024-01-15T10:05:00Z',
+      processingTime: 300000, // 5分钟
+      supplier: '青岛啤酒',
+      fileSize: 1024000, // 1MB
+      uploadUser: '张三'
+    },
+    {
+      taskId: 'mock-task-002',
+      fileName: '雪花啤酒订单.xlsx',
+      status: 'PROCESSING',
+      totalRows: 200,
+      successRows: 120,
+      failedRows: 3,
+      createdAt: '2024-01-15T11:00:00Z',
+      processingTime: 180000, // 3分钟
+      supplier: '雪花啤酒',
+      fileSize: 1536000, // 1.5MB
+      uploadUser: '李四'
+    },
+    {
+      taskId: 'mock-task-003',
+      fileName: '燕京啤酒订单.xlsx',
+      status: 'FAILED',
+      totalRows: 80,
+      successRows: 0,
+      failedRows: 80,
+      createdAt: '2024-01-15T12:00:00Z',
+      processingTime: 60000, // 1分钟
+      supplier: '燕京啤酒',
+      fileSize: 512000, // 0.5MB
+      uploadUser: '王五'
+    },
+    {
+      taskId: 'mock-task-004',
+      fileName: '百威啤酒订单.xlsx',
+      status: 'PENDING',
+      totalRows: 100,
+      successRows: 0,
+      failedRows: 0,
+      createdAt: '2024-01-15T13:00:00Z',
+      supplier: '百威啤酒',
+      fileSize: 768000, // 0.75MB
+      uploadUser: '赵六'
+    }
+  ]
+}
+
+const viewTaskDetail = (taskId: string) => {
+  const task = taskHistory.value.find(t => t.taskId === taskId)
+  if (task) {
+    selectedTask.value = task
+    detailDialogVisible.value = true
+  }
+}
+
+const retryTask = async (taskId: string) => {
+  try {
+    console.log(`🔄 开始重试任务: ${taskId}`)
+    await aiExcelImportApi.retryTask(taskId)
+    ElMessage.success('任务重新处理已启动')
+    await loadTaskHistory()
+  } catch (error: any) {
+    console.error('❌ 重新处理任务失败:', error)
+    ElMessage.error(`重新处理任务失败: ${error.message || '未知错误'}`)
+  }
+}
+
+const deleteTask = async (taskId: string) => {
+  try {
+    console.log(`🗑️ 开始删除任务: ${taskId}`)
+    await aiExcelImportApi.deleteTask(taskId)
+    ElMessage.success('任务删除成功')
+    await loadTaskHistory()
+  } catch (error: any) {
+    console.error('❌ 删除任务失败:', error)
+    ElMessage.error(`删除任务失败: ${error.message || '未知错误'}`)
+  }
+}
+
+const exportTasks = () => {
+  ElMessage.info('导出功能开发中...')
+}
+
+const viewTaskResults = (taskId: string) => {
+  ElMessage.info('查看结果功能开发中...')
+}
+
+const downloadResults = (taskId: string) => {
+  ElMessage.info('下载结果功能开发中...')
+}
+
+const viewLogs = (taskId: string) => {
+  ElMessage.info('查看日志功能开发中...')
+}
+
+const scrollToTable = () => {
+  // 滚动到表格区域
+  const tableElement = document.querySelector('.task-table-container')
+  if (tableElement) {
+    tableElement.scrollIntoView({ behavior: 'smooth' })
+  }
+}
+
+// 工具方法
+const getCurrentUserId = (): number => {
+  try {
+    const userInfo = localStorage.getItem('userInfo')
+    if (userInfo) {
+      const user = JSON.parse(userInfo)
+      if (user.id) return user.id
+    }
+    
+    const token = localStorage.getItem('token')
+    if (token) {
+      try {
+        const parts = token.split('.')
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]))
+          if (payload.userId) return payload.userId
+        }
+      } catch (e: any) {
+        console.error('解析JWT失败:', e)
+      }
+    }
+    
+    return 1
+  } catch (error: any) {
+    console.error('获取用户ID失败:', error)
+    return 1
+  }
+}
+
+const getCurrentCompanyId = (): number => {
+  try {
+    const userInfo = localStorage.getItem('userInfo')
+    if (userInfo) {
+      const user = JSON.parse(userInfo)
+      if (user.companyId) return user.companyId
+    }
+    
+    const token = localStorage.getItem('token')
+    if (token) {
+      try {
+        const parts = token.split('.')
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]))
+          if (payload.companyId) return payload.companyId
+        }
+      } catch (e: any) {
+        console.error('解析JWT失败:', e)
+      }
+    }
+    
+    return 1
+  } catch (error: any) {
+    console.error('获取公司ID失败:', error)
+    return 1
+  }
 }
 
 // 生命周期
 onMounted(() => {
   console.log('🚀 AIExcelImport 主页面已挂载')
-  console.log('📋 事件处理器状态:', {
-    handleFileSelected: typeof handleFileSelected,
-    handleUploadSuccess: typeof handleUploadSuccess,
-    handleUploadError: typeof handleUploadError
-  })
-  
-  // 显示当前用户信息
-  console.log('👤 当前用户信息:', {
-    userId: getCurrentUserId(),
-    companyId: getCurrentCompanyId(),
-    localStorage: {
-      userInfo: localStorage.getItem('userInfo') ? '已设置' : '未设置',
-      token: localStorage.getItem('token') ? '已设置' : '未设置',
-      userRoles: localStorage.getItem('userRoles') ? '已设置' : '未设置'
-    }
-  })
-  
-  // TODO: 加载历史任务
   loadTaskHistory()
 })
 
-const loadTaskHistory = () => {
-  // TODO: 从后端加载历史任务
-  taskHistory.value = []
-}
+onUnmounted(() => {
+  clearProgressPolling()
+})
 
-const loadErrorOrders = async () => {
-  if (!currentTaskId) return
-  
-  try {
-    console.log('📋 加载错误订单，任务ID:', currentTaskId)
-    // TODO: 调用后端API获取错误订单
-    // const response = await aiExcelImportApi.getErrorOrders(currentTaskId)
-    // errorOrders.value = response.data.errorOrders || []
-  } catch (error) {
-    console.error('加载错误订单失败:', error)
-    ElMessage.error('加载错误订单失败')
+// 开发模式切换
+const handleDevModeChange = (value: boolean) => {
+  devMode.value = value
+  if (value) {
+    console.log('切换到开发模式，使用模拟数据')
+    taskHistory.value = getMockTaskData()
+    totalTasks.value = taskHistory.value.length
+    ElMessage.info('已切换到开发模式，当前使用模拟数据')
+  } else {
+    console.log('切换到生产模式，使用真实API')
+    loadTaskHistory()
   }
-}
-
-const handleCreateOrderFromError = (errorOrder: ErrorOrderInfo) => {
-  console.log('📋 从错误订单创建订单:', errorOrder)
-  ElMessage.info('手动创建订单功能开发中...')
-  // TODO: 实现手动创建订单的逻辑
 }
 </script>
 
 <style scoped>
 .ai-excel-import-container {
   padding: 24px;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -431,49 +723,56 @@ const handleCreateOrderFromError = (errorOrder: ErrorOrderInfo) => {
   line-height: 1.5;
 }
 
+.dev-mode-switch {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.dev-mode-hint {
+  font-size: 14px;
+  color: #909399;
+}
+
 .main-content {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
 }
 
-.section-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
+.upload-dialog-content {
+  padding: 20px 0;
+}
+
+.ai-config-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e4e7ed;
+}
+
+.ai-config-section h4 {
   margin: 0 0 16px 0;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #e4e7ed;
+  color: #303133;
 }
 
-.upload-section,
-.config-section,
-.progress-section,
-.result-section,
-.history-section {
-  background: #fff;
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+.dialog-footer {
+  text-align: right;
 }
 
-.config-section {
-  border-left: 4px solid #409eff;
-}
-
-.progress-section {
-  border-left: 4px solid #67c23a;
-}
-
-.result-section {
-  border-left: 4px solid #e6a23c;
-}
-
-.error-section {
-  border-left: 4px solid #f56c6c;
-}
-
-.history-section {
-  border-left: 4px solid #909399;
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .ai-excel-import-container {
+    padding: 16px;
+  }
+  
+  .page-title {
+    font-size: 24px;
+  }
+  
+  .page-description {
+    font-size: 14px;
+  }
 }
 </style>

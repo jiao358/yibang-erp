@@ -5,6 +5,7 @@ import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.event.AnalysisEventListener;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yibang.erp.domain.dto.*;
@@ -12,12 +13,7 @@ import com.yibang.erp.domain.entity.AIExcelProcessTask;
 import com.yibang.erp.domain.entity.AIExcelProcessTaskDetail;
 import com.yibang.erp.domain.entity.Order;
 import com.yibang.erp.domain.entity.OrderItem;
-import com.yibang.erp.domain.service.AIExcelOrderService;
-import com.yibang.erp.domain.service.AIExcelErrorOrderService;
-import com.yibang.erp.domain.service.AIExcelFieldRecognitionService;
-import com.yibang.erp.domain.service.CustomerMatchingService;
-import com.yibang.erp.domain.service.OrderNumberGeneratorService;
-import com.yibang.erp.domain.service.ProductMatchingService;
+import com.yibang.erp.domain.service.*;
 import com.yibang.erp.infrastructure.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,11 +25,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * AI Excel订单处理服务实现类
@@ -196,6 +193,229 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
         } catch (Exception e) {
             log.error("获取任务结果失败", e);
             return buildErrorResponse(taskId, e.getMessage());
+        }
+    }
+
+    @Override
+    public TaskListResponse getUserTasks(Long userId, String status, Integer page, Integer size) {
+        try {
+            log.info("查询用户任务列表，用户ID: {}, 状态: {}, 页码: {}, 大小: {}", userId, status, page, size);
+            
+            // 构建查询条件
+            QueryWrapper<AIExcelProcessTask> queryWrapper = new QueryWrapper<>();
+            
+            // 根据用户ID筛选
+            queryWrapper.eq("sales_user_id", userId);
+            
+            // 根据状态筛选
+            if (status != null && !status.isEmpty()) {
+                queryWrapper.eq("task_status", status);
+            }
+            
+            // 只查询未删除的任务
+            queryWrapper.eq("deleted", false);
+            
+            // 按创建时间倒序排列
+            queryWrapper.orderByDesc("created_at");
+            
+            // 执行分页查询
+            Page<AIExcelProcessTask> pageParam = new Page<>(page, size);
+            Page<AIExcelProcessTask> result = taskRepository.selectPage(pageParam, queryWrapper);
+            
+            // 转换为TaskInfo列表
+            List<TaskListResponse.TaskInfo> taskInfos = result.getRecords().stream().map(task -> {
+                TaskListResponse.TaskInfo info = new TaskListResponse.TaskInfo();
+                
+                // 基本任务信息
+                info.setTaskId(task.getTaskId());
+                info.setFileName(task.getFileName());
+                info.setStatus(task.getTaskStatus());
+                info.setTotalRows(task.getTotalRows());
+                info.setSuccessRows(task.getSuccessRows());
+                info.setFailedRows(task.getFailedRows());
+                info.setManualProcessRows(task.getManualProcessRows());
+                info.setFileSize(task.getFileSize());
+                
+                // 时间信息 - 转换为字符串格式
+                if (task.getCreatedAt() != null) {
+                    info.setCreatedAt(task.getCreatedAt().toString());
+                }
+                if (task.getStartedAt() != null) {
+                    info.setStartedAt(task.getStartedAt().toString());
+                }
+                if (task.getCompletedAt() != null) {
+                    info.setCompletedAt(task.getCompletedAt().toString());
+                }
+                
+                // 计算处理时间（毫秒）
+                if (task.getStartedAt() != null && task.getCompletedAt() != null) {
+                    long processingTime = java.time.Duration.between(task.getStartedAt(), task.getCompletedAt()).toMillis();
+                    info.setProcessingTime(processingTime);
+                }
+                
+                // 设置上传用户
+                if (task.getCreatedBy() != null) {
+                    info.setUploadUser("用户" + task.getCreatedBy());
+                }
+                
+                // 设置供应商信息（暂时设置为默认值）
+                info.setSupplier("待设置");
+                
+                return info;
+            }).collect(Collectors.toList());
+
+            long count = taskRepository.selectCount( queryWrapper);
+            // 构建响应
+            TaskListResponse response = TaskListResponse.success();
+            response.setContent(taskInfos);
+            response.setTotalElements(count);
+            response.setTotalPages((int) result.getPages());
+            response.setCurrentPage(page);
+            response.setSize(size);
+            
+            log.info("查询完成，用户ID: {}, 总任务数: {}, 当前页: {}, 每页大小: {}", 
+                    userId, result.getTotal(), page, size);
+            
+            return response;
+            
+        } catch (Exception e) {
+            log.error("查询用户任务列表失败，用户ID: {}", userId, e);
+            return TaskListResponse.error("查询任务列表失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public TaskStatisticsResponse getTaskStatistics(Long companyId, String startDate, String endDate) {
+        try {
+            log.info("查询任务统计信息，公司ID: {}, 开始日期: {}, 结束日期: {}", companyId, startDate, endDate);
+            
+            // 构建基础查询条件
+            QueryWrapper<AIExcelProcessTask> baseWrapper = new QueryWrapper<>();
+            baseWrapper.eq("deleted", false);
+            
+            // 根据公司ID筛选
+            if (companyId != null) {
+                baseWrapper.eq("sales_company_id", companyId);
+            }
+            
+            // 根据时间范围筛选
+            if (startDate != null && endDate != null) {
+                try {
+                    LocalDateTime startDateTime = LocalDateTime.parse(startDate + "T00:00:00");
+                    LocalDateTime endDateTime = LocalDateTime.parse(endDate + "T23:59:59");
+                    baseWrapper.between("created_at", startDateTime, endDateTime);
+                } catch (Exception e) {
+                    log.warn("时间格式解析失败，使用默认时间范围: {} - {}", startDate, endDate);
+                }
+            }
+            
+            // 查询总任务数
+            Long totalTasks = taskRepository.selectCount(baseWrapper);
+            
+            // 查询各状态的任务数
+            QueryWrapper<AIExcelProcessTask> processingWrapper = new QueryWrapper<>();
+            processingWrapper.eq("deleted", false);
+            if (companyId != null) {
+                processingWrapper.eq("sales_company_id", companyId);
+            }
+            if (startDate != null && endDate != null) {
+                try {
+                    LocalDateTime startDateTime = LocalDateTime.parse(startDate + "T00:00:00");
+                    LocalDateTime endDateTime = LocalDateTime.parse(endDate + "T23:59:59");
+                    processingWrapper.between("created_at", startDateTime, endDateTime);
+                } catch (Exception e) {
+                    log.warn("时间格式解析失败，使用默认时间范围: {} - {}", startDate, endDate);
+                }
+            }
+            processingWrapper.eq("task_status", "PROCESSING");
+            Long processingTasks = taskRepository.selectCount(processingWrapper);
+            
+            QueryWrapper<AIExcelProcessTask> completedWrapper = new QueryWrapper<>();
+            completedWrapper.eq("deleted", false);
+            if (companyId != null) {
+                completedWrapper.eq("sales_company_id", companyId);
+            }
+            if (startDate != null && endDate != null) {
+                try {
+                    LocalDateTime startDateTime = LocalDateTime.parse(startDate + "T00:00:00");
+                    LocalDateTime endDateTime = LocalDateTime.parse(endDate + "T23:59:59");
+                    completedWrapper.between("created_at", startDateTime, endDateTime);
+                } catch (Exception e) {
+                    log.warn("时间格式解析失败，使用默认时间范围: {} - {}", startDate, endDate);
+                }
+            }
+            completedWrapper.eq("task_status", "COMPLETED");
+            Long completedTasks = taskRepository.selectCount(completedWrapper);
+            
+            QueryWrapper<AIExcelProcessTask> failedWrapper = new QueryWrapper<>();
+            failedWrapper.eq("deleted", false);
+            if (companyId != null) {
+                failedWrapper.eq("sales_company_id", companyId);
+            }
+            if (startDate != null && endDate != null) {
+                try {
+                    LocalDateTime startDateTime = LocalDateTime.parse(startDate + "T00:00:00");
+                    LocalDateTime endDateTime = LocalDateTime.parse(endDate + "T23:59:59");
+                    failedWrapper.between("created_at", startDateTime, endDateTime);
+                } catch (Exception e) {
+                    log.warn("时间格式解析失败，使用默认时间范围: {} - {}", startDate, endDate);
+                }
+            }
+            failedWrapper.eq("task_status", "FAILED");
+            Long failedTasks = taskRepository.selectCount(failedWrapper);
+            
+            // 查询今日任务数
+            QueryWrapper<AIExcelProcessTask> todayWrapper = new QueryWrapper<>();
+            todayWrapper.eq("deleted", false);
+            if (companyId != null) {
+                todayWrapper.eq("sales_company_id", companyId);
+            }
+            LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
+            LocalDateTime todayEnd = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59).withNano(999999999);
+            todayWrapper.between("created_at", todayStart, todayEnd);
+            Long todayTasks = taskRepository.selectCount(todayWrapper);
+            
+            // 查询本周任务数
+            QueryWrapper<AIExcelProcessTask> thisWeekWrapper = new QueryWrapper<>();
+            thisWeekWrapper.eq("deleted", false);
+            if (companyId != null) {
+                thisWeekWrapper.eq("sales_company_id", companyId);
+            }
+            LocalDateTime weekStart = LocalDateTime.now().with(DayOfWeek.MONDAY).withHour(0).withMinute(0).withSecond(0).withNano(0);
+            LocalDateTime weekEnd = LocalDateTime.now().with(DayOfWeek.SUNDAY).withHour(23).withMinute(59).withSecond(59).withNano(999999999);
+            thisWeekWrapper.between("created_at", weekStart, weekEnd);
+            Long thisWeekTasks = taskRepository.selectCount(thisWeekWrapper);
+            
+            // 查询本月任务数
+            QueryWrapper<AIExcelProcessTask> thisMonthWrapper = new QueryWrapper<>();
+            thisMonthWrapper.eq("deleted", false);
+            if (companyId != null) {
+                thisMonthWrapper.eq("sales_company_id", companyId);
+            }
+            LocalDateTime monthStart = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0).withNano(0);
+            LocalDateTime monthEnd = LocalDateTime.now().withDayOfMonth(LocalDateTime.now().getMonth().length(LocalDateTime.now().toLocalDate().isLeapYear()))
+                .withHour(23).withMinute(59).withSecond(59).withNano(999999999);
+            thisMonthWrapper.between("created_at", monthStart, monthEnd);
+            Long thisMonthTasks = taskRepository.selectCount(thisMonthWrapper);
+            
+            // 构建响应
+            TaskStatisticsResponse response = TaskStatisticsResponse.success();
+            response.setTotalTasks(totalTasks);
+            response.setProcessingTasks(processingTasks);
+            response.setCompletedTasks(completedTasks);
+            response.setFailedTasks(failedTasks);
+            response.setTodayTasks(todayTasks);
+            response.setThisWeekTasks(thisWeekTasks);
+            response.setThisMonthTasks(thisMonthTasks);
+            
+            log.info("统计完成，总任务数: {}, 处理中: {}, 完成: {}, 失败: {}, 今日: {}, 本周: {}, 本月: {}", 
+                    totalTasks, processingTasks, completedTasks, failedTasks, todayTasks, thisWeekTasks, thisMonthTasks);
+            
+            return response;
+            
+        } catch (Exception e) {
+            log.error("查询任务统计信息失败", e);
+            return TaskStatisticsResponse.error("查询统计信息失败: " + e.getMessage());
         }
     }
 

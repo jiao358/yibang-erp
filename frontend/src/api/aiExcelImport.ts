@@ -81,6 +81,25 @@ export const aiExcelImportApi = {
   },
 
   /**
+   * 获取任务统计信息
+   */
+  getTaskStatistics: (params?: {
+    companyId?: number
+    startDate?: string
+    endDate?: string
+  }) => {
+    return request.get<{
+      totalTasks: number
+      processingTasks: number
+      completedTasks: number
+      failedTasks: number
+      todayTasks?: number
+      thisWeekTasks?: number
+      thisMonthTasks?: number
+    }>('/api/ai-excel-orders/statistics', { params })
+  },
+
+  /**
    * 重新处理任务
    */
   retryTask: (taskId: string) => {

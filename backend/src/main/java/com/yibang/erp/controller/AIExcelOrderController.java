@@ -1,8 +1,11 @@
 package com.yibang.erp.controller;
 
+import com.yibang.erp.common.util.JwtUtil;
 import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.dto.AIExcelProcessRequest;
 import com.yibang.erp.domain.dto.AIExcelProcessResponse;
+import com.yibang.erp.domain.dto.TaskListResponse;
+import com.yibang.erp.domain.dto.TaskStatisticsResponse;
 import com.yibang.erp.domain.service.AIExcelOrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +26,8 @@ public class AIExcelOrderController {
 
     @Autowired
     private AIExcelOrderService aiExcelOrderService;
+    @Autowired
+    private JwtUtil jwtUtil;
 
     /**
      * 启动AI Excel订单处理任务
@@ -145,28 +150,77 @@ public class AIExcelOrderController {
     }
 
     /**
-     * 获取当前用户的AI处理任务列表
+     * 获取任务统计信息
+     * 基于现有数据库表 ai_excel_process_tasks 进行统计
      */
-    @GetMapping("/tasks")
-    public ResponseEntity<AIExcelProcessResponse> getUserTasks(
-            @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
-            @RequestParam(value = "size", required = false, defaultValue = "20") Integer size) {
+    @GetMapping("/statistics")
+    public ResponseEntity<TaskStatisticsResponse> getTaskStatistics(
+            @RequestParam(value = "companyId", required = false) Long companyId,
+            @RequestParam(value = "startDate", required = false) String startDate,
+            @RequestParam(value = "endDate", required = false) String endDate) {
 
         try {
-            log.info("获取用户任务列表，状态: {}, 页码: {}, 大小: {}", status, page, size);
+            log.info("获取任务统计信息，公司ID: {}, 开始日期: {}, 结束日期: {}", companyId, startDate, endDate);
             
-            // TODO: 实现获取用户任务列表的逻辑
-            AIExcelProcessResponse response = new AIExcelProcessResponse();
-            response.setMessage("获取任务列表功能待实现");
+            // 调用服务层获取真实统计数据
+            TaskStatisticsResponse response = aiExcelOrderService.getTaskStatistics(companyId, startDate, endDate);
+            
+            log.info("返回统计数据: 总数={}, 处理中={}, 完成={}, 失败={}", 
+                    response.getTotalTasks(), response.getProcessingTasks(), 
+                    response.getCompletedTasks(), response.getFailedTasks());
+            
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("获取任务统计信息失败", e);
+            TaskStatisticsResponse errorResponse = TaskStatisticsResponse.error("获取统计信息失败: " + e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+
+    private Long getCurrentUserId(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new IllegalArgumentException("无效的Authorization头");
+        }
+
+        String token = authHeader.substring(7);
+        return jwtUtil.getUserIdFromToken(token);
+    }
+
+    /**
+     * 获取当前用户的AI处理任务列表
+     * 基于现有数据库表 ai_excel_process_tasks 进行查询
+     */
+    @GetMapping("/tasks")
+    public ResponseEntity<TaskListResponse> getUserTasks(
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
+            @RequestParam(value = "size", required = false, defaultValue = "20") Integer size,
+            @RequestHeader("Authorization") String authorization) {
+
+        try {
+            // 获取当前登录用户ID
+            Long currentUserId = getCurrentUserId(authorization);
+
+            if (currentUserId == null) {
+                log.warn("无法获取当前用户ID");
+                return ResponseEntity.badRequest().body(TaskListResponse.error("无法获取当前用户信息"));
+            }
+            
+            log.info("获取用户任务列表，用户ID: {}, 状态: {}, 页码: {}, 大小: {}", 
+                    currentUserId, status, page, size);
+            
+            // 调用服务层获取真实任务列表
+            TaskListResponse response = aiExcelOrderService.getUserTasks(currentUserId, status, page, size);
+            
+            log.info("返回任务列表: 总数={}, 当前页={}, 每页大小={}, 筛选状态={}", 
+                    response.getTotalElements(), response.getCurrentPage(), response.getSize(), status);
             
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             log.error("获取用户任务列表失败", e);
-            AIExcelProcessResponse errorResponse = new AIExcelProcessResponse();
-            errorResponse.setStatus("FAILED");
-            errorResponse.setMessage("获取任务列表失败: " + e.getMessage());
+            TaskListResponse errorResponse = TaskListResponse.error("获取任务列表失败: " + e.getMessage());
             return ResponseEntity.badRequest().body(errorResponse);
         }
     }

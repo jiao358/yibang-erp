@@ -270,6 +270,12 @@ export interface TaskHistoryItem {
   createdAt: string
   completedAt?: string
   processingTime?: number
+  // 新增字段
+  supplier?: string
+  fileSize?: number
+  uploadUser?: string
+  startedAt?: string
+  manualProcessRows?: number
 }
 
 // AI Excel处理请求类型
@@ -334,4 +340,16 @@ export interface ColumnMappingResult {
   columnMappings: FieldRecognitionResult[]
   confidence: number
   reasoning: string
+}
+
+// 任务筛选表单类型
+export interface TaskFilterForm {
+  status: string
+  dateRange: string[]
+  fileName: string
+  sortBy: string
+  minRows?: number
+  maxRows?: number
+  successRate: string
+  processingDuration: string
 }
