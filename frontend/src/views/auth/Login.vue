@@ -2,7 +2,7 @@
   <div class="login-container">
     <div class="login-box">
       <div class="login-header">
-        <h1>易邦ERP系统</h1>
+        <h1>懿邦ERP系统</h1>
         <p>智能供应链协作平台</p>
       </div>
       
@@ -48,7 +48,7 @@
       </el-form>
       
       <div class="login-footer">
-        <p>© 2024 易邦ERP系统 - 智能供应链协作平台</p>
+        <p>© 2024 懿邦ERP系统 - 智能供应链协作平台</p>
       </div>
     </div>
   </div>

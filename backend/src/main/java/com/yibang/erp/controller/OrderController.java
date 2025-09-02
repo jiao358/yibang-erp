@@ -5,11 +5,15 @@ import com.yibang.erp.common.util.JwtUtil;
 import com.yibang.erp.domain.dto.*;
 import com.yibang.erp.domain.entity.OrderStatusLog;
 import com.yibang.erp.domain.service.OrderService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -17,6 +21,7 @@ import java.util.List;
 /**
  * 订单管理控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/orders")
 @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES')")
@@ -291,6 +296,104 @@ public class OrderController {
     public ResponseEntity<List<OrderStatusLog>> getOrderStatusHistory(@PathVariable Long orderId) {
         List<OrderStatusLog> response = orderService.getOrderStatusHistory(orderId);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 导出订单
+     */
+    @PostMapping("/export")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER')")
+    public ResponseEntity<byte[]> exportOrders(@RequestBody OrderExportRequest request) {
+        try {
+            log.info("导出订单请求，订单ID列表: {}", request.getOrderIds());
+            
+            byte[] excelData = orderService.exportOrders(request.getOrderIds());
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", "订单导出.xlsx");
+            
+            return ResponseEntity.ok()
+                .headers(headers)
+                .body(excelData);
+                
+        } catch (Exception e) {
+            log.error("导出订单失败", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * 下载发货模板
+     */
+    @GetMapping("/ship-template")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER')")
+    public ResponseEntity<byte[]> downloadShipTemplate() {
+        try {
+            log.info("下载发货模板请求");
+            
+            byte[] templateData = orderService.downloadShipTemplate();
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", "发货模板.xlsx");
+            
+            return ResponseEntity.ok()
+                .headers(headers)
+                .body(templateData);
+                
+        } catch (Exception e) {
+            log.error("下载发货模板失败", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * 预览发货导入数据
+     */
+    @PostMapping("/ship-import/preview")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER')")
+    public ResponseEntity<ShipImportPreviewResponse> previewShipImport(@RequestParam("file") MultipartFile file) {
+        try {
+            log.info("预览发货导入数据请求，文件名: {}", file.getOriginalFilename());
+            
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            byte[] fileData = file.getBytes();
+            ShipImportPreviewResponse response = orderService.previewShipImport(fileData);
+            
+            return ResponseEntity.ok(response);
+                
+        } catch (Exception e) {
+            log.error("预览发货导入数据失败", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * 导入发货数据
+     */
+    @PostMapping("/ship-import")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER')")
+    public ResponseEntity<ShipImportResultResponse> importShipData(@RequestParam("file") MultipartFile file) {
+        try {
+            log.info("导入发货数据请求，文件名: {}", file.getOriginalFilename());
+            
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            byte[] fileData = file.getBytes();
+            ShipImportResultResponse response = orderService.importShipData(fileData);
+            
+            return ResponseEntity.ok(response);
+                
+        } catch (Exception e) {
+            log.error("导入发货数据失败", e);
+            return ResponseEntity.badRequest().build();
+        }
     }
 
     /**

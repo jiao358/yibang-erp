@@ -105,6 +105,38 @@ export const orderApi = {
     return request.get(`/api/orders/${id}/status-history`)
   },
 
+  // 导出订单
+  exportOrders(orderIds: number[]): Promise<Blob> {
+    return request.post('/api/orders/export', { orderIds }, {
+      responseType: 'blob'
+    })
+  },
+
+  // 下载发货模板
+  downloadShipTemplate(): Promise<Blob> {
+    return request.get('/api/orders/ship-template', {
+      responseType: 'blob'
+    })
+  },
+
+  // 预览发货导入数据
+  previewShipImport(file: FormData): Promise<{ data: any[] }> {
+    return request.post('/api/orders/ship-import/preview', file, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  // 导入发货数据
+  importShipData(file: FormData): Promise<{ successCount: number; failCount: number }> {
+    return request.post('/api/orders/ship-import', file, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
   // 生成平台订单号
   generatePlatformOrderNo(): Promise<string> {
     return request.get('/api/orders/generate-order-no')

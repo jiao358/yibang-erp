@@ -12,6 +12,18 @@ public class UserSecurityUtils {
         return userName;
     }
 
+    public static Long getCurrentUserId() {
+        try {
+            // 从JWT token中解析用户ID
+            String username = getCurrentUsername();
+            // 这里需要根据实际的用户ID获取方式来实现
+            // 暂时返回默认值，实际项目中应该从数据库或JWT中获取
+            return 1L;
+        } catch (Exception e) {
+            return 1L; // 默认用户ID
+        }
+    }
+
     public static String getCurrentUserRoles(){
         UserDetails userDetails=((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
         return new JSONObject(userDetails.getAuthorities().stream().map(x-> x.getAuthority()).toList()).toString();

@@ -2,8 +2,10 @@ package com.yibang.erp.config;
 
 import com.yibang.erp.security.interceptor.PermissionInterceptor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -15,6 +17,9 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class WebMvcConfig implements WebMvcConfigurer {
     
     private final PermissionInterceptor permissionInterceptor;
+    
+    @Value("${file.upload.path}")
+    private String uploadPath;
     
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -29,5 +34,13 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 "/v3/api-docs/**"      // 排除API文档
             )
             .order(1); // 设置拦截器顺序
+    }
+    
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // 配置静态资源访问
+        registry.addResourceHandler("/static/**")
+                .addResourceLocations("file:" + uploadPath)
+                .setCachePeriod(3600); // 缓存1小时
     }
 }

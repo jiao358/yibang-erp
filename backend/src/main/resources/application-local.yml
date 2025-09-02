@@ -55,6 +55,12 @@ jwt:
 file:
   upload:
     path: ${FILE_UPLOAD_PATH:./uploads/local/}
+    image:
+      max-size: 10MB
+      allowed-types: jpg,jpeg,png,gif,webp
+      path: images/products/
+    access:
+      base-url: ${FILE_ACCESS_BASE_URL:http://localhost:7102/static/}
 
 # WebSocket配置
 websocket:

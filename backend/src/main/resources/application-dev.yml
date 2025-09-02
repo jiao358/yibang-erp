@@ -67,6 +67,12 @@ jwt:
 file:
   upload:
     path: ./uploads/dev/
+    image:
+      max-size: 10MB
+      allowed-types: jpg,jpeg,png,gif,webp
+      path: images/products/
+    access:
+      base-url: http://localhost:7102/static/
 
 # 管理端点配置
 management:

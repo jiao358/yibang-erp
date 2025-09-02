@@ -1,17 +1,21 @@
 package com.yibang.erp.domain.service.impl;
 
+import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.dto.*;
+import com.yibang.erp.domain.dto.ShipImportPreviewResponse;
+import com.yibang.erp.domain.dto.ShipImportResultResponse;
+import com.yibang.erp.domain.dto.ShipTemplateData;
 import com.yibang.erp.domain.entity.*;
 import com.yibang.erp.domain.service.OrderNumberGeneratorService;
 import com.yibang.erp.domain.service.OrderService;
-import com.yibang.erp.infrastructure.repository.*;
 import com.yibang.erp.infrastructure.client.DeepSeekClient;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yibang.erp.infrastructure.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,10 +24,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 订单服务实现类
@@ -805,6 +813,263 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     }
 
     @Override
+    public byte[] exportOrders(List<Long> orderIds) {
+        try {
+            // 查询订单数据
+            List<Order> orders = orderRepository.selectBatchIds(orderIds);
+            
+            // 过滤只导出已审批的订单
+            List<Order> approvedOrders = orders.stream()
+                .filter(order -> "APPROVED".equals(order.getOrderStatus()))
+                .collect(Collectors.toList());
+            
+            if (approvedOrders.isEmpty()) {
+                throw new RuntimeException("没有可导出的已审批订单");
+            }
+            
+            // 转换为导出数据
+            List<OrderExportData> exportDataList = new ArrayList<>();
+            for (Order order : approvedOrders) {
+                // 查询订单商品信息
+                List<OrderItem> orderItems = orderItemRepository.selectByOrderId(order.getId());
+                
+                for (OrderItem item : orderItems) {
+                    OrderExportData exportData = new OrderExportData();
+                    exportData.setPlatformOrderNo(order.getPlatformOrderId());
+                    exportData.setShopCode(""); // 空字段
+                    exportData.setOrderType(""); // 空字段
+                    exportData.setCustomerName(""); // 需要从客户表查询
+                    exportData.setProductCode(item.getSku()); // 使用SKU作为商品编码
+                    exportData.setProductName(item.getProductName());
+                    exportData.setQuantity(item.getQuantity());
+                    exportData.setDeliveryProvince(""); // 空字段，需要解析地址
+                    exportData.setDeliveryCity(""); // 空字段，需要解析地址
+                    exportData.setDeliveryDistrict(""); // 空字段，需要解析地址
+                    exportData.setDeliveryAddress(order.getDeliveryAddress());
+                    exportData.setDeliveryPhone(order.getDeliveryPhone());
+                    exportData.setDeliveryTel(""); // 空字段
+                    exportData.setDeliveryContact(order.getDeliveryContact());
+                    exportData.setDeliveryPostcode(""); // 空字段
+                    exportData.setCarrier(""); // 空字段
+                    exportData.setPlatformAttribute(""); // 空字段
+                    
+                    exportDataList.add(exportData);
+                }
+            }
+            
+            // 使用EasyExcel导出
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            EasyExcel.write(outputStream, OrderExportData.class)
+                .sheet("订单导出")
+                .doWrite(exportDataList);
+            
+            return outputStream.toByteArray();
+            
+        } catch (Exception e) {
+            log.error("导出订单失败", e);
+            throw new RuntimeException("导出订单失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] downloadShipTemplate() {
+        try {
+            // 查询所有已审批的订单
+            QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("order_status", "APPROVED");
+            List<Order> approvedOrders = orderRepository.selectList(queryWrapper);
+            
+            // 转换为模板数据
+            List<ShipTemplateData> templateDataList = new ArrayList<>();
+            for (Order order : approvedOrders) {
+                ShipTemplateData templateData = new ShipTemplateData();
+                templateData.setPlatformOrderNo(order.getPlatformOrderId());
+                templateData.setTrackingNumber(""); // 空字段，待填写
+                templateData.setCarrier(""); // 空字段，待填写
+                templateData.setShippingMethod(""); // 空字段，待填写
+                templateData.setShippingNotes(""); // 空字段，待填写
+                
+                templateDataList.add(templateData);
+            }
+            
+            // 使用EasyExcel生成模板
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            EasyExcel.write(outputStream, ShipTemplateData.class)
+                .sheet("发货模板")
+                .doWrite(templateDataList);
+            
+            return outputStream.toByteArray();
+            
+        } catch (Exception e) {
+            log.error("生成发货模板失败", e);
+            throw new RuntimeException("生成发货模板失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ShipImportPreviewResponse previewShipImport(byte[] fileData) {
+        try {
+            // 解析Excel文件
+            List<ShipTemplateData> importDataList = EasyExcel.read(new ByteArrayInputStream(fileData))
+                .head(ShipTemplateData.class)
+                .sheet()
+                .doReadSync();
+            
+            // 验证数据并生成预览
+            List<ShipImportPreviewResponse.ShipImportPreviewItem> previewItems = new ArrayList<>();
+            int validCount = 0;
+            int invalidCount = 0;
+            
+            for (ShipTemplateData data : importDataList) {
+                ShipImportPreviewResponse.ShipImportPreviewItem item = new ShipImportPreviewResponse.ShipImportPreviewItem();
+                item.setPlatformOrderNo(data.getPlatformOrderNo());
+                item.setTrackingNumber(data.getTrackingNumber());
+                item.setCarrier(data.getCarrier());
+                item.setShippingMethod(data.getShippingMethod());
+                item.setShippingNotes(data.getShippingNotes());
+                
+                // 验证数据
+                String errorMessage = validateShipData(data);
+                if (errorMessage == null) {
+                    item.setStatus("valid");
+                    validCount++;
+                } else {
+                    item.setStatus("invalid");
+                    item.setErrorMessage(errorMessage);
+                    invalidCount++;
+                }
+                
+                previewItems.add(item);
+            }
+            
+            // 构建响应
+            ShipImportPreviewResponse response = new ShipImportPreviewResponse();
+            response.setData(previewItems);
+            response.setTotalCount(importDataList.size());
+            response.setValidCount(validCount);
+            response.setInvalidCount(invalidCount);
+            
+            return response;
+            
+        } catch (Exception e) {
+            log.error("预览发货导入数据失败", e);
+            throw new RuntimeException("预览发货导入数据失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public ShipImportResultResponse importShipData(byte[] fileData) {
+        try {
+            // 先预览数据
+            ShipImportPreviewResponse previewResponse = previewShipImport(fileData);
+            
+            // 只处理有效数据
+            List<ShipImportPreviewResponse.ShipImportPreviewItem> validItems = previewResponse.getData().stream()
+                .filter(item -> "valid".equals(item.getStatus()))
+                .collect(Collectors.toList());
+            
+            int successCount = 0;
+            int failCount = 0;
+            List<ShipImportResultResponse.ShipImportError> errors = new ArrayList<>();
+            
+            // 批量处理发货
+            for (ShipImportPreviewResponse.ShipImportPreviewItem item : validItems) {
+                try {
+                    // 根据平台订单号查找订单
+                    QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+                    queryWrapper.eq("platform_order_id", item.getPlatformOrderNo());
+                    queryWrapper.eq("order_status", "APPROVED");
+                    Order order = orderRepository.selectOne(queryWrapper);
+                    
+                    if (order == null) {
+                        throw new RuntimeException("订单不存在或状态不符合");
+                    }
+                    
+                    // 更新订单物流信息
+                    order.setLogisticsOrderNumber(item.getTrackingNumber());
+                    order.setLogisticsCompany(item.getCarrier());
+                    order.setOrderStatus("SHIPPED");
+                    orderRepository.updateById(order);
+                    
+                    // 创建物流信息记录
+                    LogisticsInfo logisticsInfo = new LogisticsInfo();
+                    logisticsInfo.setOrderId(order.getId());
+                    logisticsInfo.setTrackingNumber(item.getTrackingNumber());
+                    logisticsInfo.setCarrier(item.getCarrier());
+                    logisticsInfo.setShippingMethod(item.getShippingMethod());
+                    logisticsInfo.setShippingNotes(item.getShippingNotes());
+                    logisticsInfo.setStatus("SHIPPED");
+                    logisticsInfoRepository.insert(logisticsInfo);
+                    
+                    // 创建状态变更日志
+                    OrderStatusLog statusLog = new OrderStatusLog();
+                    statusLog.setOrderId(order.getId());
+                    statusLog.setFromStatus("APPROVED");
+                    statusLog.setToStatus("SHIPPED");
+                    statusLog.setChangeReason("批量发货导入");
+                    statusLog.setOperatorType("USER");
+                    statusLog.setOperatorId(getCurrentUserId());
+                    statusLog.setOperatorName(getCurrentUserName());
+                    statusLog.setOperatorRole(getCurrentUserRole());
+                    orderStatusLogRepository.insert(statusLog);
+                    
+                    successCount++;
+                    
+                } catch (Exception e) {
+                    failCount++;
+                    ShipImportResultResponse.ShipImportError error = new ShipImportResultResponse.ShipImportError();
+                    error.setPlatformOrderNo(item.getPlatformOrderNo());
+                    error.setErrorMessage(e.getMessage());
+                    error.setErrorCode("IMPORT_ERROR");
+                    errors.add(error);
+                }
+            }
+            
+            // 构建响应
+            ShipImportResultResponse response = new ShipImportResultResponse();
+            response.setSuccessCount(successCount);
+            response.setFailCount(failCount);
+            response.setTotalCount(validItems.size());
+            response.setErrors(errors);
+            
+            return response;
+            
+        } catch (Exception e) {
+            log.error("导入发货数据失败", e);
+            throw new RuntimeException("导入发货数据失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 验证发货数据
+     */
+    private String validateShipData(ShipTemplateData data) {
+        if (StringUtils.isEmpty(data.getPlatformOrderNo())) {
+            return "平台订单号不能为空";
+        }
+        
+        if (StringUtils.isEmpty(data.getTrackingNumber())) {
+            return "物流单号不能为空";
+        }
+        
+        if (StringUtils.isEmpty(data.getCarrier())) {
+            return "物流公司不能为空";
+        }
+        
+        // 验证订单是否存在且状态为已审批
+        QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("platform_order_id", data.getPlatformOrderNo());
+        queryWrapper.eq("order_status", "APPROVED");
+        Order order = orderRepository.selectOne(queryWrapper);
+        
+        if (order == null) {
+            return "订单不存在或状态不符合（必须是已审批状态）";
+        }
+        
+        return null; // 验证通过
+    }
+
+    @Override
     public List<String> preGenerateOrderNumbers(String userName, String orderSource, int count) {
         return orderNumberGeneratorService.preGenerateOrderNumbers(userName, orderSource, count);
     }
@@ -1053,6 +1318,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
 
         return user.getId();
+    }
+
+    private String getCurrentUserName() {
+        UserDetails userDetails = ((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        return userDetails.getUsername();
+    }
+
+    private String getCurrentUserRole() {
+        return UserSecurityUtils.getCurrentUserRoles();
     }
 
 

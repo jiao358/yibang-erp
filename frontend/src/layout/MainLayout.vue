@@ -3,7 +3,7 @@
     <!-- 侧边栏 -->
     <div class="sidebar" :class="{ 'collapsed': isSidebarCollapsed }">
       <div class="logo">
-        <div class="logo-text">易邦ERP</div>
+        <div class="logo-text">懿邦ERP</div>
       </div>
       
       <div class="nav-menu">

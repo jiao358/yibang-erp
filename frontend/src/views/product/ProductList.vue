@@ -258,37 +258,22 @@
     <!-- 上传图片对话框 -->
     <el-dialog
       v-model="uploadImageDialogVisible"
-      title="上传商品图片"
-      width="500px"
+      title="商品图片管理"
+      width="800px"
       class="upload-image-dialog"
     >
-      <div class="upload-image-content">
-        <el-upload
-          ref="uploadRef"
-          :action="uploadAction"
-          :headers="uploadHeaders"
-          :data="{ productId: selectedProduct?.id }"
-          :multiple="true"
-          :show-file-list="true"
-          :on-success="handleUploadSuccess"
-          :on-error="handleUploadError"
-          :before-upload="beforeUpload"
-          accept="image/*"
-          list-type="picture-card"
-        >
-          <el-icon><i class="el-icon-plus"></i></el-icon>
-          <template #tip>
-            <div class="el-upload__tip">
-              支持 jpg/png 格式，单个文件不超过 5MB
-            </div>
-          </template>
-        </el-upload>
-      </div>
+      <ProductImageUpload
+        v-if="selectedProduct"
+        :product-id="selectedProduct.id"
+        :max-count="10"
+        @upload-success="handleImageUploadSuccess"
+        @image-deleted="handleImageDeleted"
+        @primary-changed="handlePrimaryChanged"
+      />
       
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="uploadImageDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleUploadConfirm">确定</el-button>
+          <el-button @click="uploadImageDialogVisible = false">关闭</el-button>
         </div>
       </template>
     </el-dialog>
@@ -302,6 +287,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import ProductDetail from './components/ProductDetail.vue'
 import ProductEdit from './components/ProductEdit.vue'
 import ProductAudit from './components/ProductAudit.vue'
+import ProductImageUpload from '@/components/ProductImageUpload.vue'
 import { getProductList, deleteProduct, submitForApproval, getProductBrands, getProductCategories, activateProduct, deactivateProduct } from '@/api/product'
 import { productPriceConfigApi } from '@/api/productPriceConfig'
 import type { Product } from '@/types/product'
@@ -346,12 +332,7 @@ const brandOptions = ref<any[]>([])
 // 分类选项
 const categoryOptions = ref<any[]>([])
 
-// 上传相关配置
-const uploadAction = '/api/products/upload-image' // 上传接口地址
-const uploadHeaders = computed(() => {
-  const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
-})
+// 图片上传相关配置已移至ProductImageUpload组件
 
 // 计算属性
 const hasSelectedItems = computed(() => selectedItems.value.length > 0)
@@ -452,7 +433,7 @@ const handleSubmit = async (row: Product) => {
       type: 'warning'
     })
     
-    await submitForApproval(row.id, 1) // 这里应该传入实际的用户ID
+    await submitForApproval(row.id) // 提交审核
     ElMessage.success('提交审核成功')
     loadProductList()
   } catch (error) {
@@ -532,35 +513,22 @@ const handleUploadImage = (row: Product) => {
   uploadImageDialogVisible.value = true
 }
 
-const handleUploadSuccess = (response: any, file: any) => {
-  ElMessage.success('图片上传成功')
-  console.log('上传成功:', response, file)
+// 图片上传成功回调
+const handleImageUploadSuccess = (images: any[]) => {
+  console.log('图片上传成功:', images)
+  // 可以在这里更新商品列表或执行其他操作
 }
 
-const handleUploadError = (error: any, file: any) => {
-  ElMessage.error('图片上传失败')
-  console.error('上传失败:', error, file)
+// 图片删除回调
+const handleImageDeleted = (imageId: number) => {
+  console.log('图片删除成功:', imageId)
+  // 可以在这里执行其他操作
 }
 
-const beforeUpload = (file: any) => {
-  const isImage = file.type.startsWith('image/')
-  const isLt5M = file.size / 1024 / 1024 < 5
-
-  if (!isImage) {
-    ElMessage.error('只能上传图片文件!')
-    return false
-  }
-  if (!isLt5M) {
-    ElMessage.error('图片大小不能超过 5MB!')
-    return false
-  }
-  return true
-}
-
-const handleUploadConfirm = () => {
-  uploadImageDialogVisible.value = false
-  loadProductList() // 刷新商品列表
-  ElMessage.success('图片上传完成')
+// 主图变更回调
+const handlePrimaryChanged = (imageId: number) => {
+  console.log('主图变更成功:', imageId)
+  // 可以在这里执行其他操作
 }
 
 const handleBatchActivate = async () => {

@@ -230,7 +230,7 @@ const router = createRouter({
 // 路由守卫 - 恢复真实的登录验证
 router.beforeEach((to, from, next) => {
   // 设置页面标题
-  document.title = to.meta.title ? `${to.meta.title} - 易邦ERP系统` : '易邦ERP系统'
+  document.title = to.meta.title ? `${to.meta.title} - 懿邦ERP系统` : '懿邦ERP系统'
   
   // 检查是否需要认证
   if (to.meta.requiresAuth) {

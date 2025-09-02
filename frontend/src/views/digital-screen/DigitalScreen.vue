@@ -1,7 +1,7 @@
 <template>
   <div class="digital-screen">
     <div class="screen-header">
-      <h1>易邦ERP系统 - 数字大屏</h1>
+      <h1>懿邦ERP系统 - 数字大屏</h1>
       <div class="time-display">{{ currentTime }}</div>
     </div>
     

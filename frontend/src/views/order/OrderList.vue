@@ -11,6 +11,37 @@
           <el-icon><Upload /></el-icon>
           批量导入
         </el-button>
+        <el-button 
+          type="success" 
+          :disabled="selectedOrders.length === 0"
+          @click="showExportDialog('selected')"
+        >
+          <el-icon><Download /></el-icon>
+          导出选中 ({{ selectedOrders.length }})
+        </el-button>
+        <el-button 
+          type="success" 
+          :disabled="approvedOrdersCount === 0"
+          @click="showExportDialog('all')"
+        >
+          <el-icon><Download /></el-icon>
+          全部导出 ({{ approvedOrdersCount }})
+        </el-button>
+        <el-button 
+          type="primary" 
+          :disabled="approvedOrdersCount === 0"
+          @click="downloadShipTemplate"
+        >
+          <el-icon><Download /></el-icon>
+          下载发货模板
+        </el-button>
+        <el-button 
+          type="warning" 
+          @click="showImportShipDialog"
+        >
+          <el-icon><Upload /></el-icon>
+          批量发货导入
+        </el-button>
       </div>
     </div>
 
@@ -92,7 +123,9 @@
         border
         :row-class-name="getRowClassName"
         style="width: 100%"
+        @selection-change="handleSelectionChange"
       >
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="platformOrderNo" label="平台订单号" width="180" />
         <el-table-column prop="salesUserName" label="销售人" width="100" />
         <el-table-column prop="deliveryContact" label="收货人" width="100" />
@@ -317,13 +350,131 @@
       v-model="historyDialogVisible"
       :order-id="currentOrderId"
     />
+
+    <!-- 导出确认对话框 -->
+    <el-dialog
+      v-model="exportDialogVisible"
+      title="确认导出"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <div class="export-confirm-content">
+        <el-alert
+          title="导出信息确认"
+          type="info"
+          :closable="false"
+          show-icon
+        >
+          <template #default>
+            <div class="export-stats">
+              <p><strong>查询结果总数：</strong>{{ orderList.length }} 条</p>
+              <p><strong>已审批可导出：</strong>{{ approvedOrdersCount }} 条</p>
+              <p v-if="exportType === 'selected'">
+                <strong>当前选中：</strong>{{ selectedOrders.length }} 条
+              </p>
+              <p v-if="exportType === 'selected'">
+                <strong>选中中可导出：</strong>{{ selectedOrders.filter(order => order.orderStatus === 'APPROVED').length }} 条
+              </p>
+            </div>
+          </template>
+        </el-alert>
+        
+        <div class="export-warning" style="margin-top: 16px;">
+          <el-alert
+            title="注意"
+            type="warning"
+            :closable="false"
+            show-icon
+          >
+            <template #default>
+              <p>• 只能导出状态为"已审批"的订单</p>
+              <p>• 导出格式将根据供应商自动调整</p>
+              <p>• 导出文件为Excel格式(.xlsx)</p>
+            </template>
+          </el-alert>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="exportDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmExport">确认导出</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 批量发货导入对话框 -->
+    <el-dialog
+      v-model="importShipDialogVisible"
+      title="批量发货导入"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="import-ship-content">
+        <!-- 文件上传区域 -->
+        <div class="upload-section">
+          <el-upload
+            class="upload-demo"
+            drag
+            :auto-upload="false"
+            :on-change="(file: any) => handleFileUpload(file.raw)"
+            accept=".xlsx,.xls"
+            :limit="1"
+          >
+            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+            <div class="el-upload__text">
+              将文件拖到此处，或<em>点击上传</em>
+            </div>
+            <template #tip>
+              <div class="el-upload__tip">
+                只能上传 xlsx/xls 文件，且不超过 10MB
+              </div>
+            </template>
+          </el-upload>
+        </div>
+
+        <!-- 数据预览区域 -->
+        <div v-if="importPreviewData.length > 0" class="preview-section">
+          <h4>数据预览</h4>
+          <el-table :data="importPreviewData" stripe border max-height="300">
+            <el-table-column prop="platformOrderNo" label="平台订单号" width="180" />
+            <el-table-column prop="trackingNumber" label="物流单号" width="150" />
+            <el-table-column prop="carrier" label="物流公司" width="120" />
+            <el-table-column prop="shippingMethod" label="发货方式" width="100" />
+            <el-table-column prop="shippingNotes" label="发货备注" />
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'valid' ? 'success' : 'danger'">
+                  {{ row.status === 'valid' ? '有效' : '无效' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="errorMessage" label="错误信息" />
+          </el-table>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="importShipDialogVisible = false">取消</el-button>
+          <el-button 
+            type="primary" 
+            :loading="importLoading"
+            :disabled="importPreviewData.length === 0"
+            @click="confirmShipImport"
+          >
+            确认导入
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Upload, Search, Refresh, ArrowDown, Warning } from '@element-plus/icons-vue'
+import { Plus, Upload, Search, Refresh, ArrowDown, Warning, Download, UploadFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import OrderDialog from './components/OrderDialog.vue'
 import StatusHistoryDialog from './components/StatusHistoryDialog.vue'
@@ -341,6 +492,17 @@ const dialogMode = ref<'create' | 'edit'>('create')
 const currentOrder = ref<OrderResponse | null>(null)
 const historyDialogVisible = ref(false)
 const currentOrderId = ref<number | null>(null)
+
+// 多选相关状态
+const selectedOrders = ref<OrderResponse[]>([])
+const exportDialogVisible = ref(false)
+const exportType = ref<'selected' | 'all'>('selected')
+
+// 批量发货导入相关状态
+const importShipDialogVisible = ref(false)
+const uploadFile = ref<File | null>(null)
+const importPreviewData = ref<any[]>([])
+const importLoading = ref(false)
 
 // 搜索表单
 const searchForm = reactive<OrderListRequest>({
@@ -365,6 +527,152 @@ const pagination = reactive({
 onMounted(() => {
   loadOrderList()
 })
+
+// 计算属性
+const approvedOrdersCount = computed(() => {
+  return orderList.value.filter(order => order.orderStatus === 'APPROVED').length
+})
+
+// 多选相关方法
+const handleSelectionChange = (selection: OrderResponse[]) => {
+  selectedOrders.value = selection
+}
+
+const showExportDialog = (type: 'selected' | 'all') => {
+  exportType.value = type
+  exportDialogVisible.value = true
+}
+
+const confirmExport = async () => {
+  try {
+    const orderIds = exportType.value === 'selected' 
+      ? selectedOrders.value.filter(order => order.orderStatus === 'APPROVED').map(order => order.id)
+      : orderList.value.filter(order => order.orderStatus === 'APPROVED').map(order => order.id)
+    
+    if (orderIds.length === 0) {
+      ElMessage.warning('没有可导出的订单')
+      return
+    }
+    
+    const blob = await orderApi.exportOrders(orderIds)
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    // 生成文件名
+    const now = new Date()
+    const timestamp = now.toISOString().slice(0, 19).replace(/[:-]/g, '')
+    link.download = `订单导出_${timestamp}.xlsx`
+    
+    // 触发下载
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('导出成功')
+    exportDialogVisible.value = false
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
+  }
+}
+
+// 批量发货导入相关方法
+const downloadShipTemplate = async () => {
+  try {
+    const blob = await orderApi.downloadShipTemplate()
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    // 生成文件名
+    const now = new Date()
+    const timestamp = now.toISOString().slice(0, 19).replace(/[:-]/g, '')
+    link.download = `发货模板_${timestamp}.xlsx`
+    
+    // 触发下载
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('模板下载成功')
+  } catch (error) {
+    console.error('下载模板失败:', error)
+    ElMessage.error('下载模板失败')
+  }
+}
+
+const showImportShipDialog = () => {
+  importShipDialogVisible.value = true
+  uploadFile.value = null
+  importPreviewData.value = []
+}
+
+const handleFileUpload = async (file: File) => {
+  try {
+    importLoading.value = true
+    uploadFile.value = file
+    
+    // 解析Excel文件并预览
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const response = await orderApi.previewShipImport(formData)
+    importPreviewData.value = response.data || []
+    
+    ElMessage.success(`文件解析成功，共${importPreviewData.value.length}条数据`)
+  } catch (error) {
+    console.error('文件解析失败:', error)
+    ElMessage.error('文件解析失败')
+    uploadFile.value = null
+    importPreviewData.value = []
+  } finally {
+    importLoading.value = false
+  }
+}
+
+const confirmShipImport = async () => {
+  if (!uploadFile.value) {
+    ElMessage.warning('请先上传文件')
+    return
+  }
+  
+  if (importPreviewData.value.length === 0) {
+    ElMessage.warning('没有可导入的数据')
+    return
+  }
+  
+  try {
+    importLoading.value = true
+    
+    const formData = new FormData()
+    formData.append('file', uploadFile.value)
+    
+    const response = await orderApi.importShipData(formData)
+    
+    ElMessage.success(`导入成功！成功：${response.successCount}条，失败：${response.failCount}条`)
+    
+    // 刷新订单列表
+    await loadOrderList()
+    
+    // 关闭对话框
+    importShipDialogVisible.value = false
+    uploadFile.value = null
+    importPreviewData.value = []
+    
+  } catch (error) {
+    console.error('导入失败:', error)
+    ElMessage.error('导入失败')
+  } finally {
+    importLoading.value = false
+  }
+}
 
 // 加载订单列表
 const loadOrderList = async () => {
@@ -569,8 +877,16 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
             cancelButtonText: '取消',
             beforeClose: (action, instance, done) => {
               if (action === 'confirm') {
-                const trackingNumber = document.getElementById('trackingNumber').value.trim()
-                const carrier = document.getElementById('carrier').value.trim()
+                const trackingNumberInput = document.getElementById('trackingNumber') as HTMLInputElement
+                const carrierInput = document.getElementById('carrier') as HTMLInputElement
+                
+                if (!trackingNumberInput || !carrierInput) {
+                  ElMessage.error('获取输入框失败')
+                  return
+                }
+                
+                const trackingNumber = trackingNumberInput.value.trim()
+                const carrier = carrierInput.value.trim()
                 
                 if (!trackingNumber) {
                   ElMessage.error('物流单号不能为空')
@@ -584,8 +900,8 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
                 instance.confirmButtonLoading = true
                 instance.confirmButtonText = '发货中...'
                 
-                instance.trackingNumber = trackingNumber
-                instance.carrier = carrier
+                ;(instance as any).trackingNumber = trackingNumber
+                ;(instance as any).carrier = carrier
                 done()
               } else {
                 done()
@@ -594,8 +910,8 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
           })
           
           await orderApi.supplierShipOrder(order.id, {
-            trackingNumber: result.trackingNumber,
-            carrier: result.carrier,
+            trackingNumber: (result as any).trackingNumber,
+            carrier: (result as any).carrier,
             shippingMethod: '',
             shippingNotes: '',
             operatorId: getCurrentUserId(),

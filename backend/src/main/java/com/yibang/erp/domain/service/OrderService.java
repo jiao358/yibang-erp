@@ -10,6 +10,8 @@ import com.yibang.erp.domain.dto.OrderBatchProcessRequest;
 import com.yibang.erp.domain.dto.OrderBatchProcessResponse;
 import com.yibang.erp.domain.dto.SupplierRejectRequest;
 import com.yibang.erp.domain.dto.SupplierShipRequest;
+import com.yibang.erp.domain.dto.ShipImportPreviewResponse;
+import com.yibang.erp.domain.dto.ShipImportResultResponse;
 
 import java.util.List;
 
@@ -121,6 +123,26 @@ public interface OrderService {
      * 生成平台订单号
      */
     String generatePlatformOrderNo();
+
+    /**
+     * 导出订单数据
+     */
+    byte[] exportOrders(List<Long> orderIds);
+
+    /**
+     * 下载发货模板
+     */
+    byte[] downloadShipTemplate();
+
+    /**
+     * 预览发货导入数据
+     */
+    ShipImportPreviewResponse previewShipImport(byte[] fileData);
+
+    /**
+     * 导入发货数据
+     */
+    ShipImportResultResponse importShipData(byte[] fileData);
 
     /**
      * 生成平台订单号（指定账户和渠道）
