@@ -146,10 +146,6 @@
 
             <!-- 操作按钮 -->
             <el-card class="actions-card" shadow="never">
-              <template #header>
-                <span class="card-title">任务操作</span>
-              </template>
-              
               <div class="action-buttons">
                 <el-button 
                   type="primary" 
@@ -212,7 +208,7 @@
           <div class="tab-content">
             <FailedOrdersList 
               :task-id="taskDetail.taskId"
-              @retry-order="handleRetryOrder"
+              @manual-add-order="handleManualAddOrder"
               @refresh="handleRefreshFailedOrders"
             />
           </div>
@@ -355,8 +351,8 @@ const getProgressText = () => {
 }
 
 // 失败订单相关方法
-const handleRetryOrder = (orderId: number) => {
-  ElMessage.info('重试失败订单功能开发中...')
+const handleManualAddOrder = (orderId: number) => {
+  ElMessage.info(`手动添加订单: ${orderId}`)
 }
 
 const handleRefreshFailedOrders = () => {

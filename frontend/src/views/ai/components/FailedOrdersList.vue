@@ -11,15 +11,15 @@
         <!-- 功能说明 -->
         <div class="function-description">
           <el-alert
-            title="重试功能说明"
+            title="手动添加功能说明"
             type="info"
             :closable="false"
             show-icon
           >
             <template #default>
-              <p><strong>重试失败订单</strong>：当Excel中的某些行数据因为格式错误、数据缺失等原因处理失败时，</p>
-              <p>用户可以先修复Excel文件中的数据问题，然后点击"重试"按钮重新处理这一行数据。</p>
-              <p>重试成功后，该行数据将被重新解析并生成订单。</p>
+              <p><strong>手动添加订单</strong>：当Excel中的某些行数据因为格式错误、数据缺失等原因处理失败时，</p>
+              <p>用户可以点击"手动添加"按钮，跳转到订单管理模块手动创建订单。</p>
+              <p>这样可以避免重新上传Excel文件，直接在系统中创建订单。</p>
             </template>
           </el-alert>
         </div>
@@ -34,7 +34,7 @@
       <el-table :data="failedOrders" style="width: 100%" class="failed-orders-table">
         <el-table-column prop="excelRowNumber" label="Excel行号" width="100" align="center">
           <template #default="{ row }">
-            <el-tag type="info" size="small">第{{ row.excelRowNumber }}行</el-tag>
+            <el-tag type="info" size="small">第{{ (row.excelRowNumber || 0) + 1 }}行</el-tag>
           </template>
         </el-table-column>
         
@@ -89,10 +89,9 @@
             <el-button 
               type="primary" 
               size="small" 
-              @click="retryOrder(row)"
-              :disabled="row.status === 'PROCESSING'"
+              @click="manualAddOrder(row)"
             >
-              重试
+              手动添加
             </el-button>
           </template>
         </el-table-column>
@@ -149,7 +148,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Emits
 const emit = defineEmits<{
-  retryOrder: [orderId: number]
+  manualAddOrder: [orderId: number]
   refresh: []
 }>()
 
@@ -215,21 +214,23 @@ const formatRawData = (rawData: string) => {
   }
 }
 
-// 重试订单
-const retryOrder = async (order: any) => {
+// 手动添加订单
+const manualAddOrder = async (order: any) => {
   try {
     await ElMessageBox.confirm(
-      `确定要重试第${order.excelRowNumber}行的订单吗？`,
-      '确认重试',
+      `确定要手动添加第${(order.excelRowNumber || 0) + 1}行的订单吗？\n将跳转到订单管理模块进行手动创建。`,
+      '确认手动添加',
       {
-        confirmButtonText: '确定重试',
+        confirmButtonText: '确定跳转',
         cancelButtonText: '取消',
-        type: 'warning'
+        type: 'info'
       }
     )
     
-    emit('retryOrder', order.id)
-    ElMessage.success('重试请求已发送')
+    // 跳转到订单管理模块
+    window.open('/order', '_blank')
+    emit('manualAddOrder', order.id)
+    ElMessage.success('正在跳转到订单管理模块...')
   } catch {
     // 用户取消
   }
