@@ -3,8 +3,14 @@ import type { Company, CreateCompanyRequest, UpdateCompanyRequest } from '@/type
 
 export const companyApi = {
   // 获取公司列表
-  getCompanyList(): Promise<Company[]> {
-    return request.get('/api/companies')
+  getCompanyList(params?: {
+    page?: number
+    size?: number
+    name?: string
+    type?: string
+    status?: string
+  }): Promise<any> {
+    return request.get('/api/companies', { params })
   },
 
   // 根据ID获取公司

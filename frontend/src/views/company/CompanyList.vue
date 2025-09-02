@@ -97,7 +97,7 @@
       <!-- 分页 -->
       <div class="pagination-area">
         <el-pagination
-          v-model:current-page="pagination.page"
+          v-model:current-page="pagination.current"
           v-model:page-size="pagination.size"
           :page-sizes="[10, 20, 50, 100]"
           :total="pagination.total"
@@ -142,7 +142,7 @@ const searchForm = reactive({
 
 // 分页信息
 const pagination = reactive({
-  page: 1,
+  current: 1,
   size: 20,
   total: 0
 })
@@ -169,7 +169,7 @@ const fetchCompanyList = async () => {
 
 // 搜索
 const handleSearch = () => {
-  pagination.page = 1
+  pagination.current = 1
   fetchCompanyList()
 }
 
@@ -180,7 +180,7 @@ const handleReset = () => {
     type: '',
     status: ''
   })
-  pagination.page = 1
+  pagination.current = 1
   fetchCompanyList()
 }
 
@@ -238,13 +238,13 @@ const handleFormSuccess = () => {
 // 分页大小改变
 const handleSizeChange = (size: number) => {
   pagination.size = size
-  pagination.page = 1
+  pagination.current = 1
   fetchCompanyList()
 }
 
 // 当前页改变
 const handleCurrentChange = (page: number) => {
-  pagination.page = page
+  pagination.current = page
   fetchCompanyList()
 }
 
