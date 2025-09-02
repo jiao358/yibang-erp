@@ -58,11 +58,7 @@
 
             <!-- 处理结果统计 -->
             <el-card class="stats-card" shadow="never">
-              <template #header>
-                <span class="card-title">处理结果统计</span>
-              </template>
-              
-              <el-row :gutter="20">
+              <el-row :gutter="16">
                 <el-col :span="6">
                   <div class="stat-card total">
                     <div class="stat-icon">
@@ -514,8 +510,12 @@ const deleteTask = async () => {
 .stats-card,
 .progress-card,
 .actions-card {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   border: 1px solid #e4e7ed;
+}
+
+.stats-card {
+  padding: 16px;
 }
 
 .card-header {
@@ -533,7 +533,7 @@ const deleteTask = async () => {
 .stat-card {
   display: flex;
   align-items: center;
-  padding: 20px;
+  padding: 16px;
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;

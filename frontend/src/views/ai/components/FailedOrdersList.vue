@@ -1,12 +1,28 @@
 <template>
   <div class="failed-orders-list">
-    <!-- 标题和统计 -->
-    <div class="list-header">
-      <h4>失败订单列表</h4>
-      <div class="list-stats">
-        <el-tag type="danger">{{ totalFailedOrders }} 个失败订单</el-tag>
-      </div>
-    </div>
+            <!-- 标题和统计 -->
+        <div class="list-header">
+          <h4>失败订单列表</h4>
+          <div class="list-stats">
+            <el-tag type="danger">{{ totalFailedOrders }} 个失败订单</el-tag>
+          </div>
+        </div>
+        
+        <!-- 功能说明 -->
+        <div class="function-description">
+          <el-alert
+            title="重试功能说明"
+            type="info"
+            :closable="false"
+            show-icon
+          >
+            <template #default>
+              <p><strong>重试失败订单</strong>：当Excel中的某些行数据因为格式错误、数据缺失等原因处理失败时，</p>
+              <p>用户可以先修复Excel文件中的数据问题，然后点击"重试"按钮重新处理这一行数据。</p>
+              <p>重试成功后，该行数据将被重新解析并生成订单。</p>
+            </template>
+          </el-alert>
+        </div>
 
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
@@ -310,9 +326,22 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid #e4e7ed;
+}
+
+.function-description {
+  margin-bottom: 20px;
+}
+
+.function-description .el-alert {
+  margin-bottom: 0;
+}
+
+.function-description p {
+  margin: 4px 0;
+  line-height: 1.5;
 }
 
 .list-header h4 {
