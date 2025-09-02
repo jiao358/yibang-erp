@@ -44,7 +44,7 @@ export interface OrderItemResponse {
   orderId: number
   productId: number
   productName?: string
-  sku: string
+  productSku: string
   productSpecifications?: string
   quantity: number
   unitPrice: string

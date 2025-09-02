@@ -280,6 +280,11 @@
                   
                   <!-- 通用操作 -->
                   <el-dropdown-item
+                    :command="{ action: 'viewDetail', order: row }"
+                  >
+                    查看详情
+                  </el-dropdown-item>
+                  <el-dropdown-item
                     :command="{ action: 'history', order: row }"
                   >
                     状态历史
@@ -344,6 +349,12 @@
     />
 
     <!-- 导入功能已移至AI Excel导入模块 -->
+
+    <!-- 订单详情对话框 -->
+    <OrderDetail
+      v-model:visible="detailDialogVisible"
+      :order="selectedOrder"
+    />
 
     <!-- 状态历史对话框 -->
     <StatusHistoryDialog
@@ -477,6 +488,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Upload, Search, Refresh, ArrowDown, Warning, Download, UploadFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import OrderDialog from './components/OrderDialog.vue'
+import OrderDetail from './components/OrderDetail.vue'
 import StatusHistoryDialog from './components/StatusHistoryDialog.vue'
 import { orderApi } from '@/api/order'
 import type { OrderResponse, OrderListRequest } from '@/types/order'
@@ -491,7 +503,9 @@ const dialogVisible = ref(false)
 const dialogMode = ref<'create' | 'edit'>('create')
 const currentOrder = ref<OrderResponse | null>(null)
 const historyDialogVisible = ref(false)
+const detailDialogVisible = ref(false)
 const currentOrderId = ref<number | null>(null)
+const selectedOrder = ref<OrderResponse | null>(null)
 
 // 多选相关状态
 const selectedOrders = ref<OrderResponse[]>([])
@@ -774,6 +788,11 @@ const showImportDialog = () => {
 }
 
 // 显示状态历史对话框
+const showOrderDetail = (order: OrderResponse) => {
+  selectedOrder.value = order
+  detailDialogVisible.value = true
+}
+
 const showStatusHistory = (order: OrderResponse) => {
   currentOrderId.value = order.id
   historyDialogVisible.value = true
@@ -954,6 +973,9 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
           throw error // 重新抛出其他错误
         }
         break
+      case 'viewDetail':
+        showOrderDetail(order)
+        return
       case 'history':
         showStatusHistory(order)
         return
