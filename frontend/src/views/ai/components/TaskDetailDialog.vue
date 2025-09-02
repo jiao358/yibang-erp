@@ -15,62 +15,48 @@
     <div v-if="taskDetail" class="task-detail-content">
       <!-- 标签页导航 -->
       <el-tabs v-model="activeTab" class="task-detail-tabs">
+        <!-- 基本信息标签页 -->
         <el-tab-pane label="基本信息" name="basic">
           <div class="tab-content">
-      <!-- 基本信息 -->
-      <el-card class="info-card" shadow="never">
-        <template #header>
-          <div class="card-header">
-            <span class="card-title">基本信息</span>
-            <el-tag :type="getStatusType(taskDetail.status)" size="large">
-              {{ getStatusText(taskDetail.status) }}
-            </el-tag>
-          </div>
-        </template>
-        
-        <el-descriptions :column="3" border>
-          <el-descriptions-item label="任务ID">
-            <el-tag type="info" size="small">{{ taskDetail.taskId }}</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="文件名">{{ taskDetail.fileName }}</el-descriptions-item>
-          <el-descriptions-item label="供应商" v-if="taskDetail.supplier">
-            {{ taskDetail.supplier }}
-          </el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ formatDateTime(taskDetail.createdAt) }}</el-descriptions-item>
-          <el-descriptions-item label="开始时间" v-if="taskDetail.startedAt">
-            {{ formatDateTime(taskDetail.startedAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="完成时间" v-if="taskDetail.completedAt">
-            {{ formatDateTime(taskDetail.completedAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="处理耗时" v-if="taskDetail.processingTime">
-            {{ formatProcessingTime(taskDetail.processingTime) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="文件大小" v-if="taskDetail.fileSize">
-            {{ formatFileSize(taskDetail.fileSize) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="上传用户" v-if="taskDetail.uploadUser">
-            {{ taskDetail.uploadUser }}
-          </el-descriptions-item>
-        </el-descriptions>
-      </el-card>
-          </div>
-        </el-tab-pane>
+            <!-- 基本信息 -->
+            <el-card class="info-card" shadow="never">
+              <template #header>
+                <div class="card-header">
+                  <span class="card-title">基本信息</span>
+                  <el-tag :type="getStatusType(taskDetail.status)" size="large">
+                    {{ getStatusText(taskDetail.status) }}
+                  </el-tag>
+                </div>
+              </template>
+              
+              <el-descriptions :column="3" border>
+                <el-descriptions-item label="任务ID">
+                  <el-tag type="info" size="small">{{ taskDetail.taskId }}</el-tag>
+                </el-descriptions-item>
+                <el-descriptions-item label="文件名">{{ taskDetail.fileName }}</el-descriptions-item>
+                <el-descriptions-item label="供应商" v-if="taskDetail.supplier">
+                  {{ taskDetail.supplier }}
+                </el-descriptions-item>
+                <el-descriptions-item label="创建时间">{{ formatDateTime(taskDetail.createdAt) }}</el-descriptions-item>
+                <el-descriptions-item label="开始时间" v-if="taskDetail.startedAt">
+                  {{ formatDateTime(taskDetail.startedAt) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="完成时间" v-if="taskDetail.completedAt">
+                  {{ formatDateTime(taskDetail.completedAt) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="处理耗时" v-if="taskDetail.processingTime">
+                  {{ formatProcessingTime(taskDetail.processingTime) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="文件大小" v-if="taskDetail.fileSize">
+                  {{ formatFileSize(taskDetail.fileSize) }}
+                </el-descriptions-item>
+                <el-descriptions-item label="上传用户" v-if="taskDetail.uploadUser">
+                  {{ taskDetail.uploadUser }}
+                </el-descriptions-item>
+              </el-descriptions>
+            </el-card>
 
-        <!-- 失败订单标签页 -->
-        <el-tab-pane label="失败订单" name="failed-orders">
-          <div class="tab-content">
-            <FailedOrdersList 
-              :task-id="taskDetail.taskId"
-              @retry-order="handleRetryOrder"
-              @refresh="handleRefreshFailedOrders"
-            />
-          </div>
-        </el-tab-pane>
-
-        <!-- 处理进度标签页 -->
-        <el-tab-pane label="处理进度" name="progress">
-          <div class="tab-content">
+            <!-- 处理结果统计 -->
             <el-card class="stats-card" shadow="never">
               <template #header>
                 <span class="card-title">处理结果统计</span>
@@ -100,38 +86,69 @@
                     </div>
                   </div>
                 </el-col>
-          
-          <el-col :span="6">
-            <div class="stat-card failed">
-              <div class="stat-icon">
-                <el-icon><CircleClose /></el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-number">{{ taskDetail.failedRows }}</div>
-                <div class="stat-label">处理失败</div>
-              </div>
-            </div>
-          </el-col>
-          
-          <el-col :span="6">
-            <div class="stat-card manual">
-              <div class="stat-icon">
-                <el-icon><Tools /></el-icon>
-              </div>
-              <div class="stat-content">
-                <div class="stat-number">{{ taskDetail.manualProcessRows || 0 }}</div>
-                <div class="stat-label">需手动处理</div>
-              </div>
-            </div>
-          </el-col>
-        </el-row>
+                
+                <el-col :span="6">
+                  <div class="stat-card failed">
+                    <div class="stat-icon">
+                      <el-icon><CircleClose /></el-icon>
+                    </div>
+                    <div class="stat-content">
+                      <div class="stat-number">{{ taskDetail.failedRows }}</div>
+                      <div class="stat-label">处理失败</div>
+                    </div>
+                  </div>
+                </el-col>
+                
+                <el-col :span="6">
+                  <div class="stat-card manual">
+                    <div class="stat-icon">
+                      <el-icon><Tools /></el-icon>
+                    </div>
+                    <div class="stat-content">
+                      <div class="stat-number">{{ taskDetail.manualProcessRows || 0 }}</div>
+                      <div class="stat-label">需手动处理</div>
+                    </div>
+                  </div>
+                </el-col>
+              </el-row>
             </el-card>
-          </div>
-        </el-tab-pane>
 
-        <!-- 操作按钮标签页 -->
-        <el-tab-pane label="操作" name="actions">
-          <div class="tab-content">
+            <!-- 进度详情 -->
+            <el-card class="progress-card" shadow="never" v-if="taskDetail.status === 'PROCESSING'">
+              <template #header>
+                <span class="card-title">实时进度</span>
+              </template>
+              
+              <div class="progress-details">
+                <el-progress 
+                  :percentage="getProgressPercentage()"
+                  :status="getProgressStatus()"
+                  :stroke-width="12"
+                  :show-text="false"
+                  class="main-progress"
+                />
+                <div class="progress-text">
+                  {{ getProgressText() }}
+                </div>
+                
+                <div class="progress-stats">
+                  <div class="progress-stat-item">
+                    <span class="stat-label">已处理:</span>
+                    <span class="stat-value">{{ getProcessedRows() }}</span>
+                  </div>
+                  <div class="progress-stat-item">
+                    <span class="stat-label">剩余:</span>
+                    <span class="stat-value">{{ getRemainingRows() }}</span>
+                  </div>
+                  <div class="progress-stat-item">
+                    <span class="stat-label">预计剩余时间:</span>
+                    <span class="stat-value">{{ getEstimatedTime() }}</span>
+                  </div>
+                </div>
+              </div>
+            </el-card>
+
+            <!-- 操作按钮 -->
             <el-card class="actions-card" shadow="never">
               <template #header>
                 <span class="card-title">任务操作</span>
@@ -163,23 +180,45 @@
                   下载结果
                 </el-button>
                 
-                          <el-button 
-            type="warning" 
-            @click="viewLogs"
-          >
-            <el-icon><Document /></el-icon>
-            查看日志
-          </el-button>
-          
-          <el-button 
-            type="danger" 
-            @click="deleteTask"
-          >
-            <el-icon><Delete /></el-icon>
-            删除任务
-          </el-button>
-        </div>
+                <el-button 
+                  type="warning" 
+                  @click="viewLogs"
+                >
+                  <el-icon><Document /></el-icon>
+                  查看日志
+                </el-button>
+                
+                <el-button 
+                  type="danger" 
+                  @click="deleteTask"
+                >
+                  <el-icon><Delete /></el-icon>
+                  删除任务
+                </el-button>
+              </div>
             </el-card>
+                    </div>
+        </el-tab-pane>
+
+        <!-- 成功订单标签页 -->
+        <el-tab-pane label="成功订单" name="success-orders">
+          <div class="tab-content">
+            <SuccessOrdersList 
+              :task-id="taskDetail.taskId"
+              @view-order="handleViewOrder"
+              @refresh="handleRefreshSuccessOrders"
+            />
+          </div>
+        </el-tab-pane>
+
+        <!-- 失败订单标签页 -->
+        <el-tab-pane label="失败订单" name="failed-orders">
+          <div class="tab-content">
+            <FailedOrdersList 
+              :task-id="taskDetail.taskId"
+              @retry-order="handleRetryOrder"
+              @refresh="handleRefreshFailedOrders"
+            />
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -208,6 +247,7 @@ import {
 } from '@element-plus/icons-vue'
 import type { TaskHistoryItem } from '@/types/ai'
 import FailedOrdersList from './FailedOrdersList.vue'
+import SuccessOrdersList from './SuccessOrdersList.vue'
 
 // Props
 interface Props {
@@ -325,6 +365,15 @@ const handleRetryOrder = (orderId: number) => {
 
 const handleRefreshFailedOrders = () => {
   ElMessage.success('失败订单列表已刷新')
+}
+
+// 成功订单相关方法
+const handleViewOrder = (orderId: string) => {
+  ElMessage.info(`查看订单详情: ${orderId}`)
+}
+
+const handleRefreshSuccessOrders = () => {
+  ElMessage.success('成功订单列表已刷新')
 }
 
 const getProcessedRows = () => {
