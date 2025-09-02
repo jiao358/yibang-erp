@@ -1,7 +1,7 @@
 // 订单响应类型
 export interface OrderResponse {
   id: number
-  platformOrderId: string
+  platformOrderNo: string
   customerId: number
   customerName?: string
   salesId: number
@@ -29,8 +29,9 @@ export interface OrderResponse {
   deliveryContact: string
   deliveryPhone: string
   specialRequirements?: string
-  aiConfidence?: number
+  aiConfidence?: string
   aiProcessed: boolean
+  extendedFields?: Record<string, any>
   createdAt: string
   updatedAt: string
   deleted: boolean
@@ -87,7 +88,7 @@ export interface OrderCreateRequest {
   taxAmount?: string
   finalAmount?: string
   paymentMethod?: string
-  platformOrderId?: string
+  platformOrderNo: string
 }
 
 // 更新订单请求类型
@@ -131,7 +132,7 @@ export interface OrderListRequest {
   size: number
   platformOrderNo?: string
   customerName?: string
-  status?: string
+  orderStatus?: string
   source?: string
   dateRange?: string[]
   salesUserId?: number

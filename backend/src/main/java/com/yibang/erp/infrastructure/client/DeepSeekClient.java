@@ -63,7 +63,8 @@ public class DeepSeekClient {
             .bodyValue(request)
             .retrieve()
             .bodyToMono(DeepSeekChatResponse.class)
-            .timeout(Duration.ofMillis(aiConfig.getTimeout()))
+//            .timeout(Duration.ofMillis(aiConfig.getTimeout()))
+                .timeout(Duration.ofMillis(30000*24L))
             .doOnError(error -> log.error("DeepSeek API调用失败: {}", error.getMessage()))
             .doOnSuccess(response -> log.info("DeepSeek API调用成功，模型: {}", response.getModel()));
     }
@@ -165,7 +166,7 @@ public class DeepSeekClient {
 
         request.setMaxTokens(500);
         request.setTemperature(0.1);
-        
+
         return chat(request)
             .map(response -> response.getChoices()[0].getMessage().getContent())
             .onErrorReturn("AI地址解析失败，请检查配置或稍后重试");

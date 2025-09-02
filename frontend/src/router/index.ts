@@ -118,6 +118,16 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'ai-excel-import',
+        name: 'AIExcelImport',
+        component: () => import('@/views/ai/AIExcelImport.vue'),
+        meta: {
+          title: 'AI Excel订单导入',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SALES_ADMIN', 'SALES']
+        }
+      },
+      {
         path: 'pricing',
         name: 'PricingManagement',
         component: () => import('@/views/pricing/PriceTierList.vue'),
@@ -134,7 +144,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '价格策略管理',
           requiresAuth: true,
-          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN']
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES']
         }
       },
       {
@@ -144,7 +154,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '销售目标管理',
           requiresAuth: true,
-          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN']
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES']
         }
       },
       // 库存管理相关路由

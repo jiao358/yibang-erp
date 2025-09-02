@@ -37,6 +37,8 @@ CREATE TABLE customers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='客户表';
 
 -- 2. 订单表 (orders)
+
+
 CREATE TABLE orders (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '订单ID',
     platform_order_id VARCHAR(100) NOT NULL UNIQUE COMMENT '平台订单号',
@@ -66,15 +68,26 @@ CREATE TABLE orders (
     special_requirements TEXT COMMENT '特殊要求',
     ai_confidence DECIMAL(5,4) COMMENT 'AI处理置信度',
     ai_processed TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否经过AI处理：0-否，1-是',
+    source_order_id VARCHAR(255) COMMENT '来源订单ID（存储其他系统的订单ID）',
+    
+    province_code VARCHAR(20) COMMENT '省份代码',
+    province_name VARCHAR(50) COMMENT '省份名称',
+    city_code VARCHAR(20) COMMENT '城市代码',
+    city_name VARCHAR(50) COMMENT '城市名称',
+    district_code VARCHAR(20) COMMENT '区域代码',
+    district_name VARCHAR(50) COMMENT '区域名称',
+    
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     created_by BIGINT COMMENT '创建人ID',
     updated_by BIGINT COMMENT '更新人ID',
     deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除：0-未删除，1-已删除',
-    FOREIGN KEY (customer_id) REFERENCES customers(id),
+    
+    
     FOREIGN KEY (sales_id) REFERENCES users(id),
     FOREIGN KEY (supplier_company_id) REFERENCES companies(id),
     FOREIGN KEY (approval_by) REFERENCES users(id),
+    
     INDEX idx_platform_order_id (platform_order_id),
     INDEX idx_customer_id (customer_id),
     INDEX idx_sales_id (sales_id),
@@ -83,8 +96,14 @@ CREATE TABLE orders (
     INDEX idx_approval_status (approval_status),
     INDEX idx_payment_status (payment_status),
     INDEX idx_created_at (created_at),
-    INDEX idx_expected_delivery (expected_delivery_date)
+    INDEX idx_expected_delivery (expected_delivery_date),
+    INDEX idx_source_order_id (source_order_id),
+    -- 新增的地区相关索引
+    INDEX idx_province_code (province_code),
+    INDEX idx_city_code (city_code),
+    INDEX idx_district_code (district_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单表';
+
 
 -- 3. 订单明细表 (order_items)
 CREATE TABLE order_items (

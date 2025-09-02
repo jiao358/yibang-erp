@@ -184,6 +184,8 @@ public class Order {
     @TableField("ai_processed")
     private Boolean aiProcessed;
 
+
+
     /**
      * 创建时间
      */
@@ -217,6 +219,11 @@ public class Order {
 
     @TableField("district_name")
     private String  districtName;
+
+    @TableField("source_order_id")
+    private String sourceOrderId;
+
+
 
 
 

@@ -20,9 +20,23 @@ public class OrderResponse {
     private Long id;
 
     /**
+     * 配送地址
+     */
+    private String deliveryAddress;
+
+    /**
+     * 币种
+     */
+    private String currency;
+    /**
      * 平台订单号（系统内部唯一标识）
      */
     private String platformOrderNo;
+
+    /**
+     * 订单类型 (NORMAL, WHOLESALE, RUSH, SAMPLE)
+     */
+    private String orderType;
 
     /**
      * 销售订单ID（客户提供的订单号，仅作参考）
@@ -83,6 +97,10 @@ public class OrderResponse {
      * 订单状态
      */
     private String status;
+    /**
+     * 订单状态名称
+     */
+    private String orderStatus;
 
     /**
      * 订单状态名称

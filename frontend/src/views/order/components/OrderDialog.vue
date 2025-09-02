@@ -13,13 +13,27 @@
       label-width="120px"
       class="order-form"
     >
+      <!-- 操作进度提示条 -->
+      <div v-if="submitting" class="progress-bar">
+        <el-progress 
+          :percentage="submitProgress" 
+          :show-text="false"
+          :stroke-width="6"
+          color="#409eff"
+        />
+        <div class="progress-text">
+          <el-icon class="is-loading"><Refresh /></el-icon>
+          <span>{{ submitProgressText }}</span>
+        </div>
+      </div>
+      
       <!-- 基本信息 -->
       <el-divider content-position="left">基本信息</el-divider>
       <el-row :gutter="20">
         <el-col :span="12">
-          <el-form-item label="平台订单号" prop="platformOrderId">
+          <el-form-item label="平台订单号" prop="platformOrderNo">
             <el-input
-              v-model="form.platformOrderId"
+              v-model="form.platformOrderNo"
               placeholder="系统自动生成"
               disabled
             />
@@ -141,6 +155,51 @@
           </el-form-item>
         </el-col>
       </el-row>
+
+      <!-- 风险补充信息：当AI置信度低于阈值时显示 -->
+      <template v-if="props.risk">
+        <!-- 强烈风险提示 -->
+        <el-alert 
+          type="error" 
+          show-icon 
+          :closable="false" 
+          title="⚠️ 高风险订单警告 ⚠️"
+          style="margin-bottom: 15px;"
+        >
+          <template #default>
+            <div style="font-weight: bold; color: #f56c6c; margin-bottom: 10px;">
+              该订单AI识别置信度较低，存在重大风险！
+            </div>
+            <div style="color: #f56c6c; margin-bottom: 10px;">
+              • 请务必仔细审核所有订单信息<br>
+              • 请务必补充完整的收货地区信息<br>
+              • 请务必验证商品信息的准确性
+            </div>
+            <div style="color: #e6a23c; font-weight: bold; border-top: 1px solid #e6a23c; padding-top: 10px;">
+              ⚠️ 若您未进行人工确认，造成的风险由您自己承担 ⚠️
+            </div>
+          </template>
+        </el-alert>
+        
+        <el-divider content-position="left">收货地区补充（必填）</el-divider>
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="省份">
+              <el-input v-model="form.extendedFields!.province" placeholder="请输入省份" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="城市">
+              <el-input v-model="form.extendedFields!.city" placeholder="请输入城市" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="地区">
+              <el-input v-model="form.extendedFields!.district" placeholder="请输入地区/区县" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </template>
 
       <!-- 商品信息 -->
       <el-divider content-position="left">商品信息</el-divider>
@@ -386,9 +445,15 @@
 
     <template #footer>
       <div class="dialog-footer">
-        <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
-          {{ mode === 'create' ? '创建' : '更新' }}
+        <el-button @click="handleClose" :disabled="submitting">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="handleSubmit" 
+          :loading="submitting"
+          :disabled="submitting"
+        >
+          <el-icon v-if="submitting" class="is-loading"><Refresh /></el-icon>
+          {{ submitting ? (mode === 'create' ? '创建中...' : '更新中...') : (mode === 'create' ? '创建' : '更新') }}
         </el-button>
       </div>
     </template>
@@ -416,11 +481,13 @@ interface Props {
   modelValue: boolean
   order?: OrderResponse | null
   mode: 'create' | 'edit'
+  risk?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   order: null,
-  mode: 'create'
+  mode: 'create',
+  risk: false
 })
 
 // Emits
@@ -437,6 +504,8 @@ const visible = computed({
 
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const submitProgress = ref(0)
+const submitProgressText = ref('正在处理...')
 const customerLoading = ref(false)
 const productLoading = ref(false)
 const customerOptions = ref<Customer[]>([])
@@ -481,6 +550,7 @@ const form = reactive<OrderCreateRequest>({
   orderItems: [],
   
   // 前端显示字段
+  platformOrderNo: '', // 平台订单号
   orderType: 'NORMAL',
   expectedDeliveryDate: getDefaultDeliveryDate(),
   currency: 'CNY',
@@ -702,6 +772,7 @@ const confirmProductSelection = () => {
 // 监听器
 watch(() => props.order, (newOrder) => {
   if (newOrder && props.mode === 'edit') {
+    // 从后端数据填充表单
     Object.assign(form, {
       customerId: newOrder.customerId,
       orderType: newOrder.orderType,
@@ -719,8 +790,46 @@ watch(() => props.order, (newOrder) => {
       finalAmount: newOrder.finalAmount,
       paymentMethod: newOrder.paymentMethod
     })
+    
+    // 从extendedFields中恢复表单数据
+    if (newOrder.extendedFields) {
+      Object.assign(form, {
+        orderType: newOrder.extendedFields.orderType || form.orderType,
+        expectedDeliveryDate: newOrder.extendedFields.expectedDeliveryDate || form.expectedDeliveryDate,
+        currency: newOrder.extendedFields.currency || form.currency,
+        specialRequirements: newOrder.extendedFields.specialRequirements || form.specialRequirements,
+        deliveryAddress: newOrder.extendedFields.deliveryAddress || form.deliveryAddress,
+        deliveryContact: newOrder.extendedFields.deliveryContact || form.deliveryContact,
+        deliveryPhone: newOrder.extendedFields.deliveryPhone || form.deliveryPhone,
+        discountAmount: newOrder.extendedFields.discountAmount || form.discountAmount,
+        shippingAmount: newOrder.extendedFields.shippingAmount || form.shippingAmount,
+        taxAmount: newOrder.extendedFields.taxAmount || form.taxAmount,
+        finalAmount: newOrder.extendedFields.finalAmount || form.finalAmount,
+        paymentMethod: newOrder.extendedFields.paymentMethod || form.paymentMethod
+      })
+      
+      // 恢复省市区信息
+      if (newOrder.extendedFields.province || newOrder.extendedFields.city || newOrder.extendedFields.district) {
+        form.extendedFields = {
+          ...form.extendedFields,
+          province: newOrder.extendedFields.province,
+          city: newOrder.extendedFields.city,
+          district: newOrder.extendedFields.district
+        }
+      }
+    }
   }
 }, { immediate: true })
+
+// 监听对话框关闭，自动重置表单
+watch(visible, (newVisible) => {
+  if (!newVisible) {
+    // 对话框关闭时，延迟重置表单，避免影响当前操作
+    setTimeout(() => {
+      resetForm()
+    }, 100)
+  }
+})
 
 // 生命周期
 onMounted(() => {
@@ -740,7 +849,7 @@ onMounted(() => {
 const generateOrderNo = async () => {
   try {
     const orderNo = await orderApi.generatePlatformOrderNo()
-    form.platformOrderId = orderNo
+    form.platformOrderNo = orderNo
   } catch (error) {
     console.error('生成订单号失败:', error)
   }
@@ -842,9 +951,25 @@ const handleSubmit = async () => {
       return
     }
     
+    // 开始提交，显示进度
+    submitting.value = true
+    submitProgress.value = 0
+    submitProgressText.value = '正在验证数据...'
+    
+    // 模拟进度更新
+    const progressInterval = setInterval(() => {
+      if (submitProgress.value < 90) {
+        submitProgress.value += Math.random() * 15
+        if (submitProgress.value > 30) submitProgressText.value = '正在处理订单信息...'
+        if (submitProgress.value > 60) submitProgressText.value = '正在保存到数据库...'
+        if (submitProgress.value > 80) submitProgressText.value = '即将完成...'
+      }
+    }, 200)
+    
     // 发送所有表单数据到后端
     const submitData = {
-      salesOrderId: form.platformOrderId || form.salesOrderId,
+      platformOrderNo: form.platformOrderNo,
+      salesOrderId: form.platformOrderNo || form.salesOrderId,
       salesUserId: form.salesUserId,
       salesCompanyId: form.salesCompanyId,
       customerId: form.customerId,
@@ -853,18 +978,25 @@ const handleSubmit = async () => {
       remarks: form.remarks,
       extendedFields: {
         ...form.extendedFields,
+        // 基本信息
         orderType: form.orderType,
         expectedDeliveryDate: form.expectedDeliveryDate,
         currency: form.currency,
         specialRequirements: form.specialRequirements,
+        // 收货信息
         deliveryAddress: form.deliveryAddress,
         deliveryContact: form.deliveryContact,
         deliveryPhone: form.deliveryPhone,
+        // 费用信息
         discountAmount: form.discountAmount,
         shippingAmount: form.shippingAmount,
         taxAmount: form.taxAmount,
         finalAmount: form.finalAmount,
-        paymentMethod: form.paymentMethod
+        paymentMethod: form.paymentMethod,
+        // 风险补充信息（如果有的话）
+        province: form.extendedFields?.province,
+        city: form.extendedFields?.city,
+        district: form.extendedFields?.district
       },
       orderItems: form.orderItems.map(item => ({
         productId: item.productId,
@@ -882,12 +1014,14 @@ const handleSubmit = async () => {
       }))
     }
     
-    submitting.value = true
-    
     if (props.mode === 'create') {
+      submitProgressText.value = '正在创建订单...'
       await orderApi.createOrder(submitData)
+      submitProgress.value = 100
+      submitProgressText.value = '订单创建成功！'
       ElMessage.success('订单创建成功')
     } else {
+      submitProgressText.value = '正在更新订单...'
       // 更新订单需要不同的字段
       const updateData: OrderUpdateRequest = {
         customerId: form.customerId,
@@ -902,15 +1036,27 @@ const handleSubmit = async () => {
         }))
       }
       await orderApi.updateOrder(props.order!.id, updateData)
+      submitProgress.value = 100
+      submitProgressText.value = '订单更新成功！'
       ElMessage.success('订单更新成功')
     }
     
-    emit('success')
+    // 延迟一下让用户看到完成状态
+    setTimeout(() => {
+      emit('success')
+    }, 500)
+    
   } catch (error) {
     console.error('提交失败:', error)
+    submitProgressText.value = '操作失败'
     ElMessage.error('提交失败')
   } finally {
-    submitting.value = false
+    // 延迟重置状态，让用户看到最终结果
+    setTimeout(() => {
+      submitting.value = false
+      submitProgress.value = 0
+      submitProgressText.value = '正在处理...'
+    }, 1000)
   }
 }
 
@@ -922,9 +1068,47 @@ const handleClose = () => {
     type: 'warning'
   }).then(() => {
     visible.value = false
+    resetForm()
   }).catch(() => {
     // 用户取消
   })
+}
+
+// 重置表单数据
+const resetForm = () => {
+  // 重置所有表单字段到初始状态
+  Object.assign(form, {
+    // 后端必需字段
+    salesOrderId: 'MANUAL_' + Date.now(),
+    salesUserId: 0,
+    salesCompanyId: 0,
+    customerId: 0,
+    source: 'MANUAL',
+    templateVersion: '1.0',
+    remarks: '',
+    extendedFields: {},
+    orderItems: [],
+    
+    // 前端显示字段
+    platformOrderNo: '', // 平台订单号
+    orderType: 'NORMAL',
+    expectedDeliveryDate: getDefaultDeliveryDate(),
+    currency: 'CNY',
+    specialRequirements: '',
+    deliveryAddress: '',
+    deliveryContact: '',
+    deliveryPhone: '',
+    discountAmount: '0',
+    shippingAmount: '0',
+    taxAmount: '0',
+    finalAmount: '0',
+    paymentMethod: 'BANK_TRANSFER'
+  })
+  
+  // 清空表单验证状态
+  if (formRef.value) {
+    formRef.value.clearValidate()
+  }
 }
 
 
@@ -934,6 +1118,43 @@ const handleClose = () => {
 .order-form {
   max-height: 70vh;
   overflow-y: auto;
+}
+
+/* 进度条样式 */
+.progress-bar {
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid #e4e7ed;
+}
+
+.progress-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  color: #409eff;
+  font-weight: 500;
+}
+
+.progress-text .el-icon {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+/* 加载中的图标动画 */
+.is-loading {
+  animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .order-items {

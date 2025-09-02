@@ -165,3 +165,173 @@ export enum AIConfigStatus {
   DISABLED = 'DISABLED',
   ERROR = 'ERROR'
 }
+
+// AI Excel配置类型
+export interface AIExcelConfig {
+  modelType: 'deepseek' | 'gpt4' | 'claude'
+  confidenceThreshold: number
+  autoMatchStrategy: 'strict' | 'smart' | 'loose'
+  enableFallback: boolean
+  maxRetries: number
+  temperature: number
+  maxTokens: number
+  timeout: number
+}
+
+// 错误订单信息类型
+export interface ErrorOrderInfo {
+  id: number
+  taskId: string
+  excelRowNumber: number
+  rawData: Record<string, any>
+  errorType: string
+  errorTypeLabel?: string
+  errorMessage: string
+  errorLevel: string
+  suggestedAction: string
+  status: string
+  statusLabel?: string
+  processedBy?: number
+  processedByName?: string
+  processedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// 处理进度类型
+export interface ProcessingProgress {
+  totalRows: number
+  processedRows: number
+  successRows: number
+  failedRows: number
+  manualProcessRows: number
+  currentStep: string
+  percentage: number
+  estimatedTime: string
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
+}
+
+// 处理结果类型
+export interface ProcessingResult {
+  taskId: string
+  status: string
+  totalRows: number
+  successRows: number
+  failedRows: number
+  manualProcessRows: number
+  processingTime: number
+  createdAt: string
+  completedAt: string
+  details: ProcessingDetail[]
+}
+
+// 处理详情类型
+export interface ProcessingDetail {
+  rowNumber: number
+  status: 'SUCCESS' | 'FAILED' | 'MANUAL_PROCESS'
+  customerMatch: CustomerMatchResult
+  productMatch: ProductMatchResult
+  confidence: number
+  errorMessage?: string
+  orderId?: string
+}
+
+// 客户匹配结果类型
+export interface CustomerMatchResult {
+  matched: boolean
+  customerId?: number
+  customerName?: string
+  customerCode?: string
+  confidence: number
+  matchReason: string
+  suggestion?: string
+}
+
+// 商品匹配结果类型
+export interface ProductMatchResult {
+  matched: boolean
+  productId?: number
+  productName?: string
+  sku?: string
+  specification?: string
+  confidence: number
+  matchReason: string
+  suggestion?: string
+}
+
+// 任务历史类型
+export interface TaskHistoryItem {
+  taskId: string
+  fileName: string
+  status: string
+  totalRows: number
+  successRows: number
+  failedRows: number
+  createdAt: string
+  completedAt?: string
+  processingTime?: number
+}
+
+// AI Excel处理请求类型
+export interface AIExcelProcessRequest {
+  salesUserId: number
+  salesCompanyId: number
+  aiConfig: AIExcelConfig
+  fileName: string
+  fileSize: number
+}
+
+// AI Excel处理响应类型
+export interface AIExcelProcessResponse {
+  taskId: string
+  status: string
+  message: string
+  createdAt: string
+  startedAt?: string
+  completedAt?: string
+  progress?: ProcessingProgress
+  statistics?: ProcessStatistics
+}
+
+// 处理统计类型
+export interface ProcessStatistics {
+  totalOrders: number
+  successOrders: number
+  failedOrders: number
+  manualProcessOrders: number
+}
+
+// 文件上传响应类型
+export interface FileUploadResponse {
+  success: boolean
+  message: string
+  fileId?: string
+  fileName?: string
+  fileSize?: number
+}
+
+// AI模型状态类型
+export interface AIModelStatus {
+  modelType: string
+  status: 'available' | 'unavailable' | 'error'
+  lastTestTime?: string
+  responseTime?: number
+  errorMessage?: string
+}
+
+// 字段识别结果类型
+export interface FieldRecognitionResult {
+  columnIndex: number
+  originalHeader: string
+  recognizedField: string
+  fieldType: string
+  confidence: number
+  description: string
+}
+
+// 列映射结果类型
+export interface ColumnMappingResult {
+  columnMappings: FieldRecognitionResult[]
+  confidence: number
+  reasoning: string
+}

@@ -153,12 +153,25 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         // 验证请求数据
         validateOrderRequest(request);
 
+        //说明肯定有品
+
+        //todo 如果是两家供应链甚至是更多供应链商品的组合，那么就应该生成多个分发的订单。现在因为只有一个供应链，所以无碍查询一个商品的公司即可
+
+        Product product = productRepository.selectById(request.getOrderItems().get(0).getProductId());
+        Long supplierCompanyId = product.getCompanyId();
+
         // 创建订单
         Order order = new Order();
         order.setPlatformOrderId(generatePlatformOrderNo());
         order.setCustomerId(request.getCustomerId());
         order.setSalesId(request.getSalesUserId());
-        order.setSupplierCompanyId(request.getSalesCompanyId());
+        /**
+         * todo 这里就有问题了
+         * 销售公司可能是一棒 而不是供应链公司
+         * 供应链公司的逻辑，应该是从品上看的
+         */
+        order.setSupplierCompanyId(supplierCompanyId);
+
         order.setOrderType("NORMAL"); // 默认订单类型
         order.setOrderSource(request.getSource());
         order.setOrderStatus("DRAFT");
@@ -246,11 +259,35 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         if (request.getCustomerId() != null) {
             order.setCustomerId(request.getCustomerId());
         }
+
+
         if (request.getRemarks() != null) {
             order.setRemarks(request.getRemarks());
         }
         if (request.getExtendedFields() != null) {
             order.setExtendedFieldsMap(request.getExtendedFields());
+        }
+
+        boolean isEdit= false;
+        //todo 增加省份 城市 区域 的修改
+        if (request.getExtendedFields().get("provinceName") != null) {
+            order.setProvinceName(request.getExtendedFields().get("provinceName").toString());
+            isEdit=isEdit||true;
+        }
+        if(request.getExtendedFields().get("cityName") != null){
+            order.setCityName(request.getExtendedFields().get("cityName").toString());
+            isEdit=isEdit||true;
+        }
+
+        if(request.getExtendedFields().get("districtName") != null){
+            order.setDistrictName(request.getExtendedFields().get("districtName").toString());
+            isEdit=isEdit||true;
+        }
+
+        //如果有修改 ！ 则被证明是人工确认的 ai—process要成为false
+        if(isEdit){
+            order.setAiProcessed(false);
+            order.setAiConfidence(BigDecimal.ZERO);
         }
 
         order.setUpdatedAt(LocalDateTime.now());
@@ -310,6 +347,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     public Page<OrderResponse> getOrderList(OrderListRequest request) {
         // 构建查询条件
         QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+
+        if(org.apache.commons.lang3.StringUtils.isNotEmpty(request.getPlatformOrderNo())){
+            queryWrapper.eq("platform_order_id", request.getPlatformOrderNo());
+        }
         
         if (request.getCustomerId() != null) {
             queryWrapper.eq("customer_id", request.getCustomerId());
@@ -356,7 +397,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     public Page<OrderResponse> getOrderSalesList(OrderListRequest request) {
         // 构建查询条件
         QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
-
+        if(org.apache.commons.lang3.StringUtils.isNotEmpty(request.getPlatformOrderNo())){
+            queryWrapper.eq("platform_order_id", request.getPlatformOrderNo());
+        }
         //只有customerName  就当收件人 不是客户！
         if (org.apache.commons.lang3.StringUtils.isNoneEmpty(request.getCustomerName()) ) {
             queryWrapper.like("delivery_contact", request.getCustomerName());
@@ -410,6 +453,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         // 构建查询条件
         QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
 
+
+        if(org.apache.commons.lang3.StringUtils.isNotEmpty(request.getPlatformOrderNo())){
+            queryWrapper.eq("platform_order_id", request.getPlatformOrderNo());
+        }
         //只有customerName  就当收件人 不是客户！
         if (org.apache.commons.lang3.StringUtils.isNoneEmpty(request.getCustomerName()) ) {
             queryWrapper.like("delivery_contact", request.getCustomerName());
@@ -496,6 +543,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     public OrderResponse submitOrder(Long orderId) {
         OrderStatusUpdateRequest request = new OrderStatusUpdateRequest();
         //todo 如果订单处于提交状态或者拒绝状态，则不允许提交，只有CANCELLED、DRAFT 的状态才可以提交
+
+
 
 
 
@@ -691,7 +740,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     }
 
     private boolean canDeleteOrder(Order order) {
-        return List.of("DRAFT", "SUBMITTED").contains(order.getOrderStatus());
+        return List.of("DRAFT", "CANCELLED").contains(order.getOrderStatus());
     }
 
     private void createOrderItems(Long orderId, List<OrderCreateRequest.OrderItemRequest> itemRequests) {
@@ -764,11 +813,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         }
     }
 
-    private void calculateOrderTotal(Long orderId) {
+    public void calculateOrderTotal(Long orderId) {
         // 查询订单项
         QueryWrapper<OrderItem> wrapper = new QueryWrapper<>();
         wrapper.eq("order_id", orderId);
         List<OrderItem> items = orderItemRepository.selectList(wrapper);
+
+        //todo 这里应该根据客服分层价格来计算
+
+
 
         // 计算商品总额
         BigDecimal totalAmount = items.stream()
@@ -796,7 +849,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setId(order.getId());
         response.setPlatformOrderNo(order.getPlatformOrderId());
         response.setCustomerId(order.getCustomerId());
-
+        response.setCurrency(order.getCurrency());
+        response.setOrderType(order.getOrderType());
+        response.setDeliveryAddress(order.getDeliveryAddress());
+        response.setOrderStatus(order.getOrderStatus());
 
         //销售id
         response.setSalesUserId(order.getSalesId());
@@ -812,6 +868,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setSource(order.getOrderSource());
         ;
         response.setAiProcessed(order.getAiProcessed());
+        response.setAiConfidence(order.getAiConfidence()!=null?order.getAiConfidence().toString():BigDecimal.ZERO.toString());
         response.setProvinceName(order.getProvinceName());
         response.setCityName(order.getCityName());
         response.setDistrictName(order.getDistrictName());

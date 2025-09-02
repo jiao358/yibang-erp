@@ -46,5 +46,5 @@ public class AIConfig {
     /**
      * 请求超时时间（毫秒）
      */
-    private Integer timeout = 30000;
+    private Integer timeout = 130000;
 }

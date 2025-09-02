@@ -17,7 +17,7 @@
             <span>仪表盘</span>
           </el-menu-item>
           
-          <el-sub-menu index="/system">
+          <el-sub-menu index="/system" v-if="hasSystemManagePermission">
             <template #title>
               <el-icon><Setting /></el-icon>
               <span>系统管理</span>
@@ -72,57 +72,57 @@
               <el-icon><UserFilled /></el-icon>
               <span>客户管理</span>
             </el-menu-item>
-            <el-sub-menu index="/inventory">
-              <template #title>
-                <el-icon><Box /></el-icon>
-                <span>库存管理</span>
-              </template>
-              <el-menu-item index="/warehouse">
-                <el-icon><House /></el-icon>
-                <span>仓库管理</span>
-              </el-menu-item>
-              <el-menu-item index="/inventory">
-                <el-icon><Box /></el-icon>
-                <span>库存管理</span>
-              </el-menu-item>
-              <el-menu-item index="/inventory-alert">
-                <el-icon><Warning /></el-icon>
-                <span>库存预警</span>
-              </el-menu-item>
-              <el-menu-item index="/inventory-check">
-                <el-icon><Check /></el-icon>
-                <span>库存盘点</span>
-              </el-menu-item>
-            </el-sub-menu>
-            <el-menu-item index="/pricing">
-              <el-icon><TrendCharts /></el-icon>
-              <span>价格分层管理</span>
-            </el-menu-item>
-            <!-- 暂时隐藏价格策略管理 -->
-            <!-- <el-menu-item index="/price-strategy">
-              <el-icon><TrendCharts /></el-icon>
-              <span>价格策略管理</span>
-            </el-menu-item> -->
-            <el-menu-item index="/sales-target">
-              <el-icon><TrendCharts /></el-icon>
-              <span>销售目标管理</span>
-            </el-menu-item>
-          </el-sub-menu>
-          
-          <el-menu-item index="/digital-screen">
-            <el-icon><DataBoard /></el-icon>
-            <span>数字大屏</span>
+                      <el-menu-item 
+            v-if="hasAIExcelImportPermission" 
+            index="/ai-excel-import"
+          >
+            <el-icon><Upload /></el-icon>
+            <span>AI Excel导入</span>
           </el-menu-item>
-          
-          <el-menu-item index="/ai-management">
-            <el-icon><Cpu /></el-icon>
-            <span>AI管理</span>
+        </el-sub-menu>
+        
+        <!-- 库存管理模块 -->
+        <el-sub-menu index="/inventory" v-if="hasInventoryPermission">
+          <template #title>
+            <el-icon><Box /></el-icon>
+            <span>库存管理</span>
+          </template>
+          <el-menu-item index="/warehouse">
+            <el-icon><House /></el-icon>
+            <span>仓库管理</span>
           </el-menu-item>
-          
-          <el-menu-item index="/monitor">
+          <el-menu-item index="/inventory">
+            <el-icon><Box /></el-icon>
+            <span>库存管理</span>
+          </el-menu-item>
+        </el-sub-menu>
+        
+        <!-- 价格管理模块 -->
+        <el-sub-menu index="/pricing" v-if="hasPricingPermission">
+          <template #title>
             <el-icon><TrendCharts /></el-icon>
-            <span>系统监控</span>
+            <span>价格管理</span>
+          </template>
+          <el-menu-item index="/pricing">
+            <el-icon><TrendCharts /></el-icon>
+            <span>价格分层管理</span>
           </el-menu-item>
+        </el-sub-menu>
+        
+        <el-menu-item index="/digital-screen">
+          <el-icon><DataBoard /></el-icon>
+          <span>数字大屏</span>
+        </el-menu-item>
+        
+        <el-menu-item index="/ai-management" v-if="hasSystemAdminPermission">
+          <el-icon><Cpu /></el-icon>
+          <span>AI管理</span>
+        </el-menu-item>
+        
+        <el-menu-item index="/monitor" v-if="hasSystemAdminPermission">
+          <el-icon><TrendCharts /></el-icon>
+          <span>系统监控</span>
+        </el-menu-item>
         </el-menu>
       </div>
     </div>
@@ -137,7 +137,7 @@
           </button>
           
           <el-breadcrumb class="breadcrumb">
-            <el-breadcrumb-item :to="{ path: '/dashboard' }">仪表盘</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{ path: '/' }">仪表盘</el-breadcrumb-item>
             <el-breadcrumb-item v-if="$route.meta.title">{{ $route.meta.title }}</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
@@ -180,7 +180,7 @@ import { useRouter } from 'vue-router'
 import { 
   Monitor, Setting, User, Lock, OfficeBuilding, Briefcase, 
   Box, Document, DataBoard, Cpu, TrendCharts, Fold, 
-  ArrowDown, SwitchButton, UserFilled, House, Warning, Check
+  ArrowDown, SwitchButton, UserFilled, House, Warning, Check, Upload
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -205,6 +205,20 @@ const hasSystemAdminPermission = computed(() => {
     try {
       const roles = JSON.parse(userRoles)
       return roles.includes('SYSTEM_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
+// 检查是否有系统管理权限（系统管理员或供应链管理员）
+const hasSystemManagePermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SUPPLIER_ADMIN')
     } catch {
       return false
     }
@@ -261,6 +275,48 @@ const hasCustomerManagePermission = computed(() => {
     try {
       const roles = JSON.parse(userRoles)
       return roles.includes('SYSTEM_ADMIN') || roles.includes('SALES_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
+// 检查是否有AI Excel导入权限（系统管理员、销售管理员或销售）
+const hasAIExcelImportPermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SALES_ADMIN') || roles.includes('SALES')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
+// 检查是否有库存管理权限（系统管理员或供应链管理员）
+const hasInventoryPermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SUPPLIER_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
+// 检查是否有价格管理权限（系统管理员或供应链管理员）
+const hasPricingPermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SUPPLIER_ADMIN')
     } catch {
       return false
     }
