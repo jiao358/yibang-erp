@@ -3,6 +3,7 @@ package com.yibang.erp.domain.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.dto.*;
 import com.yibang.erp.domain.entity.*;
 import com.yibang.erp.domain.service.OrderNumberGeneratorService;
@@ -765,7 +766,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                     User operator = userRepository.selectById(log.getOperatorId());
                     if (operator != null) {
                         log.setOperatorName(operator.getUsername());
-                        log.setOperatorRole(operator.getRole());
+
+                        log.setOperatorRole(UserSecurityUtils.getCurrentUserRoles());
                     }
                 } catch (Exception e) {
                     // 忽略查询用户信息失败的情况

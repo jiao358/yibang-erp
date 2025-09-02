@@ -1,5 +1,6 @@
 package com.yibang.erp.common.util;
 
+import cn.hutool.json.JSONObject;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -9,6 +10,11 @@ public class UserSecurityUtils {
         UserDetails userDetails=((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
         String userName = userDetails.getUsername();
         return userName;
+    }
+
+    public static String getCurrentUserRoles(){
+        UserDetails userDetails=((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
+        return new JSONObject(userDetails.getAuthorities().stream().map(x-> x.getAuthority()).toList()).toString();
     }
 
 

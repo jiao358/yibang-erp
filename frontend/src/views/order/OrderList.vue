@@ -539,38 +539,57 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
         break
       case 'supplierShip':
         try {
-          // 显示发货信息输入对话框
-          const shipInfo = await ElMessageBox.prompt(
-            '请输入发货信息：',
-            '供应商发货',
-            {
-              confirmButtonText: '确定发货',
-              cancelButtonText: '取消',
-              type: 'warning',
-              inputType: 'textarea',
-              inputPlaceholder: '物流单号：\n物流公司：\n运输方式（可选）：\n发货备注（可选）：',
-              inputPattern: /物流单号：.*\n物流公司：.*/,
-              inputErrorMessage: '请按格式填写物流单号和物流公司'
+          // 使用Element Plus原生样式的自定义对话框
+          const result = await ElMessageBox({
+            title: '供应商发货',
+            customClass: 'ship-dialog',
+            message: `
+              <div style="padding: 20px; width: 400px;">
+                <div style="margin-bottom: 20px;">
+                  <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266;">物流单号 <span style="color: #f56c6c;">*</span></label>
+                  <input id="trackingNumber" type="text" placeholder="请输入物流单号" style="width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; box-sizing: border-box;" />
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266;">物流公司 <span style="color: #f56c6c;">*</span></label>
+                  <input id="carrier" type="text" placeholder="请输入物流公司" style="width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; box-sizing: border-box;" />
+                </div>
+              </div>
+            `,
+            dangerouslyUseHTMLString: true,
+            showCancelButton: true,
+            confirmButtonText: '确认发货',
+            cancelButtonText: '取消',
+            beforeClose: (action, instance, done) => {
+              if (action === 'confirm') {
+                const trackingNumber = document.getElementById('trackingNumber').value.trim()
+                const carrier = document.getElementById('carrier').value.trim()
+                
+                if (!trackingNumber) {
+                  ElMessage.error('物流单号不能为空')
+                  return
+                }
+                if (!carrier) {
+                  ElMessage.error('物流公司不能为空')
+                  return
+                }
+                
+                instance.confirmButtonLoading = true
+                instance.confirmButtonText = '发货中...'
+                
+                instance.trackingNumber = trackingNumber
+                instance.carrier = carrier
+                done()
+              } else {
+                done()
+              }
             }
-          )
-          
-          // 解析用户输入
-          const lines = shipInfo.value.split('\n')
-          const trackingNumber = lines[0]?.replace('物流单号：', '').trim()
-          const carrier = lines[1]?.replace('物流公司：', '').trim()
-          const shippingMethod = lines[2]?.replace('运输方式：', '').trim() || ''
-          const shippingNotes = lines[3]?.replace('发货备注：', '').trim() || ''
-          
-          if (!trackingNumber || !carrier) {
-            ElMessage.error('物流单号和物流公司不能为空')
-            return
-          }
+          })
           
           await orderApi.supplierShipOrder(order.id, {
-            trackingNumber,
-            carrier,
-            shippingMethod,
-            shippingNotes,
+            trackingNumber: result.trackingNumber,
+            carrier: result.carrier,
+            shippingMethod: '',
+            shippingNotes: '',
             operatorId: getCurrentUserId(),
             operatorName: getCurrentUserName(),
             operatorRole: getUserRole()
@@ -1061,5 +1080,14 @@ const getRowClassName = ({ row }: { row: OrderResponse }) => {
 
 .warning-icon {
   cursor: pointer;
+}
+
+/* 发货对话框宽度控制 */
+:deep(.ship-dialog) {
+  width: 400px !important;
+}
+
+:deep(.ship-dialog .el-message-box) {
+  width: 400px !important;
 }
 </style>
