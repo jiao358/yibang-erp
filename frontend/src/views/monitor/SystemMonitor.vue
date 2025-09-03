@@ -20,7 +20,7 @@
       <div class="overview-section">
         <h2>系统概览</h2>
         <div class="overview-grid">
-          <div class="overview-card" v-for="metric in systemMetrics" :key="metric.key">
+          <div class="overview-card" v-for="metric in displayMetrics" :key="metric.key">
             <div class="metric-header">
               <span class="metric-label">{{ metric.label }}</span>
               <el-tag :type="metric.status" size="small">{{ metric.statusText }}</el-tag>
@@ -201,16 +201,25 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { 
-  Refresh, Cpu, DataBoard, Folder, 
-  Warning, CircleCheck, CircleClose, InfoFilled 
+  Refresh, Cpu, DataBoard, Folder
 } from '@element-plus/icons-vue'
+import { 
+  collectAllMetrics, 
+  getLatestData, 
+  type SystemMetrics 
+} from '@/api/monitor'
 
 // 加载状态
 const loading = ref(false)
-const autoRefresh = ref(true)
+const autoRefresh = ref(false) // 改为false，避免自动刷新
+const lastCollectTime = ref<string>('')
+const collectStatus = ref<'idle' | 'collecting' | 'success' | 'error'>('idle')
 
-// 系统指标
-const systemMetrics = ref([
+// 系统指标数据
+const systemMetricsData = ref<SystemMetrics | null>(null)
+
+// 系统指标显示数据
+const displayMetrics = ref([
   { 
     key: 'cpu', 
     label: 'CPU使用率', 
@@ -354,32 +363,155 @@ const alerts = ref([
 ])
 
 // 自动刷新定时器
-let refreshTimer: number
+let refreshTimer: number | undefined
 
-// 刷新数据
+// 刷新数据 - 改为手动采集
 const refreshData = async () => {
+  if (loading.value) return
+  
   loading.value = true
+  collectStatus.value = 'collecting'
+  
   try {
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    console.log('开始手动采集监控数据')
     
-    // 更新数据
-    updateMetrics()
+    // 调用真实API采集所有监控数据
+    const data = await collectAllMetrics()
+    systemMetricsData.value = data
+    lastCollectTime.value = data.collectTime
     
-    ElMessage.success('数据刷新成功')
+    // 更新显示数据
+    updateDisplayData(data)
+    
+    collectStatus.value = 'success'
+    ElMessage.success('监控数据采集成功')
+    
+    console.log('监控数据采集完成')
+    
   } catch (error) {
-    ElMessage.error('数据刷新失败')
+    console.error('采集监控数据失败:', error)
+    collectStatus.value = 'error'
+    ElMessage.error('监控数据采集失败，请重试')
   } finally {
     loading.value = false
   }
 }
 
-// 更新指标数据
-const updateMetrics = () => {
-  // 模拟数据变化
-  cpuUsage.value.current = Math.floor(Math.random() * 30) + 50
-  memoryUsage.value.percentage = Math.floor(Math.random() * 20) + 70
-  diskUsage.value.percentage = Math.floor(Math.random() * 15) + 40
+// 更新指标数据（保留以备将来使用）
+// const updateMetrics = () => {
+//   // 模拟数据变化
+//   cpuUsage.value.current = Math.floor(Math.random() * 30) + 50
+//   memoryUsage.value.percentage = Math.floor(Math.random() * 20) + 70
+//   diskUsage.value.percentage = Math.floor(Math.random() * 15) + 40
+// }
+
+// 更新显示数据
+const updateDisplayData = (data: SystemMetrics) => {
+  // 更新系统指标
+  if (data.jvmMetrics) {
+    // CPU使用率（暂时使用JVM指标，后续可以扩展）
+    const cpuValue = data.jvmMetrics.cpuUsage || 0
+    updateMetric('cpu', cpuValue, cpuValue > 80 ? 'warning' : 'success')
+    
+    // 内存使用率
+    const memoryValue = data.jvmMetrics.memoryUsagePercentage
+    updateMetric('memory', memoryValue, memoryValue > 80 ? 'warning' : 'success')
+    
+    // 更新内存使用详情
+    memoryUsage.value = {
+      used: data.jvmMetrics.usedMemory / (1024 * 1024 * 1024), // 转换为GB
+      total: data.jvmMetrics.totalMemory / (1024 * 1024 * 1024), // 转换为GB
+      percentage: memoryValue
+    }
+  }
+  
+  // 更新数据库状态
+  if (data.databaseStatus) {
+    const dbValue = data.databaseStatus.connectionUsagePercentage
+    updateMetric('disk', dbValue, dbValue > 80 ? 'warning' : 'success')
+    
+    // 更新连接统计
+    connectionStats.value = [
+      { key: 'active', label: '活跃连接', value: data.databaseStatus.activeConnections.toString() },
+      { key: 'total', label: '总连接数', value: data.databaseStatus.totalConnections.toString() },
+      { key: 'failed', label: '失败连接', value: data.databaseStatus.errorCount.toString() },
+      { key: 'timeout', label: '超时连接', value: data.databaseStatus.timeoutCount.toString() }
+    ]
+    
+    // 更新网络状态（数据库连接）
+    networkStatus.value[2] = {
+      key: 'database',
+      label: '数据库',
+      value: data.databaseStatus.status,
+      status: data.databaseStatus.status === '正常' ? 'success' : 'error',
+      latency: data.databaseStatus.avgResponseTime,
+      packetLoss: 0
+    }
+  }
+  
+  // 更新服务状态
+  if (data.services) {
+    services.value = data.services.map(service => ({
+      ...service,
+      status: service.status,
+      statusText: service.statusText,
+      uptime: service.uptime
+    }))
+  }
+  
+  // 更新告警信息
+  if (data.alerts) {
+    alerts.value = data.alerts.map(alert => ({
+      id: alert.id,
+      level: alert.level,
+      icon: getAlertIcon(alert.level),
+      title: alert.title,
+      message: alert.message,
+      time: formatTime(alert.time)
+    }))
+  }
+}
+
+// 更新指标显示
+const updateMetric = (key: string, value: number, status: string) => {
+  const metric = displayMetrics.value.find((m: any) => m.key === key)
+  if (metric) {
+    metric.value = `${value.toFixed(1)}%`
+    metric.status = status
+    metric.statusText = status === 'warning' ? '警告' : '正常'
+    metric.trendValue = value > 80 ? '高' : '正常'
+    metric.trendIcon = value > 80 ? 'ArrowUp' : 'CircleCheck'
+  }
+}
+
+// 格式化时间
+const formatTime = (timeStr: string): string => {
+  try {
+    const time = new Date(timeStr)
+    const now = new Date()
+    const diff = now.getTime() - time.getTime()
+    
+    if (diff < 60000) return '刚刚'
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
+    return `${Math.floor(diff / 86400000)}天前`
+  } catch {
+    return timeStr
+  }
+}
+
+// 获取告警级别对应的图标
+const getAlertIcon = (level: string): string => {
+  switch (level) {
+    case 'info':
+      return 'InfoFilled'
+    case 'warning':
+      return 'Warning'
+    case 'error':
+      return 'CircleClose'
+    default:
+      return 'InfoFilled'
+  }
 }
 
 // 重启服务
@@ -405,15 +537,25 @@ const resolveAlert = (alertId: number) => {
 }
 
 // 组件挂载
-onMounted(() => {
-  if (autoRefresh.value) {
-    refreshTimer = setInterval(refreshData, 30000) // 30秒自动刷新
+onMounted(async () => {
+  // 首次进入页面，尝试获取最新数据（如果有的话）
+  try {
+    const latestData = await getLatestData()
+    if (latestData && latestData.collectTime) {
+      systemMetricsData.value = latestData
+      lastCollectTime.value = latestData.collectTime
+      updateDisplayData(latestData)
+      collectStatus.value = 'success'
+    }
+  } catch (error) {
+    console.log('没有可用的历史数据，请手动采集')
+    collectStatus.value = 'idle'
   }
 })
 
 // 组件卸载
 onUnmounted(() => {
-  if (refreshTimer) {
+  if (refreshTimer !== undefined) {
     clearInterval(refreshTimer)
   }
 })

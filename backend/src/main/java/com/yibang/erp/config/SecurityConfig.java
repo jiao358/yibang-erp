@@ -113,6 +113,9 @@ public class SecurityConfig {
                 // 静态资源公开访问
                 .requestMatchers("/static/**").permitAll()
                 
+                // 监控API - 仅系统管理员可访问
+                .requestMatchers("/api/monitor/**").hasRole("SYSTEM_ADMIN")
+                
                 // 需要认证的接口（排除已公开的）
                 .requestMatchers("/api/protected/**").authenticated()
                 .requestMatchers("/api/admin/**").authenticated()
