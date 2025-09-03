@@ -370,8 +370,10 @@
     <el-dialog
       v-model="exportDialogVisible"
       title="确认导出"
-      width="500px"
+      width="800px"
+      :append-to-body="true"
       :close-on-click-modal="false"
+      class="export-dialog"
     >
       <div class="export-confirm-content">
         <el-alert
@@ -405,6 +407,56 @@
               <p>• 只能导出状态为"已审批"的订单</p>
               <p>• 导出格式将根据供应商自动调整</p>
               <p>• 导出文件为Excel格式(.xlsx)</p>
+            </template>
+          </el-alert>
+        </div>
+        <!-- 库存影响预览 -->
+        <div class="export-inventory" style="margin-top: 16px;">
+          <el-alert :closable="false" type="warning" show-icon>
+            <template #title>
+              导出库存影响预览
+            </template>
+            <template #default>
+              <div v-if="exportInventoryLoading">正在评估库存影响...</div>
+              <div v-else style="overflow-x: auto;">
+                <el-table :data="exportInventoryPreview" size="small" border height="300" style="min-width: 720px;">
+                  <el-table-column prop="productName" label="商品" min-width="160">
+                    <template #default="{ row }">
+                      {{ row.productName || ('#' + row.productId) }}
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="requiredQty" label="需求数量" width="90" align="center" />
+                  <el-table-column prop="totalAvailable" label="总可用" width="90" align="center">
+                    <template #default="{ row }">
+                      <span :style="{ color: row.isInsufficient ? '#f56c6c' : '' }">{{ row.totalAvailable }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="分仓明细" min-width="260">
+                    <template #default="{ row }">
+                      <div v-if="row.warehouses && row.warehouses.length">
+                        <div v-for="(w, idx) in row.warehouses" :key="idx" style="display:flex; gap:8px; align-items:center; margin:4px 0;">
+                          <el-tag size="small">{{ w.warehouseName || '仓库' }}</el-tag>
+                          <span>可用: {{ w.availableQuantity }}</span>
+                          <span>发完后:
+                            <b :style="{ color: (w.afterFullShip < 0 || w.alert) ? '#f56c6c' : '' }">{{ w.afterFullShip }}</b>
+                          </span>
+                          <el-tag v-if="w.alert" type="danger" size="small">预警</el-tag>
+                        </div>
+                      </div>
+                      <span v-else>-</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="风险" width="80" align="center">
+                    <template #default="{ row }">
+                      <el-tag v-if="row.isInsufficient" type="danger" size="small">不足</el-tag>
+                      <span v-else>—</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div v-if="exportInventoryHasRisk" style="margin-top:8px; color:#f56c6c;">
+                  注：存在可用库存不足或低于预警线的商品，请谨慎导出。
+                </div>
+              </div>
             </template>
           </el-alert>
         </div>
@@ -495,6 +547,7 @@ import OrderDialog from './components/OrderDialog.vue'
 import OrderDetail from './components/OrderDetail.vue'
 import StatusHistoryDialog from './components/StatusHistoryDialog.vue'
 import { orderApi } from '@/api/order'
+import { getInventoryByProductId } from '@/api/inventory'
 import { getWarehousesByCompanyId } from '@/api/warehouse'
 import type { OrderResponse, OrderListRequest } from '@/types/order'
 import type { Warehouse } from '@/types/warehouse'
@@ -517,6 +570,28 @@ const selectedOrder = ref<OrderResponse | null>(null)
 const selectedOrders = ref<OrderResponse[]>([])
 const exportDialogVisible = ref(false)
 const exportType = ref<'selected' | 'all'>('selected')
+
+// 导出库存影响预览
+type ExportWarehouseInfo = {
+  warehouseName?: string
+  availableQuantity: number
+  minStockLevel?: number
+  afterFullShip: number
+  alert: boolean
+}
+
+type ExportInventoryRow = {
+  productId: number
+  productName?: string
+  requiredQty: number
+  totalAvailable: number
+  isInsufficient: boolean
+  warehouses: ExportWarehouseInfo[]
+}
+
+const exportInventoryLoading = ref(false)
+const exportInventoryPreview = ref<ExportInventoryRow[]>([])
+const exportInventoryHasRisk = computed(() => exportInventoryPreview.value.some(r => r.isInsufficient || r.warehouses.some(w => w.alert)))
 
 // 批量发货导入相关状态
 const importShipDialogVisible = ref(false)
@@ -566,6 +641,8 @@ const handleSelectionChange = (selection: OrderResponse[]) => {
 const showExportDialog = (type: 'selected' | 'all') => {
   exportType.value = type
   exportDialogVisible.value = true
+  // 打开时预加载库存影响预览
+  loadExportInventoryPreview()
 }
 
 const confirmExport = async () => {
@@ -602,6 +679,80 @@ const confirmExport = async () => {
   } catch (error) {
     console.error('导出失败:', error)
     ElMessage.error('导出失败')
+  }
+}
+
+// 载入导出库存影响预览
+const loadExportInventoryPreview = async () => {
+  try {
+    exportInventoryLoading.value = true
+    exportInventoryPreview.value = []
+
+    const targetOrders: OrderResponse[] = exportType.value === 'selected'
+      ? selectedOrders.value.filter(o => o.orderStatus === 'APPROVED')
+      : orderList.value.filter(o => o.orderStatus === 'APPROVED')
+
+    if (targetOrders.length === 0) return
+
+    // 拉取订单详情以获取订单项
+    const details = await Promise.all(
+      targetOrders.map(o => orderApi.getOrderById(o.id).catch(() => null))
+    )
+    const validDetails = details.filter(Boolean) as OrderResponse[]
+
+    // 汇总每个商品的需求数量
+    const productNeedMap = new Map<number, { productName?: string; qty: number }>()
+    validDetails.forEach(order => {
+      (order.orderItems || []).forEach(item => {
+        const pid = item.productId
+        const prev = productNeedMap.get(pid)?.qty || 0
+        productNeedMap.set(pid, { productName: item.productName, qty: prev + Number(item.quantity || 0) })
+      })
+    })
+
+    // 查询库存并形成预览
+    const rows: ExportInventoryRow[] = []
+    for (const [productId, info] of productNeedMap.entries()) {
+      let inventories: any[] = []
+      try {
+        const invResp: any = await getInventoryByProductId(productId)
+        if (Array.isArray(invResp)) inventories = invResp
+        else if (invResp?.data && Array.isArray(invResp.data)) inventories = invResp.data
+        else inventories = []
+      } catch {
+        inventories = []
+      }
+
+      const warehouses: ExportWarehouseInfo[] = inventories.map(inv => {
+        const available = Number(inv.availableQuantity || 0)
+        const afterFullShip = available - info.qty
+        const minLevel = inv.minStockLevel !== undefined ? Number(inv.minStockLevel) : undefined
+        const alert = minLevel !== undefined ? afterFullShip < minLevel : false
+        return {
+          warehouseName: inv.warehouseName || inv.warehouseCode,
+          availableQuantity: available,
+          minStockLevel: minLevel,
+          afterFullShip,
+          alert
+        }
+      })
+
+      const totalAvailable = warehouses.reduce((s, w) => s + w.availableQuantity, 0)
+      const isInsufficient = totalAvailable < info.qty
+
+      rows.push({
+        productId,
+        productName: info.productName,
+        requiredQty: info.qty,
+        totalAvailable,
+        isInsufficient,
+        warehouses
+      })
+    }
+
+    exportInventoryPreview.value = rows
+  } finally {
+    exportInventoryLoading.value = false
   }
 }
 
