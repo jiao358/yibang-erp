@@ -34,6 +34,7 @@
               type="primary" 
               @click="viewTaskDetail(row.taskId)"
               class="task-id-link"
+              :class="{ 'cached-task': row.isCached }"
             >
               {{ formatTaskId(row.taskId) }}
             </el-link>
@@ -81,15 +82,15 @@
             <div class="processing-stats">
               <div class="stat-item">
                 <span class="stat-label">总数:</span>
-                <span class="stat-value total">{{ row.totalRows }}</span>
+                <span class="stat-value total">{{ row.isCached ? '计算中...' : row.totalRows }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-label">成功:</span>
-                <span class="stat-value success">{{ row.successRows }}</span>
+                <span class="stat-value success">{{ row.isCached ? '计算中...' : row.successRows }}</span>
               </div>
               <div class="stat-item">
                 <span class="stat-label">失败:</span>
-                <span class="stat-value failed">{{ row.failedRows }}</span>
+                <span class="stat-value failed">{{ row.isCached ? '计算中...' : row.failedRows }}</span>
               </div>
             </div>
           </template>
@@ -131,6 +132,7 @@
                 type="primary" 
                 size="small" 
                 @click="viewTaskDetail(row.taskId)"
+                :disabled="row.isCached"
               >
                 查看详情
               </el-button>
@@ -139,6 +141,7 @@
                 type="success" 
                 size="small" 
                 @click="retryTask(row.taskId)"
+                :disabled="row.isCached"
               >
                 重新处理
               </el-button>
@@ -146,6 +149,7 @@
                 type="danger" 
                 size="small" 
                 @click="deleteTask(row.taskId)"
+                :disabled="row.isCached"
               >
                 删除
               </el-button>
@@ -221,6 +225,7 @@ const formatTaskId = (taskId: string) => {
 
 const getStatusType = (status: string) => {
   switch (status) {
+    case 'SYSTEM_PROCESSING': return 'warning'
     case 'PENDING': return 'info'
     case 'PROCESSING': return 'warning'
     case 'COMPLETED': return 'success'
@@ -232,6 +237,7 @@ const getStatusType = (status: string) => {
 
 const getStatusText = (status: string) => {
   switch (status) {
+    case 'SYSTEM_PROCESSING': return '系统处理中'
     case 'PENDING': return '等待处理'
     case 'PROCESSING': return '处理中'
     case 'COMPLETED': return '处理完成'
@@ -244,6 +250,9 @@ const getStatusText = (status: string) => {
 const getProgressPercentage = (row: TaskHistoryItem) => {
   if (row.status === 'COMPLETED' || row.status === 'FAILED') {
     return 100
+  }
+  if (row.status === 'SYSTEM_PROCESSING') {
+    return 20 // 缓存任务显示20%进度
   }
   if (row.status === 'PENDING') {
     return 0
@@ -265,6 +274,9 @@ const getProgressStatus = (status: string) => {
 const getProgressText = (row: TaskHistoryItem) => {
   if (row.status === 'COMPLETED') {
     return '100%'
+  }
+  if (row.status === 'SYSTEM_PROCESSING') {
+    return '20%' // 缓存任务固定显示20%
   }
   if (row.status === 'PENDING') {
     return '0%'
@@ -303,14 +315,33 @@ const formatProcessingTime = (milliseconds: number) => {
 }
 
 const viewTaskDetail = (taskId: string) => {
+  // 检查是否是缓存任务
+  const task = props.tasks.find(t => t.taskId === taskId)
+  if (task?.isCached) {
+    ElMessage.info('系统正在加速处理中，请稍后查看详情')
+    return
+  }
   emit('viewDetail', taskId)
 }
 
 const retryTask = (taskId: string) => {
+  // 检查是否是缓存任务
+  const task = props.tasks.find(t => t.taskId === taskId)
+  if (task?.isCached) {
+    ElMessage.info('系统正在加速处理中，请稍后操作')
+    return
+  }
   emit('retryTask', taskId)
 }
 
 const deleteTask = async (taskId: string) => {
+  // 检查是否是缓存任务
+  const task = props.tasks.find(t => t.taskId === taskId)
+  if (task?.isCached) {
+    ElMessage.info('系统正在加速处理中，请稍后操作')
+    return
+  }
+  
   try {
     await ElMessageBox.confirm(
       '确定要删除这个任务吗？删除后无法恢复。',
@@ -371,6 +402,17 @@ const handleCurrentChange = (page: number) => {
 .task-id-link {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 12px;
+}
+
+.cached-task {
+  color: #909399 !important;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.cached-task:hover {
+  color: #909399 !important;
+  text-decoration: none;
 }
 
 .file-info {

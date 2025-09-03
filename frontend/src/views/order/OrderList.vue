@@ -703,7 +703,22 @@ const confirmShipImport = async () => {
 const loadOrderList = async () => {
   try {
     loading.value = true
-    const response = await orderApi.getOrderList(searchForm)
+    
+    // 转换搜索参数，匹配后端期望的字段
+    const searchParams = {
+      current: searchForm.current,
+      size: searchForm.size,
+      platformOrderNo: searchForm.platformOrderNo,
+      customerName: searchForm.customerName,
+      sourceOrderNo: searchForm.sourceOrderNo,
+      status: searchForm.orderStatus, // 转换为后端期望的status字段
+      source: searchForm.source,
+      // 转换日期范围
+      createdAtStart: searchForm.dateRange && searchForm.dateRange.length > 0 ? new Date(searchForm.dateRange[0]).toISOString() : undefined,
+      createdAtEnd: searchForm.dateRange && searchForm.dateRange.length > 1 ? new Date(searchForm.dateRange[1]).toISOString() : undefined
+    }
+    
+    const response = await orderApi.getOrderList(searchParams)
     orderList.value = response.records || []
     pagination.total = response.total || 0
     pagination.current = response.current || 1

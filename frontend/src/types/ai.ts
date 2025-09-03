@@ -286,6 +286,8 @@ export interface TaskHistoryItem {
   }
   // 滚动阻止器引用
   scrollPreventer?: (e: Event) => boolean
+  // 缓存任务标识
+  isCached?: boolean
 }
 
 // AI Excel处理请求类型

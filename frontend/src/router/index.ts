@@ -104,7 +104,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'digital-screen',
         name: 'DigitalScreen',
-        component: () => import('@/views/digital-screen/DigitalScreen.vue'),
+        component: () => import('@/views/dashboard/DigitalScreen.vue'),
         meta: {
           title: '数字大屏',
           requiresAuth: true,

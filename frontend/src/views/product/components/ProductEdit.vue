@@ -178,26 +178,13 @@
               <el-row :gutter="20">
                 <el-col :span="8">
                   <el-form-item label="价格分层" required>
-                    <el-select
+                    <SimpleSelect
                       v-model="config.priceTierId"
+                      :options="priceTierOptionItems"
                       placeholder="选择价格分层"
-                      style="width: 100%"
-                      clearable
-                    >
-                      <el-option
-                        v-for="tier in availablePriceTierOptions"
-                        :key="tier.id"
-                        :label="`${tier.tierName} (${tier.tierType})`"
-                        :value="tier.id"
-                      />
-                      <el-option
-                        v-if="config.priceTierId && !availablePriceTierOptions.find(t => t.id === config.priceTierId)"
-                        :key="config.priceTierId"
-                        :label="`${availablePriceTiers.find(t => t.id === config.priceTierId)?.tierName || '未知分层'} (已选择)`"
-                        :value="config.priceTierId"
-                        disabled
-                      />
-                    </el-select>
+                      :zIndex="10000"
+                      :clearable="true"
+                    />
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
@@ -391,6 +378,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed, watch } from 'vue'
+import SimpleSelect from '@/components/SimpleSelect.vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { createProduct, updateProduct, getProductCategories, getProductBrands } from '@/api/product'
 import { productPriceConfigApi } from '@/api/productPriceConfig'
@@ -539,17 +527,28 @@ const canAddMoreConfigs = computed(() => {
   return priceTierConfigs.value.length < availablePriceTiers.value.length
 })
 
-const usedPriceTierIds = computed(() => {
-  return priceTierConfigs.value
-    .map(config => config.priceTierId)
-    .filter(id => id !== null)
+// 计算已使用的价格分层ID（用于禁用已选择项，避免重复）
+const usedPriceTierIds = computed(() => priceTierConfigs.value
+  .map(config => config.priceTierId)
+  .filter(id => id !== null))
+
+// 在映射选项时禁用已选择的分层，避免重复选择
+const priceTierOptionItems = computed(() => {
+  const usedSet = new Set(usedPriceTierIds.value)
+  return availablePriceTierOptions.value.map(tier => ({
+    label: `${tier.tierName} (${tier.tierType})`,
+    value: tier.id,
+    disabled: usedSet.has(tier.id)
+  }))
 })
 
 const availablePriceTierOptions = computed(() => {
-  return availablePriceTiers.value.filter(tier => 
-    !usedPriceTierIds.value.includes(tier.id)
-  )
+  // 在编辑模式下，允许选择所有可用的价格分层
+  // 因为用户可能需要修改已选择的价格分层
+  return availablePriceTiers.value
 })
+
+// 删除重复定义的 priceTierOptionItems（已合并至上方禁用逻辑）
 
 const configStatusText = computed(() => {
   const total = availablePriceTiers.value.length
@@ -639,7 +638,7 @@ const handleSubmit = async () => {
     
     if (isEdit.value && props.product) {
       // 更新商品
-      const updatedProduct = await updateProduct(props.product.id, submitData)
+      await updateProduct(props.product.id, submitData)
       savedProductId = props.product.id
       ElMessage.success('商品更新成功')
     } else {
@@ -995,5 +994,10 @@ onMounted(() => {
   .form-actions .el-button {
     width: 100%;
   }
+}
+
+/* 确保价格分层选择器下拉菜单显示在对话框之上 */
+.price-tier-select-dropdown {
+  z-index: 9999 !important;
 }
 </style>

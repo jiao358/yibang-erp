@@ -136,6 +136,10 @@ export interface OrderListRequest {
   orderStatus?: string
   source?: string
   dateRange?: string[]
+  // 后端期望的字段
+  status?: string
+  createdAtStart?: string
+  createdAtEnd?: string
   salesUserId?: number
   supplierCompanyId?: number
   customerId?: number

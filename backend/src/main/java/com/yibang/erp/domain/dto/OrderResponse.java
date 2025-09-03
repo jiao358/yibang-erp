@@ -250,6 +250,7 @@ public class OrderResponse {
          */
         private Long id;
 
+        private String unit;
         /**
          * 商品ID
          */
@@ -289,6 +290,8 @@ public class OrderResponse {
          * 商品备注
          */
         private String remarks;
+
+        private String currency;
 
         /**
          * 扩展字段

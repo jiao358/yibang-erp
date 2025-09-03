@@ -108,35 +108,24 @@
       <!-- 处理进度弹窗 -->
       <el-dialog
         v-model="showProgressDialog"
-        title="处理进度"
-        width="500px"
+        title="AI处理启动"
+        width="400px"
         :close-on-click-modal="false"
         :close-on-press-escape="false"
         :show-close="false"
       >
-        <ProcessingProgress 
-          :progress="progress"
-          :status="processingStatus"
-          @cancel-processing="handleCancelProcessing"
-        />
-        
-        <template #footer>
-          <div class="dialog-footer">
-            <el-button 
-              v-if="processingStatus === 'PROCESSING'"
-              @click="handleCancelProcessing"
-            >
-              取消处理
-            </el-button>
-            <el-button 
-              v-else
-              type="primary" 
-              @click="showProgressDialog = false"
-            >
-              确定
-            </el-button>
-      </div>
-        </template>
+        <div class="auto-processing-notice">
+          <div class="notice-icon">
+            <el-icon size="48" color="#409eff"><Loading /></el-icon>
+          </div>
+          <div class="notice-content">
+            <h3>AI处理已启动</h3>
+            <p>系统正在后台处理您的Excel文件，请稍候...</p>
+            <div class="countdown">
+              <span>弹窗将在 {{ countdownSeconds }} 秒后自动关闭</span>
+            </div>
+          </div>
+        </div>
       </el-dialog>
     </div>
   </div>
@@ -145,6 +134,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 import TaskOverview from './components/TaskOverview.vue'
 import TaskFilter from './components/TaskFilter.vue'
 import TaskTable from './components/TaskTable.vue'
@@ -171,6 +161,7 @@ const totalTasks = ref(0)
 const detailDialogVisible = ref(false)
 const selectedTask = ref<TaskHistoryItem | null>(null)
 const devMode = ref(false) // 新增开发模式开关
+const countdownSeconds = ref(5) // 倒计时秒数
 
 // 统计数据
 const statistics = ref({
@@ -221,25 +212,30 @@ const filteredTasks = computed(() => {
     })
   }
   
-  // 行数筛选
+  // 行数筛选 - 缓存任务不受行数筛选影响
   if (filterForm.minRows !== undefined) {
-    tasks = tasks.filter(task => task.totalRows >= filterForm.minRows!)
+    tasks = tasks.filter(task => task.isCached || task.totalRows >= filterForm.minRows!)
   }
   if (filterForm.maxRows !== undefined) {
-    tasks = tasks.filter(task => task.totalRows <= filterForm.maxRows!)
+    tasks = tasks.filter(task => task.isCached || task.totalRows <= filterForm.maxRows!)
   }
   
-  // 成功率筛选
+  // 成功率筛选 - 缓存任务不受成功率筛选影响
   if (filterForm.successRate) {
     const rate = parseInt(filterForm.successRate.replace('+', ''))
     tasks = tasks.filter(task => {
+      if (task.isCached) return true // 缓存任务始终显示
       const successRate = (task.successRows / task.totalRows) * 100
       return successRate >= rate
     })
   }
   
-  // 排序
+  // 排序 - 缓存任务始终排在前面
   tasks.sort((a, b) => {
+    // 缓存任务优先显示
+    if (a.isCached && !b.isCached) return -1
+    if (!a.isCached && b.isCached) return 1
+    
     switch (filterForm.sortBy) {
       case 'fileName':
         return a.fileName.localeCompare(b.fileName)
@@ -314,6 +310,20 @@ const startProcessing = async () => {
     
     if (response && response.taskId) {
       ElMessage.success('AI处理已启动')
+      
+      // 创建缓存任务并插入到任务列表第一行
+      const cachedTask = createCachedTask(response.taskId, selectedFile.value)
+      console.log('📝 创建的缓存任务:', cachedTask)
+      
+      taskHistory.value.unshift(cachedTask)
+      totalTasks.value++
+      
+      console.log('📋 当前任务列表长度:', taskHistory.value.length)
+      console.log('📋 任务列表内容:', taskHistory.value)
+      
+      // 启动倒计时，5秒后自动关闭弹窗
+      startCountdown()
+      // 后台开始进度轮询
       startProgressPolling(response.taskId)
     } else {
       throw new Error('启动处理失败：未获取到任务ID')
@@ -323,12 +333,63 @@ const startProcessing = async () => {
     console.error('启动AI处理失败:', error)
     processingStatus.value = 'FAILED'
     ElMessage.error(`启动AI处理失败: ${error.message || error}`)
+    showProgressDialog.value = false
   }
 }
+
+// 倒计时相关
+let countdownInterval: NodeJS.Timeout | null = null
 
 // 进度轮询相关
 let progressInterval: NodeJS.Timeout | null = null
 let currentTaskId: string | null = null
+
+// 启动倒计时
+const startCountdown = () => {
+  console.log('⏰ 开始倒计时，初始值:', countdownSeconds.value)
+  countdownSeconds.value = 5
+  countdownInterval = setInterval(() => {
+    countdownSeconds.value--
+    console.log('⏰ 倒计时:', countdownSeconds.value, '秒')
+    
+    if (countdownSeconds.value <= 0) {
+      console.log('⏰ 倒计时结束，关闭弹窗')
+      clearCountdown()
+      showProgressDialog.value = false
+      ElMessage.info('系统正在后台处理，请稍候查看处理结果')
+    }
+  }, 1000)
+}
+
+// 清理倒计时
+const clearCountdown = () => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval)
+    countdownInterval = null
+  }
+}
+
+// 创建缓存任务
+const createCachedTask = (taskId: string, file: File): TaskHistoryItem => {
+  // 获取当前用户信息
+  const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+  const currentUsername = userInfo.username || userInfo.name || '当前用户'
+  
+  return {
+    taskId: taskId,
+    fileName: file.name,
+    status: 'SYSTEM_PROCESSING',
+    totalRows: 100, // 设置一个合理的总数，避免除零错误
+    successRows: 20, // 初始显示20%进度
+    failedRows: 0,
+    manualProcessRows: 0,
+    createdAt: new Date().toISOString(),
+    fileSize: file.size,
+    uploadUser: currentUsername,
+    supplier: '系统处理中',
+    isCached: true
+  }
+}
 
 const startProgressPolling = (taskId: string) => {
   currentTaskId = taskId
@@ -336,6 +397,7 @@ const startProgressPolling = (taskId: string) => {
     try {
       const response = await aiExcelImportApi.getProgress(taskId)
       if (response.progress) {
+        // 只更新全局进度，不影响缓存任务
         progress.value = response.progress
         
         // 检查是否完成
@@ -343,11 +405,11 @@ const startProgressPolling = (taskId: string) => {
           clearProgressPolling()
           processingStatus.value = response.status
           
-          // 重新加载任务历史
+          // 重新加载任务历史，这会替换缓存任务
           await loadTaskHistory()
         }
       }
-      } catch (error: any) {
+    } catch (error: any) {
       console.error('获取进度失败:', error)
     }
   }, 2000) // 每2秒轮询一次
@@ -358,6 +420,8 @@ const clearProgressPolling = () => {
     clearInterval(progressInterval)
     progressInterval = null
   }
+  // 同时清理倒计时
+  clearCountdown()
 }
 
 const handleCancelProcessing = async () => {
@@ -443,14 +507,38 @@ const loadTaskHistory = async () => {
     console.log('📥 API响应:', response)
     
     if (response && response.content) {
-      taskHistory.value = response.content
+      const realTasks = response.content
+      
+      // 清理缓存任务：找到真实任务的就替换，找不到的就保留
+      taskHistory.value = taskHistory.value.map(task => {
+        if (task.isCached) {
+          const realTask = realTasks.find(real => real.taskId === task.taskId)
+          if (realTask) {
+            // 找到真实任务，替换并显示成功消息
+            ElMessage.success(`任务 ${realTask.fileName} 已开始处理！`)
+            return realTask
+          }
+          // 没找到真实任务，保留缓存任务
+          return task
+        }
+        return task
+      })
+      
+      // 添加新的真实任务（避免重复）
+      const existingTaskIds = new Set(taskHistory.value.map(task => task.taskId))
+      const newTasks = realTasks.filter(task => !existingTaskIds.has(task.taskId))
+      taskHistory.value.unshift(...newTasks)
+      
       totalTasks.value = response.totalElements || 0
-      console.log(`✅ 成功加载 ${taskHistory.value.length} 个任务`)
+      console.log(`✅ 成功加载 ${taskHistory.value.length} 个任务，清理了缓存任务`)
     } else {
       console.warn('⚠️ API响应数据格式异常:', response)
-      taskHistory.value = []
-      totalTasks.value = 0
-      ElMessage.warning('任务数据格式异常，已显示空列表')
+      // 保留缓存任务，不清空
+      if (taskHistory.value.length === 0) {
+        taskHistory.value = []
+        totalTasks.value = 0
+        ElMessage.warning('任务数据格式异常，已显示空列表')
+      }
     }
   } catch (error: any) {
     console.error('❌ 加载任务历史失败:', error)
@@ -761,7 +849,14 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // 清理所有定时器
+  clearCountdown()
   clearProgressPolling()
+})
+
+// 监控倒计时变化
+watch(countdownSeconds, (newVal, oldVal) => {
+  console.log('⏰ 倒计时变化:', oldVal, '->', newVal)
 })
 
 // 开发模式切换
@@ -884,5 +979,41 @@ const handleDevModeChange = (value: boolean) => {
   .page-description {
     font-size: 14px;
   }
+}
+
+.auto-processing-notice {
+  text-align: center;
+  padding: 20px;
+}
+
+.notice-icon {
+  margin-bottom: 20px;
+}
+
+.notice-content h3 {
+  color: #303133;
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+
+.notice-content p {
+  color: #606266;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.countdown {
+  background: #f0f9ff;
+  border: 1px solid #b3d8ff;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 16px;
+}
+
+.countdown span {
+  color: #409eff;
+  font-size: 14px;
+  font-weight: 500;
 }
 </style>

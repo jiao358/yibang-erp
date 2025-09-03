@@ -10,10 +10,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.dto.*;
-import com.yibang.erp.domain.entity.AIExcelProcessTask;
-import com.yibang.erp.domain.entity.AIExcelProcessTaskDetail;
-import com.yibang.erp.domain.entity.Order;
-import com.yibang.erp.domain.entity.OrderItem;
+import com.yibang.erp.domain.entity.*;
 import com.yibang.erp.domain.service.*;
 import com.yibang.erp.infrastructure.repository.*;
 import lombok.extern.slf4j.Slf4j;
@@ -88,6 +85,10 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
     private final ThreadLocal<String> currentTaskIdContext = new ThreadLocal<>();
     @Autowired
     private OrderServiceImpl orderServiceImpl;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private ProductPriceTierConfigRepository productPriceTierConfigRepository;
 
     @Override
     public AIExcelProcessResponse startAIExcelProcess(MultipartFile file, AIExcelProcessRequest request) {
@@ -531,6 +532,7 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
             }
 
 
+
             QueryWrapper<AIExcelProcessTaskDetail> taskSuccessDetails = new QueryWrapper<>();
             taskSuccessDetails.eq("task_id",taskId);
             taskSuccessDetails.eq("process_status","SUCCESS");
@@ -582,12 +584,53 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 info.setOrderId(order.getPlatformOrderId()); // 使用platformOrderId作为订单编号
                 info.setTaskId(taskId);
                 info.setExcelRowNumber(null); // 暂时设为null，后续可以从扩展字段获取
-                info.setCustomerName(null); // 暂时设为null，后续需要关联customer表获取
+                info.setCustomerName(order.getDeliveryContact()); // 暂时设为null，后续需要关联customer表获取
                 info.setCustomerId(order.getCustomerId());
-                info.setProductName(null); // 暂时设为null，后续需要关联product表获取
-                info.setProductId(null); // 暂时设为null，后续需要关联product表获取
-                info.setQuantity(null); // 暂时设为null，后续需要关联order_items表获取
-                info.setUnitPrice(0.0); // 暂时设为0，后续需要关联order_items表获取
+                //肯定只有一个product
+                List<OrderItem> items= orderItemRepository.selectByOrderId(order.getId());
+                if(CollectionUtils.isNotEmpty(items)){
+                    //肯定只有一个
+                    Long productId = items.get(0).getProductId();
+                    String name = items.get(0).getProductName();
+                    int quantity = items.get(0).getQuantity();
+                    info.setProductName(name); // 暂时设为null，后续需要关联product表获取
+                    info.setProductId(productId); // 暂时设为null，后续需要关联product表获取
+                    info.setQuantity(quantity);
+
+                    Long salesId= UserSecurityUtils.getCurrentUserId();
+                    User user= userRepository.selectById(salesId);
+                    long tierId= user.getPriceTierId();
+
+                    QueryWrapper<ProductPriceTierConfig> productPriceTierConfigQueryWrapper = new QueryWrapper<>();
+                    productPriceTierConfigQueryWrapper.eq("product_id", productId);
+                    productPriceTierConfigQueryWrapper.eq("price_tier_id", tierId);
+                    productPriceTierConfigQueryWrapper.eq("deleted", false);
+
+                    ProductPriceTierConfig productPriceTierConfig = productPriceTierConfigRepository.selectOne(productPriceTierConfigQueryWrapper);
+                    if(productPriceTierConfig!=null){
+                        info.setUnitPrice(productPriceTierConfig.getDropshippingPrice().doubleValue());
+                    }else{
+
+                        info.setUnitPrice(productRepository.selectById(productId).getMarketPrice().doubleValue()); // 暂时设为0，后续需要关联order_items表获取
+                    }
+
+                    // 通过客户表获取价格分层 如果没有则使用product内的unitPrice
+
+
+                }else{
+
+                    info.setProductName(null); // 暂时设为null，后续需要关联product表获取
+                    info.setProductId(null); // 暂时设为null，后续需要关联product表获取
+                    info.setQuantity(null); // 暂时设为null，后续需要关联order_items表获取
+                    info.setUnitPrice(0.0); // 暂时设为0，后续需要关联order_items表获取
+                }
+
+
+
+
+
+
+
                 info.setAmount(order.getTotalAmount() != null ? order.getTotalAmount().doubleValue() : 0.0);
                 info.setStatus(order.getOrderStatus());
                 info.setRemark(order.getRemarks());

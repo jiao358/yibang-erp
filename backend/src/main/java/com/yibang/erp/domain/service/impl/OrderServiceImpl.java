@@ -383,7 +383,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         if (StringUtils.hasText(request.getSource())) {
             queryWrapper.eq("order_source", request.getSource());
         }
-        
+
+
+        if(request.getCreatedAtStart()!=null){
+            queryWrapper.between("created_at", request.getCreatedAtStart(), request.getCreatedAtEnd());
+
+        }
+
+
         if (StringUtils.hasText(request.getKeyword())) {
             queryWrapper.and(wrapper -> wrapper
                 .like("platform_order_id", request.getKeyword())
@@ -443,6 +450,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                     .or()
                     .like("special_requirements", request.getKeyword())
             );
+        }
+
+        if(request.getCreatedAtStart()!=null){
+            queryWrapper.between("created_at", request.getCreatedAtStart(), request.getCreatedAtEnd());
+
         }
 
         queryWrapper.orderByDesc("created_at");
@@ -507,6 +519,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                     .or()
                     .like("special_requirements", request.getKeyword())
             );
+        }
+
+        if(request.getCreatedAtStart()!=null){
+            queryWrapper.between("created_at", request.getCreatedAtStart(), request.getCreatedAtEnd());
+
+        }
+
+        if(StringUtils.hasText(request.getSourceOrderNo())){
+            queryWrapper.eq("source_order_id", request.getSourceOrderNo());
         }
 
         queryWrapper.orderByDesc("created_at");
@@ -1439,6 +1460,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setQuantity(item.getQuantity());
         response.setUnitPrice(item.getUnitPrice());
         response.setTotalPrice(item.getSubtotal());
+        response.setCurrency("CNY");
+        response.setUnit(item.getUnit());
 
         return response;
     }

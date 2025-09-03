@@ -1,6 +1,7 @@
 package com.yibang.erp.domain.dto;
 
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDateTime;
 
@@ -88,21 +89,25 @@ public class OrderListRequest {
     /**
      * 创建开始时间
      */
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime createdAtStart;
 
     /**
      * 创建结束时间
      */
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime createdAtEnd;
 
     /**
      * 更新开始时间
      */
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime updatedAtStart;
 
     /**
      * 更新结束时间
      */
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
     private LocalDateTime updatedAtEnd;
 
     /**

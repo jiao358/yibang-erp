@@ -119,7 +119,7 @@
           <span>AI管理</span>
         </el-menu-item>
         
-        <el-menu-item index="/monitor" v-if="hasSystemAdminPermission">
+        <el-menu-item index="/system-monitor" v-if="hasSystemAdminPermission">
           <el-icon><TrendCharts /></el-icon>
           <span>系统监控</span>
         </el-menu-item>

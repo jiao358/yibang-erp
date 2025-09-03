@@ -10,7 +10,11 @@
     <div class="tab-navigation">
       <el-tabs v-model="activeTab" class="ai-tabs" @tab-change="handleTabChange">
         <el-tab-pane label="AI配置" name="config">
-          <AIConfigPanel />
+          <AIConfigPanel 
+            :config="aiConfig" 
+            @update:config="handleConfigUpdate"
+            @config-change="handleConfigChange"
+          />
         </el-tab-pane>
         <el-tab-pane label="订单处理" name="orders">
           <AIOrderPanel />
@@ -27,18 +31,40 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import AIConfigPanel from './components/AIConfigPanel.vue'
 import AIOrderPanel from './components/AIOrderPanel.vue'
 import AIHistoryPanel from './components/AIHistoryPanel.vue'
 import AIStatisticsPanel from './components/AIStatisticsPanel.vue'
+import type { AIExcelConfig } from '@/types/ai'
 
 // 响应式数据
 const activeTab = ref('config')
 
+// AI配置数据
+const aiConfig = reactive<AIExcelConfig>({
+  modelType: 'deepseek',
+  confidenceThreshold: 0.8,
+  autoMatchStrategy: 'smart',
+  enableFallback: true,
+  maxRetries: 3,
+  temperature: 0.1,
+  maxTokens: 2000,
+  timeout: 30
+})
+
 // 方法
 const handleTabChange = (tabName: string) => {
   console.log('切换到标签页:', tabName)
+}
+
+const handleConfigUpdate = (newConfig: AIExcelConfig) => {
+  Object.assign(aiConfig, newConfig)
+  console.log('配置已更新:', newConfig)
+}
+
+const handleConfigChange = (newConfig: AIExcelConfig) => {
+  console.log('配置发生变化:', newConfig)
 }
 </script>
 

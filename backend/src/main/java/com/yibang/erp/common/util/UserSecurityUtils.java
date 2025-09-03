@@ -1,10 +1,12 @@
 package com.yibang.erp.common.util;
 
 import cn.hutool.json.JSONObject;
+import com.yibang.erp.domain.service.UserService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 
 public class UserSecurityUtils {
+
 
     public static String getCurrentUsername() {
         UserDetails userDetails=((UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal());
@@ -16,11 +18,16 @@ public class UserSecurityUtils {
         try {
             // 从JWT token中解析用户ID
             String username = getCurrentUsername();
+            UserService userService = SpringUtils.getBean(UserService.class);
+
+            return  userService.getUserByUsername(username).getId();
+
+
+
             // 这里需要根据实际的用户ID获取方式来实现
             // 暂时返回默认值，实际项目中应该从数据库或JWT中获取
-            return 1L;
         } catch (Exception e) {
-            return 1L; // 默认用户ID
+            return null; // 默认用户ID
         }
     }
 
@@ -51,4 +58,8 @@ public class UserSecurityUtils {
                 stream().anyMatch(x->x.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
         return isAdmin;
     }
+
+
+
+
 }
