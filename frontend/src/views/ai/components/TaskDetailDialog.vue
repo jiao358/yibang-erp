@@ -155,10 +155,10 @@
                   查看结果
                 </el-button>
                 
+                <!-- 隐藏重新处理按钮 -->
                 <el-button 
-                  v-if="canRetry(taskDetail.status)"
-                  type="success" 
-                  @click="retryTask"
+                  v-if="false"
+                  type="success"
                 >
                   <el-icon><Refresh /></el-icon>
                   重新处理

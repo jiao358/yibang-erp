@@ -350,8 +350,8 @@ public class WorkspaceServiceImpl implements WorkspaceService {
         
         try {
             QueryWrapper<Order> wrapper = new QueryWrapper<>();
-            wrapper.eq("sales_user_id", userId);
-            wrapper.eq("sales_company_id", companyId);
+            wrapper.eq("sales_id", userId);
+//            wrapper.eq("sales_company_id", companyId);
             wrapper.eq("deleted", false);
             wrapper.orderByDesc("created_at");
             wrapper.last("LIMIT " + limit);

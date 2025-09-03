@@ -92,7 +92,9 @@ public class AIExcelFieldRecognitionServiceImpl implements AIExcelFieldRecogniti
             // 如果AI识别失败，使用规则识别作为备选
             if (aiResult == null) {
                 log.warn("AI行字段识别失败，使用规则识别作为备选");
-                return fallbackRuleBasedRowRecognition(rowData);
+                //不用备用的选择
+                return aiResult;
+//                return fallbackRuleBasedRowRecognition(rowData);
             }
             
             return aiResult;

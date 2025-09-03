@@ -757,6 +757,13 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
             // AI字段识别和映射
             List<AIExcelRowData> recognizedDataList = recognizeFields(rowDataList, taskId);
 
+            if(CollectionUtils.isEmpty(recognizedDataList) && CollectionUtils.isNotEmpty(rowDataList)){
+                //还得更新 detail
+
+                updateTaskFinalProgress(taskId, rowDataList.size(), Integer.valueOf(0), 0, rowDataList.size(), 0);
+                updateTaskStatus(taskId, "FAILED", "处理失败: " + "AI映射字段失败");
+                return;
+            }
             // 数据验证和商品匹配
             List<ProcessedRowData> processedDataList = processAndValidateData(recognizedDataList, request, taskId);
 
@@ -883,7 +890,9 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 AIExcelRowData.RecognizedFields fields = fieldRecognitionService.recognizeRowFields(rowData);
                 rowData.setRecognizedFields(fields);
 
-                double confidence = fields.getAiConfidence();
+                Double confidence = fields.getAiConfidence();
+
+
                 //先匹配AI返回的置信度，如果没有 则进行规则匹配计算
                 if(fields.getAiConfidence() ==null || fields.getAiConfidence()==0){
                     // 计算置信度

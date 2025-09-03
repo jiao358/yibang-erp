@@ -117,15 +117,15 @@
         <div class="auto-processing-notice">
           <div class="notice-icon">
             <el-icon size="48" color="#409eff"><Loading /></el-icon>
-          </div>
+      </div>
           <div class="notice-content">
             <h3>AI处理已启动</h3>
             <p>系统正在后台处理您的Excel文件，请稍候...</p>
             <div class="countdown">
               <span>弹窗将在 {{ countdownSeconds }} 秒后自动关闭</span>
-            </div>
-          </div>
-        </div>
+      </div>
+      </div>
+      </div>
       </el-dialog>
     </div>
   </div>
@@ -141,7 +141,7 @@ import TaskTable from './components/TaskTable.vue'
 import TaskDetailDialog from './components/TaskDetailDialog.vue'
 import FileUpload from './components/FileUpload.vue'
 // AI配置已移至管理员页面
-import ProcessingProgress from './components/ProcessingProgress.vue'
+// import ProcessingProgress from './components/ProcessingProgress.vue'
 import { aiExcelImportApi } from '@/api/aiExcelImport'
 import type { 
   ProcessingProgress as ProcessingProgressType, 
@@ -162,6 +162,8 @@ const detailDialogVisible = ref(false)
 const selectedTask = ref<TaskHistoryItem | null>(null)
 const devMode = ref(false) // 新增开发模式开关
 const countdownSeconds = ref(5) // 倒计时秒数
+// 前端缓存任务持久化键名
+const CACHED_TASKS_KEY = 'aiExcelCachedTasks'
 
 // 统计数据
 const statistics = ref({
@@ -258,7 +260,7 @@ const handleFileSelected = (file: File) => {
   ElMessage.success(`已选择文件: ${file.name}`)
 }
 
-const handleUploadSuccess = (response: any) => {
+const handleUploadSuccess = (_response: any) => {
   ElMessage.success('文件上传成功')
 }
 
@@ -292,6 +294,10 @@ const startProcessing = async () => {
     showUploadDialog.value = false
     showProgressDialog.value = true
     processingStatus.value = 'PROCESSING'
+    // 立即启动5秒倒计时，不等待后端响应
+    if (!countdownInterval) {
+      startCountdown()
+    }
     
     // 创建FormData对象
     const formData = new FormData()
@@ -317,12 +323,13 @@ const startProcessing = async () => {
       
       taskHistory.value.unshift(cachedTask)
       totalTasks.value++
+      // 持久化缓存任务，刷新后恢复
+      persistCachedTask(cachedTask)
       
       console.log('📋 当前任务列表长度:', taskHistory.value.length)
       console.log('📋 任务列表内容:', taskHistory.value)
       
-      // 启动倒计时，5秒后自动关闭弹窗
-      startCountdown()
+      // 倒计时已在点击开始时启动，这里不再重复启动
       // 后台开始进度轮询
       startProgressPolling(response.taskId)
     } else {
@@ -342,7 +349,6 @@ let countdownInterval: NodeJS.Timeout | null = null
 
 // 进度轮询相关
 let progressInterval: NodeJS.Timeout | null = null
-let currentTaskId: string | null = null
 
 // 启动倒计时
 const startCountdown = () => {
@@ -392,7 +398,6 @@ const createCachedTask = (taskId: string, file: File): TaskHistoryItem => {
 }
 
 const startProgressPolling = (taskId: string) => {
-  currentTaskId = taskId
   progressInterval = setInterval(async () => {
     try {
       const response = await aiExcelImportApi.getProgress(taskId)
@@ -424,20 +429,45 @@ const clearProgressPolling = () => {
   clearCountdown()
 }
 
-const handleCancelProcessing = async () => {
-  if (!currentTaskId) return
-  
+// 缓存任务持久化：读/写/删/恢复
+function loadCachedTasks(): TaskHistoryItem[] {
   try {
-    await aiExcelImportApi.cancelProcessing(currentTaskId)
-    clearProgressPolling()
-    processingStatus.value = 'CANCELLED'
-    ElMessage.info('处理已取消')
-  } catch (error: any) {
-    ElMessage.error(`取消处理失败: ${error.message || '未知错误'}`)
+    const raw = localStorage.getItem(CACHED_TASKS_KEY)
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
   }
 }
 
+function persistCachedTask(task: TaskHistoryItem) {
+  const arr = loadCachedTasks()
+  const idx = arr.findIndex((t: TaskHistoryItem) => t.taskId === task.taskId)
+  if (idx >= 0) arr[idx] = task; else arr.unshift(task)
+  localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(arr))
+}
+
+function removeCachedTask(taskId: string) {
+  const arr = loadCachedTasks().filter(t => t.taskId !== taskId)
+  localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(arr))
+}
+
+function restoreCachedTasks() {
+  const cached = loadCachedTasks()
+  if (!cached.length) return
+  const existingIds = new Set(taskHistory.value.map(t => t.taskId))
+  const toAdd = cached.filter(t => !existingIds.has(t.taskId))
+  if (toAdd.length) {
+    taskHistory.value.unshift(...toAdd)
+  }
+}
+
+// 预留：取消处理（当前未在UI中挂载）
+// 取消处理能力如需启用，可在UI中挂载后再恢复实现
+
 // 加载统计数据
+// 统计加载（在刷新任务历史时并行调用）
 const loadStatistics = async () => {
   try {
     console.log('📊 开始加载统计数据...')
@@ -493,14 +523,13 @@ const loadTaskHistory = async () => {
     
     console.log('🔐 Token验证通过，开始请求API...')
     
-    // 同时加载任务历史和统计数据
-    const [taskResponse, statsResponse] = await Promise.all([
-      aiExcelImportApi.getTaskHistory({
-        page: 1,
-        size: 1000
-      }),
-      loadStatistics()
-    ])
+    // 加载任务历史
+    const taskResponse = await aiExcelImportApi.getTaskHistory({
+      page: 1,
+      size: 1000
+    })
+    // 同步刷新统计
+    await loadStatistics()
     
     const response = taskResponse
     
@@ -516,6 +545,8 @@ const loadTaskHistory = async () => {
           if (realTask) {
             // 找到真实任务，替换并显示成功消息
             ElMessage.success(`任务 ${realTask.fileName} 已开始处理！`)
+            // 从本地持久化缓存移除
+            removeCachedTask(realTask.taskId)
             return realTask
           }
           // 没找到真实任务，保留缓存任务
@@ -757,15 +788,15 @@ const exportTasks = () => {
   ElMessage.info('导出功能开发中...')
 }
 
-const viewTaskResults = (taskId: string) => {
+const viewTaskResults = (_taskId: string) => {
   ElMessage.info('查看结果功能开发中...')
 }
 
-const downloadResults = (taskId: string) => {
+const downloadResults = (_taskId: string) => {
   ElMessage.info('下载结果功能开发中...')
 }
 
-const viewLogs = (taskId: string) => {
+const viewLogs = (_taskId: string) => {
   ElMessage.info('查看日志功能开发中...')
 }
 
@@ -845,6 +876,8 @@ watch(detailDialogVisible, (newValue) => {
 // 生命周期
 onMounted(() => {
   console.log('🚀 AIExcelImport 主页面已挂载')
+  // 恢复本地缓存任务，优先显示
+  restoreCachedTasks()
   loadTaskHistory()
 })
 
@@ -869,6 +902,8 @@ const handleDevModeChange = (value: boolean) => {
     ElMessage.info('已切换到开发模式，当前使用模拟数据')
   } else {
     console.log('切换到生产模式，使用真实API')
+    // 同步恢复本地缓存任务
+    restoreCachedTasks()
     loadTaskHistory()
   }
 }

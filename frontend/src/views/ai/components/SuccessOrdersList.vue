@@ -46,9 +46,9 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="amount" label="金额" width="120" align="right">
+        <el-table-column label="金额" width="140" align="right">
           <template #default="{ row }">
-            <span class="amount">¥{{ formatAmount(row.amount) }}</span>
+            <span class="amount">¥{{ formatAmount(computeAmount(row)) }}</span>
           </template>
         </el-table-column>
         
@@ -111,7 +111,7 @@
           <el-descriptions-item label="客户名称">{{ selectedOrder.customerName }}</el-descriptions-item>
           <el-descriptions-item label="产品名称">{{ selectedOrder.productName }}</el-descriptions-item>
           <el-descriptions-item label="数量">{{ selectedOrder.quantity }}</el-descriptions-item>
-          <el-descriptions-item label="金额">¥{{ formatAmount(selectedOrder.amount) }}</el-descriptions-item>
+          <el-descriptions-item label="金额">¥{{ formatAmount(computeAmount(selectedOrder)) }}</el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag :type="getStatusTagType(selectedOrder.status)">
               {{ getStatusText(selectedOrder.status) }}
@@ -205,9 +205,17 @@ const viewOrder = (order: any) => {
   emit('viewOrder', order.orderId)
 }
 
+// 计算金额：quantity * unitPrice（后端未提供时默认0）
+const computeAmount = (row: any) => {
+  const qty = Number(row?.quantity ?? 0)
+  const unit = Number(row?.unitPrice ?? 0)
+  return qty * unit
+}
+
 // 格式化金额
 const formatAmount = (amount: number) => {
-  return amount ? amount.toFixed(2) : '0.00'
+  const num = Number(amount) || 0
+  return num.toFixed(2)
 }
 
 // 格式化时间

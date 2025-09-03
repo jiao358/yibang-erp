@@ -13,7 +13,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import java.time.Duration;
 
@@ -64,8 +66,18 @@ public class DeepSeekClient {
             .retrieve()
             .bodyToMono(DeepSeekChatResponse.class)
 //            .timeout(Duration.ofMillis(aiConfig.getTimeout()))
-                .timeout(Duration.ofMillis(30000*24L))
-            .doOnError(error -> log.error("DeepSeek API调用失败: {}", error.getMessage()))
+                .timeout(Duration.ofMillis(30000*24L)).retryWhen(Retry.backoff(3, Duration.ofSeconds(3)))
+
+                        .doOnError(error ->{
+                            log.error("DeepSeek API调用失败: {}", error.getMessage());
+                            if (error instanceof WebClientRequestException) {
+                                log.error("网络连接失败，请检查网络配置和DNS: {}", error.getMessage());
+                            } else {
+                                log.error("DeepSeek API调用失败: {}", error.getMessage());
+                            }
+
+
+                        } )
             .doOnSuccess(response -> log.info("DeepSeek API调用成功，模型: {}", response.getModel()));
     }
     
