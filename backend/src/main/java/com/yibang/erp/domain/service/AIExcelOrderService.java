@@ -48,11 +48,14 @@ public interface AIExcelOrderService {
      * 获取用户任务列表
      * @param userId 用户ID
      * @param status 任务状态（可选）
+     * @param fileName 文件名搜索（可选）
+     * @param startDate 开始日期（可选）
+     * @param endDate 结束日期（可选）
      * @param page 页码
      * @param size 每页大小
      * @return 任务列表响应
      */
-    TaskListResponse getUserTasks(Long userId, String status, Integer page, Integer size);
+    TaskListResponse getUserTasks(Long userId, String status, String fileName, String startDate, String endDate, Integer page, Integer size);
 
     /**
      * 获取任务统计信息

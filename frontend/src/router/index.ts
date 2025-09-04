@@ -108,7 +108,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '数字大屏',
           requiresAuth: true,
-          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN', 'SUPPLIER_OPERATOR', 'SALES']
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN']
         }
       },
       {

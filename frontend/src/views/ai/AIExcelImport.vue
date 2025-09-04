@@ -31,7 +31,13 @@
         @view-all="scrollToTable"
       />
 
-      <!-- 任务列表 - 提前显示，减少用户滚动 -->
+      <!-- 任务筛选 -->
+      <TaskFilter 
+        v-model="filterForm"
+        @filter-change="handleFilterChange"
+      />
+
+      <!-- 任务列表 -->
       <div class="task-section">
         <div class="section-header">
           <h3>任务列表</h3>
@@ -47,20 +53,18 @@
           :tasks="filteredTasks"
           :loading="loading"
           :total-tasks="totalTasks"
+          :current-page="currentPage"
+          :page-size="pageSize"
           @refresh="loadTaskHistory"
           @export="exportTasks"
           @view-detail="viewTaskDetail"
           @retry-task="retryTask"
           @delete-task="deleteTask"
           @selection-change="handleSelectionChange"
+          @page-change="handlePageChange"
+          @size-change="handleSizeChange"
         />
       </div>
-
-      <!-- 任务筛选 - 移到任务列表下方 -->
-      <TaskFilter 
-        v-model="filterForm"
-        @filter-change="handleFilterChange"
-      />
 
       <!-- 任务详情弹窗 -->
       <TaskDetailDialog 
@@ -173,85 +177,22 @@ const statistics = ref({
   failedTasks: 0
 })
 
-// 筛选表单
+// 筛选表单（移除排序与高级选项）
 const filterForm = reactive<TaskFilterForm>({
   status: '',
   dateRange: [],
-  fileName: '',
-  sortBy: 'createdAt',
-  minRows: undefined,
-  maxRows: undefined,
-  successRate: '',
-  processingDuration: ''
+  fileName: ''
 })
+
+// 分页参数
+const currentPage = ref(1)
+const pageSize = ref(20)
 
 // AI配置已移至管理员页面，使用默认配置
 
-// 计算属性
+// 计算属性 - 直接使用taskHistory，不再前端筛选
 const filteredTasks = computed(() => {
-  let tasks = [...taskHistory.value]
-  
-  // 状态筛选
-  if (filterForm.status) {
-    tasks = tasks.filter(task => task.status === filterForm.status)
-  }
-  
-  // 文件名筛选
-  if (filterForm.fileName) {
-    tasks = tasks.filter(task => 
-      task.fileName.toLowerCase().includes(filterForm.fileName.toLowerCase())
-    )
-  }
-  
-  // 时间范围筛选
-  if (filterForm.dateRange && filterForm.dateRange.length === 2) {
-    const [startDate, endDate] = filterForm.dateRange
-    tasks = tasks.filter(task => {
-      const taskDate = new Date(task.createdAt)
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-      return taskDate >= start && taskDate <= end
-    })
-  }
-  
-  // 行数筛选 - 缓存任务不受行数筛选影响
-  if (filterForm.minRows !== undefined) {
-    tasks = tasks.filter(task => task.isCached || task.totalRows >= filterForm.minRows!)
-  }
-  if (filterForm.maxRows !== undefined) {
-    tasks = tasks.filter(task => task.isCached || task.totalRows <= filterForm.maxRows!)
-  }
-  
-  // 成功率筛选 - 缓存任务不受成功率筛选影响
-  if (filterForm.successRate) {
-    const rate = parseInt(filterForm.successRate.replace('+', ''))
-    tasks = tasks.filter(task => {
-      if (task.isCached) return true // 缓存任务始终显示
-      const successRate = (task.successRows / task.totalRows) * 100
-      return successRate >= rate
-    })
-  }
-  
-  // 排序 - 缓存任务始终排在前面
-  tasks.sort((a, b) => {
-    // 缓存任务优先显示
-    if (a.isCached && !b.isCached) return -1
-    if (!a.isCached && b.isCached) return 1
-    
-    switch (filterForm.sortBy) {
-      case 'fileName':
-        return a.fileName.localeCompare(b.fileName)
-      case 'status':
-        return a.status.localeCompare(b.status)
-      case 'processingTime':
-        return (a.processingTime || 0) - (b.processingTime || 0)
-      case 'createdAt':
-      default:
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    }
-  })
-  
-  return tasks
+  return taskHistory.value
 })
 
 // 事件处理
@@ -272,11 +213,27 @@ const handleUploadError = (error: string) => {
 
 const handleFilterChange = (filters: TaskFilterForm) => {
   console.log('筛选条件已更新:', filters)
-  // 可以在这里添加额外的筛选逻辑
+  // 更新本地筛选表单
+  Object.assign(filterForm, filters)
+  // 重置到第一页并重新加载
+  currentPage.value = 1
+  loadTaskHistory()
 }
 
 const handleSelectionChange = (selectedTasks: TaskHistoryItem[]) => {
   console.log('选中的任务:', selectedTasks)
+}
+
+// 分页处理
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  loadTaskHistory()
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  loadTaskHistory()
 }
 
 const handleCloseUploadDialog = () => {
@@ -448,10 +405,6 @@ function persistCachedTask(task: TaskHistoryItem) {
   localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(arr))
 }
 
-function removeCachedTask(taskId: string) {
-  const arr = loadCachedTasks().filter(t => t.taskId !== taskId)
-  localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(arr))
-}
 
 function restoreCachedTasks() {
   const cached = loadCachedTasks()
@@ -522,14 +475,22 @@ const loadTaskHistory = async () => {
     }
     
     console.log('🔐 Token验证通过，开始请求API...')
+    console.log('📋 当前筛选条件:', filterForm)
     
-    // 加载任务历史
-    const taskResponse = await aiExcelImportApi.getTaskHistory({
-      page: 1,
-      size: 1000
-    })
-    // 同步刷新统计
-    await loadStatistics()
+    // 构建请求参数
+    const requestParams = {
+      page: currentPage.value,
+      size: pageSize.value,
+      status: filterForm.status || undefined,
+      fileName: filterForm.fileName || undefined,
+      startDate: filterForm.dateRange && filterForm.dateRange.length > 0 ? filterForm.dateRange[0] : undefined,
+      endDate: filterForm.dateRange && filterForm.dateRange.length > 1 ? filterForm.dateRange[1] : undefined
+    }
+    
+    console.log('🚀 API请求参数:', requestParams)
+    
+    // 加载任务历史 - 使用筛选条件和分页
+    const taskResponse = await aiExcelImportApi.getTaskHistory(requestParams)
     
     const response = taskResponse
     
@@ -538,38 +499,16 @@ const loadTaskHistory = async () => {
     if (response && response.content) {
       const realTasks = response.content
       
-      // 清理缓存任务：找到真实任务的就替换，找不到的就保留
-      taskHistory.value = taskHistory.value.map(task => {
-        if (task.isCached) {
-          const realTask = realTasks.find(real => real.taskId === task.taskId)
-          if (realTask) {
-            // 找到真实任务，替换并显示成功消息
-            ElMessage.success(`任务 ${realTask.fileName} 已开始处理！`)
-            // 从本地持久化缓存移除
-            removeCachedTask(realTask.taskId)
-            return realTask
-          }
-          // 没找到真实任务，保留缓存任务
-          return task
-        }
-        return task
-      })
+      // 直接使用API返回的任务列表
+      taskHistory.value = realTasks
       
-      // 添加新的真实任务（避免重复）
-      const existingTaskIds = new Set(taskHistory.value.map(task => task.taskId))
-      const newTasks = realTasks.filter(task => !existingTaskIds.has(task.taskId))
-      taskHistory.value.unshift(...newTasks)
-      
+      // 更新总数
       totalTasks.value = response.totalElements || 0
-      console.log(`✅ 成功加载 ${taskHistory.value.length} 个任务，清理了缓存任务`)
+      
+      console.log('✅ 任务历史加载完成，总数:', totalTasks.value)
     } else {
-      console.warn('⚠️ API响应数据格式异常:', response)
-      // 保留缓存任务，不清空
-      if (taskHistory.value.length === 0) {
-        taskHistory.value = []
-        totalTasks.value = 0
-        ElMessage.warning('任务数据格式异常，已显示空列表')
-      }
+      console.warn('⚠️ API响应格式异常:', response)
+      ElMessage.warning('获取任务列表失败')
     }
   } catch (error: any) {
     console.error('❌ 加载任务历史失败:', error)
@@ -874,11 +813,14 @@ watch(detailDialogVisible, (newValue) => {
 })
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
   console.log('🚀 AIExcelImport 主页面已挂载')
   // 恢复本地缓存任务，优先显示
   restoreCachedTasks()
-  loadTaskHistory()
+  // 加载统计信息（只在页面初始化时调用）
+  await loadStatistics()
+  // 加载任务历史
+  await loadTaskHistory()
 })
 
 onUnmounted(() => {

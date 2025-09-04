@@ -109,7 +109,7 @@
           </el-menu-item>
         </el-sub-menu>
         
-        <el-menu-item index="/digital-screen">
+        <el-menu-item index="/digital-screen" v-if="hasDigitalScreenPermission">
           <el-icon><DataBoard /></el-icon>
           <span>数字大屏</span>
         </el-menu-item>
@@ -312,6 +312,20 @@ const hasInventoryPermission = computed(() => {
 
 // 检查是否有价格管理权限（系统管理员或供应链管理员）
 const hasPricingPermission = computed(() => {
+  const userRoles = localStorage.getItem('userRoles')
+  if (userRoles) {
+    try {
+      const roles = JSON.parse(userRoles)
+      return roles.includes('SYSTEM_ADMIN') || roles.includes('SUPPLIER_ADMIN')
+    } catch {
+      return false
+    }
+  }
+  return false
+})
+
+// 数字大屏权限（仅系统管理员或供应链管理员可见）
+const hasDigitalScreenPermission = computed(() => {
   const userRoles = localStorage.getItem('userRoles')
   if (userRoles) {
     try {

@@ -24,7 +24,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -200,9 +199,10 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
     }
 
     @Override
-    public TaskListResponse getUserTasks(Long userId, String status, Integer page, Integer size) {
+    public TaskListResponse getUserTasks(Long userId, String status, String fileName, String startDate, String endDate, Integer page, Integer size) {
         try {
-            log.info("查询用户任务列表，用户ID: {}, 状态: {}, 页码: {}, 大小: {}", userId, status, page, size);
+            log.info("查询用户任务列表，用户ID: {}, 状态: {}, 文件名: {}, 开始日期: {}, 结束日期: {}, 页码: {}, 大小: {}", 
+                    userId, status, fileName, startDate, endDate, page, size);
             
             // 构建查询条件
             QueryWrapper<AIExcelProcessTask> queryWrapper = new QueryWrapper<>();
@@ -215,18 +215,47 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 queryWrapper.eq("task_status", status);
             }
             
+            // 根据文件名搜索
+            if (fileName != null && !fileName.trim().isEmpty()) {
+                queryWrapper.like("file_name", fileName.trim());
+            }
+            
+            // 根据日期范围筛选
+            if (startDate != null && !startDate.trim().isEmpty()) {
+                queryWrapper.ge("created_at", startDate.trim() + " 00:00:00");
+            }
+            if (endDate != null && !endDate.trim().isEmpty()) {
+                queryWrapper.le("created_at", endDate.trim() + " 23:59:59");
+            }
+            
             // 只查询未删除的任务
             queryWrapper.eq("deleted", false);
             
             // 按创建时间倒序排列
             queryWrapper.orderByDesc("created_at");
             
-            // 执行分页查询
-            Page<AIExcelProcessTask> pageParam = new Page<>(page, size);
-            Page<AIExcelProcessTask> result = taskRepository.selectPage(pageParam, queryWrapper);
+            // 手动分页实现（参考User模块）
+            long total = taskRepository.selectCount(queryWrapper);
+            
+            if (total == 0) {
+                TaskListResponse emptyResponse = TaskListResponse.success();
+                emptyResponse.setContent(List.of());
+                emptyResponse.setTotalElements(0L);
+                emptyResponse.setTotalPages(0);
+                emptyResponse.setCurrentPage(page);
+                emptyResponse.setSize(size);
+                return emptyResponse;
+            }
+            
+            // 计算分页参数
+            long offset = (page - 1) * size;
+            queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+            
+            // 查询数据
+            List<AIExcelProcessTask> taskList = taskRepository.selectList(queryWrapper);
             
             // 转换为TaskInfo列表
-            List<TaskListResponse.TaskInfo> taskInfos = result.getRecords().stream().map(task -> {
+            List<TaskListResponse.TaskInfo> taskInfos = taskList.stream().map(task -> {
                 TaskListResponse.TaskInfo info = new TaskListResponse.TaskInfo();
                 
                 // 基本任务信息
@@ -267,17 +296,16 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 return info;
             }).collect(Collectors.toList());
 
-            long count = taskRepository.selectCount( queryWrapper);
             // 构建响应
             TaskListResponse response = TaskListResponse.success();
             response.setContent(taskInfos);
-            response.setTotalElements(count);
-            response.setTotalPages((int) result.getPages());
+            response.setTotalElements(total);
+            response.setTotalPages((int) ((total + size - 1) / size));
             response.setCurrentPage(page);
             response.setSize(size);
             
             log.info("查询完成，用户ID: {}, 总任务数: {}, 当前页: {}, 每页大小: {}", 
-                    userId, result.getTotal(), page, size);
+                    userId, total, page, size);
             
             return response;
             
@@ -295,7 +323,11 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
             // 构建基础查询条件
             QueryWrapper<AIExcelProcessTask> baseWrapper = new QueryWrapper<>();
             baseWrapper.eq("deleted", false);
-            
+            Long salesId= UserSecurityUtils.getCurrentUserId();
+            //只能看到自己上传的任务内容
+            baseWrapper.eq("sales_user_id",salesId);
+
+
             // 根据公司ID筛选
             if (companyId != null) {
                 baseWrapper.eq("sales_company_id", companyId);
@@ -331,6 +363,7 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 }
             }
             processingWrapper.eq("task_status", "PROCESSING");
+            processingWrapper.eq("sales_user_id",salesId);
             Long processingTasks = taskRepository.selectCount(processingWrapper);
             
             QueryWrapper<AIExcelProcessTask> completedWrapper = new QueryWrapper<>();
@@ -348,6 +381,7 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 }
             }
             completedWrapper.eq("task_status", "COMPLETED");
+            completedWrapper.eq("sales_user_id",salesId);
             Long completedTasks = taskRepository.selectCount(completedWrapper);
             
             QueryWrapper<AIExcelProcessTask> failedWrapper = new QueryWrapper<>();
@@ -365,14 +399,16 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 }
             }
             failedWrapper.eq("task_status", "FAILED");
+            failedWrapper.eq("sales_user_id",salesId);
             Long failedTasks = taskRepository.selectCount(failedWrapper);
             
-            // 查询今日任务数
+           /* // 查询今日任务数
             QueryWrapper<AIExcelProcessTask> todayWrapper = new QueryWrapper<>();
             todayWrapper.eq("deleted", false);
             if (companyId != null) {
                 todayWrapper.eq("sales_company_id", companyId);
             }
+            todayWrapper.eq("sales_user_id",salesId);
             LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0).withNano(0);
             LocalDateTime todayEnd = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59).withNano(999999999);
             todayWrapper.between("created_at", todayStart, todayEnd);
@@ -387,6 +423,7 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
             LocalDateTime weekStart = LocalDateTime.now().with(DayOfWeek.MONDAY).withHour(0).withMinute(0).withSecond(0).withNano(0);
             LocalDateTime weekEnd = LocalDateTime.now().with(DayOfWeek.SUNDAY).withHour(23).withMinute(59).withSecond(59).withNano(999999999);
             thisWeekWrapper.between("created_at", weekStart, weekEnd);
+
             Long thisWeekTasks = taskRepository.selectCount(thisWeekWrapper);
             
             // 查询本月任务数
@@ -410,9 +447,19 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
             response.setTodayTasks(todayTasks);
             response.setThisWeekTasks(thisWeekTasks);
             response.setThisMonthTasks(thisMonthTasks);
-            
-            log.info("统计完成，总任务数: {}, 处理中: {}, 完成: {}, 失败: {}, 今日: {}, 本周: {}, 本月: {}", 
-                    totalTasks, processingTasks, completedTasks, failedTasks, todayTasks, thisWeekTasks, thisMonthTasks);
+            */
+            TaskStatisticsResponse response = TaskStatisticsResponse.success();
+            response.setTotalTasks(totalTasks);
+            response.setProcessingTasks(processingTasks);
+            response.setCompletedTasks(completedTasks);
+            response.setFailedTasks(failedTasks);
+            response.setTodayTasks(null);
+            response.setThisWeekTasks(null);
+            response.setThisMonthTasks(null);
+
+
+            log.info("统计完成，总任务数: {}, 处理中: {}, 完成: {}, 失败: {}",
+                    totalTasks, processingTasks, completedTasks, failedTasks);
             
             return response;
             

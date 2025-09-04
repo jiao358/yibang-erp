@@ -359,9 +359,4 @@ export interface TaskFilterForm {
   status: string
   dateRange: string[]
   fileName: string
-  sortBy: string
-  minRows?: number
-  maxRows?: number
-  successRate: string
-  processingDuration: string
 }

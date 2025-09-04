@@ -267,6 +267,9 @@ public class AIExcelOrderController {
     @GetMapping("/tasks")
     public ResponseEntity<TaskListResponse> getUserTasks(
             @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "fileName", required = false) String fileName,
+            @RequestParam(value = "startDate", required = false) String startDate,
+            @RequestParam(value = "endDate", required = false) String endDate,
             @RequestParam(value = "page", required = false, defaultValue = "1") Integer page,
             @RequestParam(value = "size", required = false, defaultValue = "20") Integer size,
             @RequestHeader("Authorization") String authorization) {
@@ -280,11 +283,11 @@ public class AIExcelOrderController {
                 return ResponseEntity.badRequest().body(TaskListResponse.error("无法获取当前用户信息"));
             }
             
-            log.info("获取用户任务列表，用户ID: {}, 状态: {}, 页码: {}, 大小: {}", 
-                    currentUserId, status, page, size);
+            log.info("获取用户任务列表，用户ID: {}, 状态: {}, 文件名: {}, 开始日期: {}, 结束日期: {}, 页码: {}, 大小: {}", 
+                    currentUserId, status, fileName, startDate, endDate, page, size);
             
             // 调用服务层获取真实任务列表
-            TaskListResponse response = aiExcelOrderService.getUserTasks(currentUserId, status, page, size);
+            TaskListResponse response = aiExcelOrderService.getUserTasks(currentUserId, status, fileName, startDate, endDate, page, size);
             
             log.info("返回任务列表: 总数={}, 当前页={}, 每页大小={}, 筛选状态={}", 
                     response.getTotalElements(), response.getCurrentPage(), response.getSize(), status);

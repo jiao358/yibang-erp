@@ -69,6 +69,7 @@ export const aiExcelImportApi = {
     page?: number
     size?: number
     status?: string
+    fileName?: string
     startDate?: string
     endDate?: string
   }) => {

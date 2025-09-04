@@ -19,7 +19,7 @@
       
       <!-- 任务列表表格 -->
       <el-table 
-        :data="tasks" 
+        :data="paginatedTasks" 
         style="width: 100%"
         v-loading="loading"
         stripe
@@ -161,10 +161,10 @@
       <!-- 分页 -->
       <div class="pagination-container">
         <el-pagination
-          v-model:current-page="currentPage"
-          v-model:page-size="pageSize"
+          v-model:current-page="props.currentPage"
+          v-model:page-size="props.pageSize"
           :page-sizes="[10, 20, 50, 100]"
-          :total="totalTasks"
+          :total="props.totalTasks"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
@@ -189,11 +189,15 @@ interface Props {
   tasks: TaskHistoryItem[]
   loading?: boolean
   totalTasks?: number
+  currentPage?: number
+  pageSize?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
-  totalTasks: 0
+  totalTasks: 0,
+  currentPage: 1,
+  pageSize: 20
 })
 
 // Emits
@@ -204,18 +208,16 @@ const emit = defineEmits<{
   retryTask: [taskId: string]
   deleteTask: [taskId: string]
   selectionChange: [selectedTasks: TaskHistoryItem[]]
+  pageChange: [page: number]
+  sizeChange: [size: number]
 }>()
 
 // 响应式数据
-const currentPage = ref(1)
-const pageSize = ref(20)
 const selectedTasks = ref<TaskHistoryItem[]>([])
 
-// 计算属性
+// 计算属性 - 直接使用props中的分页参数
 const paginatedTasks = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return props.tasks.slice(start, end)
+  return props.tasks
 })
 
 // 方法
@@ -364,12 +366,11 @@ const handleSelectionChange = (selection: TaskHistoryItem[]) => {
 }
 
 const handleSizeChange = (size: number) => {
-  pageSize.value = size
-  currentPage.value = 1
+  emit('sizeChange', size)
 }
 
 const handleCurrentChange = (page: number) => {
-  currentPage.value = page
+  emit('pageChange', page)
 }
 </script>
 
