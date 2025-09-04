@@ -248,12 +248,7 @@
                   >
                     确认订单
                   </el-dropdown-item>
-                  <el-dropdown-item
-                    v-if="canShip(row)"
-                    :command="{ action: 'ship', order: row }"
-                  >
-                    发货
-                  </el-dropdown-item>
+                  <!-- 移除销售侧发货入口，避免与供应商发货重复 -->
                   
                   <!-- 供应链用户操作 -->
                   <el-dropdown-item
@@ -535,12 +530,57 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 供应商发货对话框 -->
+    <el-dialog
+      v-model="shipDialogVisible"
+      title="供应商发货"
+      width="600px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="shipFormRef"
+        :model="shipForm"
+        :rules="shipRules"
+        label-width="120px"
+      >
+        <el-form-item label="发货仓库" prop="warehouseId">
+          <el-select v-model="shipForm.warehouseId" placeholder="请选择发货仓库" style="width: 100%" :loading="warehouseLoading">
+            <el-option
+              v-for="w in warehouseList"
+              :key="w.id"
+              :label="`${w.warehouseName} (${w.warehouseCode})`"
+              :value="w.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="物流单号" prop="trackingNumber">
+          <el-input v-model="shipForm.trackingNumber" placeholder="请输入物流单号" />
+        </el-form-item>
+        <el-form-item label="物流公司" prop="carrier">
+          <el-input v-model="shipForm.carrier" placeholder="请输入物流公司" />
+        </el-form-item>
+        <el-form-item label="发货方式">
+          <el-input v-model="shipForm.shippingMethod" placeholder="可选，填写发货方式" />
+        </el-form-item>
+        <el-form-item label="发货备注">
+          <el-input v-model="shipForm.shippingNotes" type="textarea" :rows="2" placeholder="可选，填写发货备注" />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="shipDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="shipSubmitting" @click="submitShipForm">确认发货</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Upload, Search, Refresh, ArrowDown, Warning, Download, UploadFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import OrderDialog from './components/OrderDialog.vue'
@@ -602,6 +642,24 @@ const importLoading = ref(false)
 // 仓库相关状态
 const warehouseList = ref<Warehouse[]>([])
 const warehouseLoading = ref(false)
+
+// 供应商发货对话框
+const shipDialogVisible = ref(false)
+const shipSubmitting = ref(false)
+const currentShipOrder = ref<OrderResponse | null>(null)
+const shipFormRef = ref<FormInstance>()
+const shipForm = reactive({
+  warehouseId: undefined as number | undefined,
+  trackingNumber: '',
+  carrier: '',
+  shippingMethod: '',
+  shippingNotes: ''
+})
+const shipRules: FormRules = {
+  warehouseId: [{ required: true, message: '发货仓库不能为空', trigger: 'change' }],
+  trackingNumber: [{ required: true, message: '物流单号不能为空', trigger: 'blur' }],
+  carrier: [{ required: true, message: '物流公司不能为空', trigger: 'blur' }]
+}
 
 // 搜索表单
 const searchForm = reactive<OrderListRequest>({
@@ -679,6 +737,34 @@ const confirmExport = async () => {
   } catch (error) {
     console.error('导出失败:', error)
     ElMessage.error('导出失败')
+  }
+}
+
+// 提交供应商发货
+const submitShipForm = async () => {
+  if (!shipFormRef.value || !currentShipOrder.value) return
+  try {
+    await shipFormRef.value.validate()
+    shipSubmitting.value = true
+    await orderApi.supplierShipOrder(currentShipOrder.value.id, {
+      warehouseId: shipForm.warehouseId as number,
+      warehouseName: (warehouseList.value.find(w => w.id === shipForm.warehouseId)?.warehouseName) || '',
+      trackingNumber: shipForm.trackingNumber.trim(),
+      carrier: shipForm.carrier.trim(),
+      shippingMethod: shipForm.shippingMethod || '',
+      shippingNotes: shipForm.shippingNotes || '',
+      operatorId: getCurrentUserId(),
+      operatorName: getCurrentUserName(),
+      operatorRole: getUserRole()
+    })
+    ElMessage.success('供应商发货成功')
+    shipDialogVisible.value = false
+    await loadOrderList()
+  } catch (e) {
+    // 验证失败或请求失败
+    ElMessage.success('供应商发货异常'+ e)
+  } finally {
+    shipSubmitting.value = false
   }
 }
 
@@ -1073,97 +1159,21 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
         break
       case 'supplierShip':
         try {
-          // 使用Element Plus原生样式的自定义对话框
-          const result = await ElMessageBox({
-            title: '供应商发货',
-            customClass: 'ship-dialog',
-            message: `
-              <div style="padding: 20px; width: 500px;">
-                <div style="margin-bottom: 20px;">
-                  <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266;">发货仓库 <span style="color: #f56c6c;">*</span></label>
-                  <select id="warehouseId" style="width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; box-sizing: border-box;">
-                    <option value="">请选择发货仓库</option>
-                    ${warehouseList.value.map(warehouse => 
-                      `<option value="${warehouse.id}">${warehouse.warehouseName} (${warehouse.warehouseCode})</option>`
-                    ).join('')}
-                  </select>
-                </div>
-                <div style="margin-bottom: 20px;">
-                  <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266;">物流单号 <span style="color: #f56c6c;">*</span></label>
-                  <input id="trackingNumber" type="text" placeholder="请输入物流单号" style="width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; box-sizing: border-box;" />
-                </div>
-                <div>
-                  <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266;">物流公司 <span style="color: #f56c6c;">*</span></label>
-                  <input id="carrier" type="text" placeholder="请输入物流公司" style="width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; box-sizing: border-box;" />
-                </div>
-              </div>
-            `,
-            dangerouslyUseHTMLString: true,
-            showCancelButton: true,
-            confirmButtonText: '确认发货',
-            cancelButtonText: '取消',
-            beforeClose: (action, instance, done) => {
-              if (action === 'confirm') {
-                const warehouseSelect = document.getElementById('warehouseId') as HTMLSelectElement
-                const trackingNumberInput = document.getElementById('trackingNumber') as HTMLInputElement
-                const carrierInput = document.getElementById('carrier') as HTMLInputElement
-                
-                if (!warehouseSelect || !trackingNumberInput || !carrierInput) {
-                  ElMessage.error('获取输入框失败')
-                  return
-                }
-                
-                const warehouseId = warehouseSelect.value
-                const trackingNumber = trackingNumberInput.value.trim()
-                const carrier = carrierInput.value.trim()
-                
-                if (!warehouseId) {
-                  ElMessage.error('发货仓库不能为空')
-                  return
-                }
-                if (!trackingNumber) {
-                  ElMessage.error('物流单号不能为空')
-                  return
-                }
-                if (!carrier) {
-                  ElMessage.error('物流公司不能为空')
-                  return
-                }
-                
-                instance.confirmButtonLoading = true
-                instance.confirmButtonText = '发货中...'
-                
-                // 获取选中的仓库信息
-                const selectedWarehouse = warehouseList.value.find(w => w.id.toString() === warehouseId)
-                
-                ;(instance as any).warehouseId = parseInt(warehouseId)
-                ;(instance as any).warehouseName = selectedWarehouse?.warehouseName || ''
-                ;(instance as any).trackingNumber = trackingNumber
-                ;(instance as any).carrier = carrier
-                done()
-              } else {
-                done()
-              }
-            }
-          })
-          
-          await orderApi.supplierShipOrder(order.id, {
-            warehouseId: (result as any).warehouseId,
-            warehouseName: (result as any).warehouseName,
-            trackingNumber: (result as any).trackingNumber,
-            carrier: (result as any).carrier,
-            shippingMethod: '',
-            shippingNotes: '',
-            operatorId: getCurrentUserId(),
-            operatorName: getCurrentUserName(),
-            operatorRole: getUserRole()
-          })
-          ElMessage.success('供应商发货成功')
-        } catch (error) {
-          if (error === 'cancel') {
-            return // 用户取消，不显示错误信息
+          currentShipOrder.value = order
+          if (warehouseList.value.length === 0) {
+            await loadWarehouseList()
           }
-          throw error // 重新抛出其他错误
+          // 重置表单
+          Object.assign(shipForm, {
+            warehouseId: undefined,
+            trackingNumber: '',
+            carrier: '',
+            shippingMethod: '',
+            shippingNotes: ''
+          })
+          shipDialogVisible.value = true
+        } catch (error) {
+          console.error('打开发货对话框失败:', error)
         }
         break
       case 'supplierReject':
@@ -1498,10 +1508,8 @@ const canConfirm = (order: OrderResponse) => {
   return isSalesUser() && order.orderStatus === 'SUBMITTED'
 }
 
-const canShip = (order: OrderResponse) => {
-  // 只有销售用户且订单状态为供应商确认时才能发货
-  return isSalesUser() && order.orderStatus === 'SUPPLIER_CONFIRMED'
-}
+// 已废弃：销售侧发货入口已移除
+const canShip = (_order: OrderResponse) => false
 
 // 状态标签类型
 const getStatusTagType = (status: string) => {

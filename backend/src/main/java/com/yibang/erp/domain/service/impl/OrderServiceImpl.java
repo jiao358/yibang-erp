@@ -401,18 +401,31 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         
         queryWrapper.orderByDesc("created_at");
 
-        // 执行分页查询
-        Page<Order> page = new Page<>(request.getCurrent(), request.getSize());
-        Page<Order> orderPage = orderRepository.selectPage(page, queryWrapper);
-        long count= orderRepository.selectCount(queryWrapper);
-        // 转换为响应对象
-        Page<OrderResponse> responsePage = new Page<>();
-        responsePage.setCurrent(orderPage.getCurrent());
-        responsePage.setSize(orderPage.getSize());
-        responsePage.setTotal(count);
-        responsePage.setPages(orderPage.getPages());
+        // 手动分页（避免分页插件问题）
+        long total = orderRepository.selectCount(queryWrapper);
 
-        List<OrderResponse> responses = orderPage.getRecords().stream()
+        Page<OrderResponse> responsePage = new Page<>();
+        responsePage.setCurrent(request.getCurrent());
+        responsePage.setSize(request.getSize());
+        responsePage.setTotal(total);
+
+        if (total == 0) {
+            responsePage.setPages(0);
+            responsePage.setRecords(List.of());
+            return responsePage;
+        }
+
+        long size = request.getSize() == 0 ? 20 : request.getSize();
+        long current = request.getCurrent() <= 0 ? 1 : request.getCurrent();
+        long pages = (total + size - 1) / size;
+        responsePage.setPages(pages);
+
+        long offset = (current - 1) * size;
+        queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+
+        List<Order> orderList = orderRepository.selectList(queryWrapper);
+
+        List<OrderResponse> responses = orderList.stream()
                 .map(this::enrichOrderResponse)
                 .toList();
         responsePage.setRecords(responses);
@@ -459,19 +472,31 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
         queryWrapper.orderByDesc("created_at");
 
-        // 执行分页查询
-        Page<Order> page = new Page<>(request.getCurrent(), request.getSize());
-        Page<Order> orderPage = orderRepository.selectPage(page, queryWrapper);
+        // 手动分页（避免分页插件问题）
+        long total = orderRepository.selectCount(queryWrapper);
 
-        long count= orderRepository.selectCount(queryWrapper);
-        // 转换为响应对象
         Page<OrderResponse> responsePage = new Page<>();
-        responsePage.setCurrent(orderPage.getCurrent());
-        responsePage.setSize(orderPage.getSize());
-        responsePage.setTotal(count);
-        responsePage.setPages(orderPage.getPages());
+        responsePage.setCurrent(request.getCurrent());
+        responsePage.setSize(request.getSize());
+        responsePage.setTotal(total);
 
-        List<OrderResponse> responses = orderPage.getRecords().stream()
+        if (total == 0) {
+            responsePage.setPages(0);
+            responsePage.setRecords(List.of());
+            return responsePage;
+        }
+
+        long size = request.getSize() == 0 ? 20 : request.getSize();
+        long current = request.getCurrent() <= 0 ? 1 : request.getCurrent();
+        long pages = (total + size - 1) / size;
+        responsePage.setPages(pages);
+
+        long offset = (current - 1) * size;
+        queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+
+        List<Order> orderList = orderRepository.selectList(queryWrapper);
+
+        List<OrderResponse> responses = orderList.stream()
                 .map(this::enrichOrderResponse)
                 .toList();
         responsePage.setRecords(responses);
@@ -623,6 +648,19 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         // 验证状态转换
         if (!isValidStatusTransition(order.getOrderStatus(), "SHIPPED")) {
             throw new IllegalStateException("无效的状态转换: " + order.getOrderStatus() + " -> SHIPPED");
+        }
+
+        //这里要进行3个物流内容的验证
+        if(request.getWarehouseId()==null){
+            throw new RuntimeException("仓库ID不能为空");
+        }
+
+        if(request.getTrackingNumber()==null){
+            throw new RuntimeException("物流单号不能为空");
+        }
+
+        if (request.getCarrier()==null){
+            throw new RuntimeException("物流公司不能为空");
         }
 
         // 记录状态变更日志
@@ -1411,6 +1449,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     private OrderResponse enrichOrderResponse(Order order) {
         OrderResponse response = new OrderResponse();
 
+        Long salesId= order.getSalesId();
+
+
         // 复制基本字段
         response.setId(order.getId());
         response.setPlatformOrderNo(order.getPlatformOrderId());
@@ -1420,10 +1461,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setDeliveryAddress(order.getDeliveryAddress());
         response.setOrderStatus(order.getOrderStatus());
 
+        response.setSourceOrderNo(order.getSourceOrderId());
         //销售id
         response.setSalesUserId(order.getSalesId());
         User saleUser = userRepository.selectById(order.getSalesId());
         response.setSalesUserName(saleUser.getUsername());
+        response.setCustomerName(saleUser.getRealName());
+        response.setCreateUserName(saleUser.getUsername());
         //供应商id
         response.setSupplierCompanyId(order.getSupplierCompanyId());
         Company company = companyRepository.selectById(order.getSupplierCompanyId());
@@ -1433,6 +1477,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setStatus(order.getOrderStatus());
         response.setSource(order.getOrderSource());
         ;
+
         response.setAiProcessed(order.getAiProcessed());
         response.setAiConfidence(order.getAiConfidence()!=null?order.getAiConfidence().toString():BigDecimal.ZERO.toString());
         response.setProvinceName(order.getProvinceName());
@@ -1451,6 +1496,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setApprovalComment(order.getApprovalComment());
         response.setApprovalAt(order.getApprovalAt());
         response.setApprovalBy(order.getApprovalBy());
+        response.setSalesNote(order.getSalesNote());
+        response.setBuyerNote(order.getBuyerNote());
+
+        ;
 
         // 获取客户信息
         if (order.getCustomerId() != null && order.getCustomerId().longValue()!=0L) {
@@ -1462,6 +1511,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
 
 
+
+
         // 获取订单项
         QueryWrapper<OrderItem> itemWrapper = new QueryWrapper<>();
         itemWrapper.eq("order_id", order.getId());
@@ -1470,7 +1521,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         List<OrderResponse.OrderItemResponse> itemResponses = items.stream()
                 .map(this::convertToOrderItemResponse)
                 .toList();
+
+
+        //todo 查询物流相关信息。
+
+
+
         response.setOrderItems(itemResponses);
+
 
         return response;
     }
@@ -1486,6 +1544,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setTotalPrice(item.getSubtotal());
         response.setCurrency("CNY");
         response.setUnit(item.getUnit());
+        response.setDiscountAmount(item.getDiscountAmount());
+
 
         return response;
     }

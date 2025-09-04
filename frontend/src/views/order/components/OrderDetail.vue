@@ -49,7 +49,7 @@
             </div>
             <div class="info-item">
               <label>创建人：</label>
-              <span>{{ order.createdBy || '--' }}</span>
+              <span>{{ order.createUserName || '--' }}</span>
             </div>
           </div>
         </div>
@@ -60,7 +60,7 @@
           <div class="info-grid">
             <div class="info-item">
               <label>收货人：</label>
-              <span>{{ order.deliveryName || '--' }}</span>
+              <span>{{ order.deliveryContact || '--' }}</span>
             </div>
             <div class="info-item">
               <label>联系电话：</label>
@@ -73,6 +73,14 @@
             <div class="info-item">
               <label>邮政编码：</label>
               <span>{{ order.deliveryPostalCode || '--' }}</span>
+            </div>
+            <div class="info-item">
+              <label>卖家留言</label>
+              <span>{{ order.salesNote || '--' }}</span>
+            </div>
+            <div class="info-item">
+              <label>买家留言</label>
+              <span>{{ order.buyerNote || '--' }}</span>
             </div>
           </div>
         </div>

@@ -250,7 +250,7 @@
                 :min="0"
                 :precision="2"
                 style="width: 100%"
-                @change="() => calculateItemTotal($index)"
+                :disabled="true"
               />
             </template>
           </el-table-column>

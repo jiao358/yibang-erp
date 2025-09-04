@@ -77,7 +77,8 @@ CREATE TABLE orders (
     city_name VARCHAR(50) COMMENT '城市名称',
     district_code VARCHAR(20) COMMENT '区域代码',
     district_name VARCHAR(50) COMMENT '区域名称',
-    
+    sales_note TEXT COMMENT '卖家备注',
+    buyer_note TEXT COMMENT '买家备注',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     created_by BIGINT COMMENT '创建人ID',
@@ -125,6 +126,8 @@ CREATE TABLE order_items (
     subtotal DECIMAL(12,2) NOT NULL COMMENT '小计金额',
     ai_mapped_product_id BIGINT COMMENT 'AI映射后的商品ID',
     ai_confidence DECIMAL(5,4) COMMENT 'AI映射置信度',
+    sales_note TEXT COMMENT '卖家备注',
+    buyer_note TEXT COMMENT '买家备注',
     ai_processing_status ENUM('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED') NOT NULL DEFAULT 'PENDING' COMMENT 'AI处理状态',
     ai_processing_result JSON COMMENT 'AI处理结果JSON',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

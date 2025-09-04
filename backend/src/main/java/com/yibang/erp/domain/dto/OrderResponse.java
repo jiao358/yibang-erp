@@ -33,6 +33,10 @@ public class OrderResponse {
      */
     private String platformOrderNo;
 
+    private String buyerNote;
+
+    private String salesNote;
+
     /**
      * 订单类型 (NORMAL, WHOLESALE, RUSH, SAMPLE)
      */
@@ -127,6 +131,10 @@ public class OrderResponse {
      */
     private String sourceName;
 
+    /**
+     * 来源订单平台id
+     */
+    private String sourceOrderNo;
 
     /**
      * 配送联系人
@@ -187,6 +195,10 @@ public class OrderResponse {
      */
     private Long createdBy;
 
+    /**
+     * user loginName
+     */
+    private String createUserName;
     /**
      * 创建人姓名
      */
@@ -286,6 +298,8 @@ public class OrderResponse {
          */
         private BigDecimal totalPrice;
 
+        private BigDecimal discountAmount;
+
         /**
          * 商品备注
          */
@@ -297,5 +311,13 @@ public class OrderResponse {
          * 扩展字段
          */
         private Map<String, Object> extendedFields;
+
+        /**
+         * 配送联系人
+         */
+        private String deliveryName;
+
+
+
     }
 }
