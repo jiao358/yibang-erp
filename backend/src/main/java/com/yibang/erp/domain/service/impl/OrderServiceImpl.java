@@ -973,9 +973,33 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                 for (OrderItem item : orderItems) {
                     OrderExportData exportData = new OrderExportData();
                     exportData.setPlatformOrderNo(order.getPlatformOrderId());
-                    exportData.setShopCode(""); // 空字段
-                    exportData.setOrderType(""); // 空字段
+                    exportData.setShopCode("325"); // 空字段
+                    exportData.setOrderType("销售单"); // 空字段
+                    exportData.setDeliveryType("");
+                    //卖家留言 和买家留言 如果item表中有则用他们的，没有则用总的
+                    if(StringUtils.hasText(item.getBuyerNote())){
+                        exportData.setBuyerNote(item.getBuyerNote());
+                    }else{
+                        exportData.setBuyerNote(order.getBuyerNote());
+                    }
+
+
+                    if(StringUtils.hasText(item.getSalesNote())){
+                        exportData.setSalesNote(item.getSalesNote());
+                    }else{
+                        exportData.setSalesNote(order.getSalesNote());
+                    }
+                    //平台创建时间
+                    exportData.setOrderCreateTime(order.getCreatedAt().toString());
+                    //付款时间
+                    exportData.setPayTime("");
+
                     exportData.setCustomerName(saleName); // 需要从客户表查询
+                    //运费金额
+                    exportData.setShippingAmount(order.getShippingAmount()==null?"0":order.getShippingAmount().toString());
+                    //平台订单号
+                    exportData.setPlatformOrderId(order.getPlatformOrderId());
+
                     exportData.setProductCode(item.getSku()); // 使用SKU作为商品编码
                     exportData.setProductName(item.getProductName());
                     exportData.setQuantity(item.getQuantity());

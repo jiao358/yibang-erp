@@ -259,6 +259,11 @@ public class Order {
     @TableField(exist = false)
     private String remarks; // 订单备注，用于前端显示
 
+    @TableField( "sales_note")//卖家备注
+    private String salesNote;
+    @TableField( "buyer_note") //买家备注
+    private String buyerNote;
+
     /**
      * 获取扩展字段Map
      */

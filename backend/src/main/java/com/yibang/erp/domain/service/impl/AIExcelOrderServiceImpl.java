@@ -1274,7 +1274,8 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
             order.setSupplierCompanyId(fields.getCompanyId());
             order.setSupplierCompanyId(productMatch.getSupplierCompanyId());
             order.setDeliveryContact(fields.getContactPerson());
-
+            order.setSalesNote(fields.getSalesNote());
+            order.setBuyerNote(fields.getBuyerNote());
             order.setExpectedDeliveryDate(LocalDate.now().plusDays(2));
             order.setSpecialRequirements(fields.getRemarks());
 
@@ -1347,6 +1348,8 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 orderItem.setProductName(productMatch.getProductName());
                 orderItem.setSku(productMatch.getSku());
                 orderItem.setProductSpecifications(productMatch.getSpecification());
+                orderItem.setSalesNote(fields.getSalesNote());
+                orderItem.setBuyerNote(fields.getBuyerNote());
 
                 // 设置数量和价格
                 if (fields.getQuantity() != null) {
@@ -1385,7 +1388,6 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 // 设置基本信息
                 orderItem.setCreatedAt(LocalDateTime.now());
                 orderItem.setUpdatedAt(LocalDateTime.now());
-
                 // 保存订单项
                 orderItemRepository.insert(orderItem);
 

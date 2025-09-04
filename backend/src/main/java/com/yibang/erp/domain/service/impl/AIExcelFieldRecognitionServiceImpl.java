@@ -185,6 +185,8 @@ public class AIExcelFieldRecognitionServiceImpl implements AIExcelFieldRecogniti
         prompt.append("  \"quantity\": 数量值,\n");
         prompt.append("  \"unitPrice\": 单价值,\n");
         prompt.append("  \"unit\": \"单位值\",\n");
+        prompt.append("  \"salesNote\": \"卖家留言\",\n");
+        prompt.append("  \"buyerNote\": \"买家留言\",\n");
         prompt.append("  \"orderType\": \"订单类型值\",\n");
         prompt.append("  \"specialRequirements\": \"特殊要求值\",\n");
         prompt.append("  \"remarks\": \"备注值\"\n");
@@ -394,6 +396,12 @@ public class AIExcelFieldRecognitionServiceImpl implements AIExcelFieldRecogniti
                 fields.setSourceOrderId((String) responseMap.get("sourceOrderId"));
             }
 
+            if(responseMap.containsKey("salesNote")){
+                fields.setSalesNote((String) responseMap.get("salesNote"));
+            }
+            if(responseMap.containsKey("buyerNote")){
+                fields.setBuyerNote((String) responseMap.get("buyerNote"));
+            }
             if(responseMap.containsKey("provinceName")) {
                 fields.setProvinceName((String) responseMap.get("provinceName"));
             }

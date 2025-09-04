@@ -67,10 +67,16 @@ public class AIExcelRowData {
         private String unit;
         private Long companyId;
 
+
+
         // 订单信息
         private String orderType;
         private String specialRequirements;
         private String remarks;
+        //卖家留言
+        private String salesNote;
+        //买家留言
+        private String buyerNote;
 
         private String sourceOrderId;
 

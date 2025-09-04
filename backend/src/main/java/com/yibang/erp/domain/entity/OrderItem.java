@@ -51,6 +51,12 @@ public class OrderItem {
     @TableField("product_specifications")
     private String productSpecifications;
 
+    @TableField( "sales_note")//卖家备注
+    private String salesNote;
+    @TableField( "buyer_note") //买家备注
+    private String buyerNote;
+
+
     /**
      * 商品单价
      */
