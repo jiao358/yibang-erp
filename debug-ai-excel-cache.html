@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Excel缓存调试工具</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .debug-info {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button.danger {
+            background: #dc3545;
+        }
+        .button.danger:hover {
+            background: #c82333;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 AI Excel缓存调试工具</h1>
+        
+        <div class="section">
+            <h3>📊 缓存状态检查</h3>
+            <button class="button" onclick="checkCacheStatus()">检查缓存状态</button>
+            <button class="button" onclick="clearAllCache()">清除所有缓存</button>
+            <div id="cacheStatus" class="debug-info"></div>
+        </div>
+
+        <div class="section">
+            <h3>🧪 测试缓存功能</h3>
+            <button class="button" onclick="createTestCache()">创建测试缓存任务</button>
+            <button class="button" onclick="simulateRestore()">模拟恢复缓存</button>
+            <div id="testResults" class="debug-info"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔧 调试信息</h3>
+            <button class="button" onclick="showDebugInfo()">显示调试信息</button>
+            <button class="button" onclick="checkLocalStorage()">检查LocalStorage</button>
+            <div id="debugInfo" class="debug-info"></div>
+        </div>
+
+        <div class="section">
+            <h3>📝 操作日志</h3>
+            <button class="button" onclick="clearLog()">清除日志</button>
+            <div id="operationLog" class="debug-info"></div>
+        </div>
+    </div>
+
+    <script>
+        const CACHED_TASKS_KEY = 'aiExcelCachedTasks';
+        let operationLog = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            operationLog.push(logEntry);
+            updateLogDisplay();
+            console.log(logEntry);
+        }
+
+        function updateLogDisplay() {
+            const logElement = document.getElementById('operationLog');
+            logElement.textContent = operationLog.join('\n');
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function checkCacheStatus() {
+            log('🔍 检查缓存状态...');
+            
+            try {
+                const cachedTasks = loadCachedTasks();
+                const statusElement = document.getElementById('cacheStatus');
+                
+                if (cachedTasks.length === 0) {
+                    statusElement.innerHTML = '<div class="status warning">⚠️ 没有找到缓存任务</div>';
+                    log('⚠️ 没有找到缓存任务');
+                } else {
+                    statusElement.innerHTML = `<div class="status success">✅ 找到 ${cachedTasks.length} 个缓存任务</div>`;
+                    log(`✅ 找到 ${cachedTasks.length} 个缓存任务`);
+                    
+                    cachedTasks.forEach((task, index) => {
+                        log(`  任务 ${index + 1}: ${task.taskId} - ${task.fileName} (${task.status})`);
+                    });
+                }
+            } catch (error) {
+                log(`❌ 检查缓存状态失败: ${error.message}`, 'error');
+                document.getElementById('cacheStatus').innerHTML = `<div class="status error">❌ 检查失败: ${error.message}</div>`;
+            }
+        }
+
+        function loadCachedTasks() {
+            try {
+                const raw = localStorage.getItem(CACHED_TASKS_KEY);
+                if (!raw) return [];
+                const arr = JSON.parse(raw);
+                return Array.isArray(arr) ? arr : [];
+            } catch (error) {
+                log(`❌ 加载缓存任务失败: ${error.message}`, 'error');
+                return [];
+            }
+        }
+
+        function createTestCache() {
+            log('🧪 创建测试缓存任务...');
+            
+            try {
+                const testTask = {
+                    taskId: 'test-task-' + Date.now(),
+                    fileName: '测试文件.xlsx',
+                    status: 'SYSTEM_PROCESSING',
+                    totalRows: 100,
+                    successRows: 20,
+                    failedRows: 0,
+                    manualProcessRows: 0,
+                    createdAt: new Date().toISOString(),
+                    fileSize: 1024000,
+                    uploadUser: '测试用户',
+                    supplier: '系统处理中',
+                    isCached: true
+                };
+
+                const arr = loadCachedTasks();
+                arr.unshift(testTask);
+                localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(arr));
+                
+                log(`✅ 测试缓存任务创建成功: ${testTask.taskId}`);
+                document.getElementById('testResults').innerHTML = `<div class="status success">✅ 测试缓存任务创建成功</div>`;
+                
+                // 自动检查缓存状态
+                setTimeout(checkCacheStatus, 100);
+            } catch (error) {
+                log(`❌ 创建测试缓存任务失败: ${error.message}`, 'error');
+                document.getElementById('testResults').innerHTML = `<div class="status error">❌ 创建失败: ${error.message}</div>`;
+            }
+        }
+
+        function simulateRestore() {
+            log('🔄 模拟恢复缓存任务...');
+            
+            try {
+                const cached = loadCachedTasks();
+                if (cached.length === 0) {
+                    log('⚠️ 没有缓存任务需要恢复');
+                    document.getElementById('testResults').innerHTML = '<div class="status warning">⚠️ 没有缓存任务需要恢复</div>';
+                    return;
+                }
+
+                // 模拟任务历史数组
+                const taskHistory = [];
+                const existingIds = new Set(taskHistory.map(t => t.taskId));
+                const toAdd = cached.filter(t => !existingIds.has(t.taskId));
+                
+                if (toAdd.length) {
+                    taskHistory.unshift(...toAdd);
+                    log(`✅ 成功恢复 ${toAdd.length} 个缓存任务`);
+                    document.getElementById('testResults').innerHTML = `<div class="status success">✅ 成功恢复 ${toAdd.length} 个缓存任务</div>`;
+                } else {
+                    log('ℹ️ 没有新的缓存任务需要恢复');
+                    document.getElementById('testResults').innerHTML = '<div class="status warning">ℹ️ 没有新的缓存任务需要恢复</div>';
+                }
+            } catch (error) {
+                log(`❌ 模拟恢复失败: ${error.message}`, 'error');
+                document.getElementById('testResults').innerHTML = `<div class="status error">❌ 恢复失败: ${error.message}</div>`;
+            }
+        }
+
+        function clearAllCache() {
+            log('🗑️ 清除所有缓存...');
+            
+            try {
+                localStorage.removeItem(CACHED_TASKS_KEY);
+                log('✅ 所有缓存已清除');
+                document.getElementById('cacheStatus').innerHTML = '<div class="status success">✅ 所有缓存已清除</div>';
+            } catch (error) {
+                log(`❌ 清除缓存失败: ${error.message}`, 'error');
+                document.getElementById('cacheStatus').innerHTML = `<div class="status error">❌ 清除失败: ${error.message}</div>`;
+            }
+        }
+
+        function showDebugInfo() {
+            log('🔧 显示调试信息...');
+            
+            const debugInfo = {
+                userAgent: navigator.userAgent,
+                localStorage: {
+                    available: typeof(Storage) !== "undefined",
+                    keys: Object.keys(localStorage),
+                    cachedTasksKey: CACHED_TASKS_KEY,
+                    hasCachedTasks: localStorage.getItem(CACHED_TASKS_KEY) !== null
+                },
+                timestamp: new Date().toISOString()
+            };
+
+            document.getElementById('debugInfo').textContent = JSON.stringify(debugInfo, null, 2);
+            log('✅ 调试信息已显示');
+        }
+
+        function checkLocalStorage() {
+            log('📦 检查LocalStorage...');
+            
+            try {
+                const keys = Object.keys(localStorage);
+                const storageInfo = keys.map(key => {
+                    const value = localStorage.getItem(key);
+                    return `${key}: ${value ? (value.length > 100 ? value.substring(0, 100) + '...' : value) : 'null'}`;
+                }).join('\n');
+
+                document.getElementById('debugInfo').textContent = `LocalStorage Keys (${keys.length}):\n${storageInfo}`;
+                log(`✅ 找到 ${keys.length} 个LocalStorage键`);
+            } catch (error) {
+                log(`❌ 检查LocalStorage失败: ${error.message}`, 'error');
+                document.getElementById('debugInfo').textContent = `错误: ${error.message}`;
+            }
+        }
+
+        function clearLog() {
+            operationLog = [];
+            updateLogDisplay();
+            log('📝 日志已清除');
+        }
+
+        // 页面加载时自动检查缓存状态
+        window.onload = function() {
+            log('🚀 调试工具已加载');
+            checkCacheStatus();
+        };
+    </script>
+</body>
+</html>

@@ -789,7 +789,8 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
      * 异步启动处理任务
      */
     @Async
-    protected void startAsyncProcessing(MultipartFile file, AIExcelProcessRequest request, String taskId) {
+    protected void startAsyncProcessing(MultipartFile file, AIExcelProcessRequest request, String taskId) throws InterruptedException {
+
         try {
             // 设置当前任务ID到线程上下文
             setCurrentTaskId(taskId);

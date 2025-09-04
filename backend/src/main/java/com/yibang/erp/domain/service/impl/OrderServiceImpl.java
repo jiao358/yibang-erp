@@ -390,7 +390,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
         }
 
-
+        
         if (StringUtils.hasText(request.getKeyword())) {
             queryWrapper.and(wrapper -> wrapper
                 .like("platform_order_id", request.getKeyword())
@@ -503,6 +503,86 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
         return responsePage;
 
+    }
+
+    /**
+     * 查询订单物流信息
+     * 对于已发货、运输中、已送达、已完成等状态的订单，查询相关的物流信息
+     */
+    public void queryLogisticsInfo(List<Order> orders) {
+        if (orders == null || orders.isEmpty()) {
+            return;
+        }
+        
+        // 定义需要查询物流信息的订单状态
+        List<String> logisticsStatuses = List.of(
+            "SHIPPED",      // 已发货
+            "IN_TRANSIT",   // 运输中
+            "DELIVERED",    // 已送达
+            "COMPLETED"     // 已完成
+        );
+        
+        // 筛选出需要查询物流信息的订单
+        List<Long> orderIds = orders.stream()
+            .filter(order -> logisticsStatuses.contains(order.getOrderStatus()))
+            .map(Order::getId)
+            .toList();
+        
+        if (orderIds.isEmpty()) {
+            return;
+        }
+        
+        // 批量查询物流信息
+        QueryWrapper<LogisticsInfo> queryWrapper = new QueryWrapper<>();
+        queryWrapper.in("order_id", orderIds);
+        queryWrapper.orderByDesc("created_at");
+        
+        List<LogisticsInfo> logisticsInfoList = logisticsInfoRepository.selectList(queryWrapper);
+        
+        // 按订单ID分组物流信息
+        Map<Long, List<LogisticsInfo>> logisticsMap = logisticsInfoList.stream()
+            .collect(Collectors.groupingBy(LogisticsInfo::getOrderId));
+        
+        // 为每个订单设置最新的物流信息
+        for (Order order : orders) {
+            if (logisticsStatuses.contains(order.getOrderStatus())) {
+                List<LogisticsInfo> orderLogistics = logisticsMap.get(order.getId());
+                if (orderLogistics != null && !orderLogistics.isEmpty()) {
+                    // 取最新的物流信息
+                    LogisticsInfo latestLogistics = orderLogistics.get(0);
+                    order.setLogisticsInfo(convertToLogisticsInfoDTO(latestLogistics));
+                }
+            }
+        }
+    }
+    
+    /**
+     * 将LogisticsInfo实体转换为LogisticsInfoDTO
+     */
+    private LogisticsInfoDTO convertToLogisticsInfoDTO(LogisticsInfo logisticsInfo) {
+        if (logisticsInfo == null) {
+            return null;
+        }
+        
+        LogisticsInfoDTO dto = new LogisticsInfoDTO();
+        dto.setCarrier(logisticsInfo.getCarrier());
+        dto.setTrackingNumber(logisticsInfo.getTrackingNumber());
+        dto.setShippingMethod(logisticsInfo.getShippingMethod());
+        dto.setShippedAt(logisticsInfo.getShippingDate());
+        dto.setNotes(logisticsInfo.getShippingNotes());
+        dto.setStatus(logisticsInfo.getStatus());
+        dto.setEstimatedDeliveryDate(logisticsInfo.getEstimatedDeliveryDate() != null ? 
+            logisticsInfo.getEstimatedDeliveryDate().toString() : null);
+        dto.setActualDeliveryDate(logisticsInfo.getActualDeliveryDate());
+        dto.setShippingAddress(logisticsInfo.getShippingAddress());
+        dto.setDeliveryAddress(logisticsInfo.getDeliveryAddress());
+        dto.setShippingContact(logisticsInfo.getShippingContact());
+        dto.setDeliveryContact(logisticsInfo.getDeliveryContact());
+        dto.setShippingPhone(logisticsInfo.getShippingPhone());
+        dto.setDeliveryPhone(logisticsInfo.getDeliveryPhone());
+        dto.setWarehouseName(logisticsInfo.getWarehouseName());
+        
+        return dto;
     }
 
     @Override
@@ -1523,9 +1603,14 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                 .toList();
 
 
-        //todo 查询物流相关信息。
-
-
+        // 查询物流相关信息
+        List<String> logisticsStatuses = List.of("SHIPPED", "IN_TRANSIT", "DELIVERED", "COMPLETED");
+        if (logisticsStatuses.contains(order.getOrderStatus())) {
+            LogisticsInfo logisticsInfo = logisticsInfoRepository.selectByOrderId(order.getId());
+            if (logisticsInfo != null) {
+                response.setLogisticsInfo(convertToLogisticsInfoDTO(logisticsInfo));
+            }
+        }
 
         response.setOrderItems(itemResponses);
 

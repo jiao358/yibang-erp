@@ -53,9 +53,13 @@
 
     <!-- 快速操作区域 -->
     <div class="quick-actions">
-      <el-button type="primary" @click="$emit('uploadNew')">
+      <el-button 
+        type="primary" 
+        :disabled="props.hasProcessingTasks"
+        @click="$emit('uploadNew')"
+      >
         <el-icon><Upload /></el-icon>
-        上传新文件
+        {{ props.hasProcessingTasks ? '处理中...' : '上传新文件' }}
       </el-button>
       
       <el-button @click="$emit('refresh')">
@@ -91,11 +95,13 @@ interface Props {
     completedTasks: number
     failedTasks: number
   }
+  hasProcessingTasks?: boolean
   autoRefresh?: boolean
   refreshInterval?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  hasProcessingTasks: false,
   autoRefresh: true,
   refreshInterval: 30000 // 30秒
 })
@@ -221,6 +227,11 @@ onUnmounted(() => {
 
 .quick-actions .el-button {
   min-width: 120px;
+}
+
+.quick-actions .el-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 /* 响应式设计 */

@@ -26,7 +26,8 @@
       <!-- 任务概览 -->
       <TaskOverview 
         :statistics="statistics"
-        @upload-new="showUploadDialog = true"
+        :has-processing-tasks="hasProcessingTasks"
+        @upload-new="handleUploadNew"
         @refresh="loadTaskHistory"
         @view-all="scrollToTable"
       />
@@ -195,7 +196,28 @@ const filteredTasks = computed(() => {
   return taskHistory.value
 })
 
+// 计算属性 - 检查是否有正在处理的任务
+const hasProcessingTasks = computed(() => {
+  return taskHistory.value.some(task => 
+    task.status === 'PROCESSING' || 
+    task.status === 'SYSTEM_PROCESSING' ||
+    task.status === 'PENDING'
+  )
+})
+
 // 事件处理
+const handleUploadNew = () => {
+  if (hasProcessingTasks.value) {
+    ElMessage.warning({
+      message: '当前有任务正在处理中，请等待处理完成后再上传新文件',
+      duration: 3000,
+      showClose: true
+    })
+    return
+  }
+  showUploadDialog.value = true
+}
+
 const handleFileSelected = (file: File) => {
   selectedFile.value = file
   ElMessage.success(`已选择文件: ${file.name}`)
@@ -247,10 +269,26 @@ const startProcessing = async () => {
     return
   }
   
+  // 生成临时任务ID，用于缓存任务
+  const tempTaskId = 'temp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)
+  
   try {
     showUploadDialog.value = false
     showProgressDialog.value = true
     processingStatus.value = 'PROCESSING'
+    
+    // 立即创建缓存任务，不等待API响应
+    const cachedTask = createCachedTask(tempTaskId, selectedFile.value)
+    console.log('📝 创建的缓存任务:', cachedTask)
+    
+    taskHistory.value.unshift(cachedTask)
+    totalTasks.value++
+    // 持久化缓存任务，刷新后恢复
+    persistCachedTask(cachedTask)
+    
+    console.log('📋 当前任务列表长度:', taskHistory.value.length)
+    console.log('📋 任务列表内容:', taskHistory.value)
+    
     // 立即启动5秒倒计时，不等待后端响应
     if (!countdownInterval) {
       startCountdown()
@@ -274,19 +312,15 @@ const startProcessing = async () => {
     if (response && response.taskId) {
       ElMessage.success('AI处理已启动')
       
-      // 创建缓存任务并插入到任务列表第一行
-      const cachedTask = createCachedTask(response.taskId, selectedFile.value)
-      console.log('📝 创建的缓存任务:', cachedTask)
+      // 更新缓存任务为真实任务ID
+      const updatedCachedTask = { ...cachedTask, taskId: response.taskId }
+      const taskIndex = taskHistory.value.findIndex(t => t.taskId === tempTaskId)
+      if (taskIndex !== -1) {
+        taskHistory.value[taskIndex] = updatedCachedTask
+        persistCachedTask(updatedCachedTask)
+        console.log('📝 更新缓存任务ID:', tempTaskId, '->', response.taskId)
+      }
       
-      taskHistory.value.unshift(cachedTask)
-      totalTasks.value++
-      // 持久化缓存任务，刷新后恢复
-      persistCachedTask(cachedTask)
-      
-      console.log('📋 当前任务列表长度:', taskHistory.value.length)
-      console.log('📋 任务列表内容:', taskHistory.value)
-      
-      // 倒计时已在点击开始时启动，这里不再重复启动
       // 后台开始进度轮询
       startProgressPolling(response.taskId)
     } else {
@@ -296,6 +330,19 @@ const startProcessing = async () => {
   } catch (error: any) {
     console.error('启动AI处理失败:', error)
     processingStatus.value = 'FAILED'
+    
+    // 更新缓存任务状态为失败
+    const taskIndex = taskHistory.value.findIndex(t => t.taskId === tempTaskId)
+    if (taskIndex !== -1) {
+      taskHistory.value[taskIndex] = { 
+        ...taskHistory.value[taskIndex], 
+        status: 'FAILED',
+        supplier: '处理失败'
+      }
+      persistCachedTask(taskHistory.value[taskIndex])
+      console.log('📝 更新缓存任务状态为失败')
+    }
+    
     ElMessage.error(`启动AI处理失败: ${error.message || error}`)
     showProgressDialog.value = false
   }
@@ -367,7 +414,10 @@ const startProgressPolling = (taskId: string) => {
           clearProgressPolling()
           processingStatus.value = response.status
           
-          // 重新加载任务历史，这会替换缓存任务
+          // 清理对应的缓存任务
+          removeCachedTask(taskId)
+          
+          // 重新加载任务历史
           await loadTaskHistory()
         }
       }
@@ -392,7 +442,23 @@ function loadCachedTasks(): TaskHistoryItem[] {
     const raw = localStorage.getItem(CACHED_TASKS_KEY)
     if (!raw) return []
     const arr = JSON.parse(raw)
-    return Array.isArray(arr) ? arr : []
+    if (!Array.isArray(arr)) return []
+    
+    // 清理过期的缓存任务（超过1小时）
+    const now = new Date().getTime()
+    const validTasks = arr.filter(task => {
+      const taskTime = new Date(task.createdAt).getTime()
+      const hoursDiff = (now - taskTime) / (1000 * 60 * 60)
+      return hoursDiff < 1 // 保留1小时内的缓存任务
+    })
+    
+    // 如果有任务被清理，更新localStorage
+    if (validTasks.length !== arr.length) {
+      localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(validTasks))
+      console.log(`📋 清理了 ${arr.length - validTasks.length} 个过期缓存任务`)
+    }
+    
+    return validTasks
   } catch {
     return []
   }
@@ -402,17 +468,44 @@ function persistCachedTask(task: TaskHistoryItem) {
   const arr = loadCachedTasks()
   const idx = arr.findIndex((t: TaskHistoryItem) => t.taskId === task.taskId)
   if (idx >= 0) arr[idx] = task; else arr.unshift(task)
+  
+  // 限制缓存任务数量，最多保留10个
+  if (arr.length > 10) {
+    arr.splice(10)
+    console.log('📋 缓存任务数量超限，已清理多余任务')
+  }
+  
   localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(arr))
+  console.log(`📋 缓存任务已保存: ${task.taskId}`)
 }
 
 
 function restoreCachedTasks() {
   const cached = loadCachedTasks()
-  if (!cached.length) return
+  if (!cached.length) {
+    console.log('📋 没有缓存任务需要恢复')
+    return
+  }
+  
   const existingIds = new Set(taskHistory.value.map(t => t.taskId))
   const toAdd = cached.filter(t => !existingIds.has(t.taskId))
+  
   if (toAdd.length) {
     taskHistory.value.unshift(...toAdd)
+    totalTasks.value += toAdd.length
+    console.log(`📋 恢复了 ${toAdd.length} 个缓存任务`)
+  } else {
+    console.log('📋 没有新的缓存任务需要恢复')
+  }
+}
+
+// 清理指定的缓存任务
+function removeCachedTask(taskId: string) {
+  const arr = loadCachedTasks()
+  const filtered = arr.filter(t => t.taskId !== taskId)
+  if (filtered.length !== arr.length) {
+    localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(filtered))
+    console.log(`📋 已清理缓存任务: ${taskId}`)
   }
 }
 
@@ -499,13 +592,18 @@ const loadTaskHistory = async () => {
     if (response && response.content) {
       const realTasks = response.content
       
-      // 直接使用API返回的任务列表
-      taskHistory.value = realTasks
+      // 合并真实任务和缓存任务
+      const cachedTasks = loadCachedTasks()
+      const existingIds = new Set(realTasks.map(t => t.taskId))
+      const validCachedTasks = cachedTasks.filter(t => !existingIds.has(t.taskId))
       
-      // 更新总数
-      totalTasks.value = response.totalElements || 0
+      // 将缓存任务插入到真实任务前面
+      taskHistory.value = [...validCachedTasks, ...realTasks]
       
-      console.log('✅ 任务历史加载完成，总数:', totalTasks.value)
+      // 更新总数（包含缓存任务）
+      totalTasks.value = response.totalElements + validCachedTasks.length
+      
+      console.log('✅ 任务历史加载完成，总数:', totalTasks.value, '缓存任务:', validCachedTasks.length)
     } else {
       console.warn('⚠️ API响应格式异常:', response)
       ElMessage.warning('获取任务列表失败')

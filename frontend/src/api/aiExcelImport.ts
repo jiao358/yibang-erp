@@ -37,7 +37,8 @@ export const aiExcelImportApi = {
     return request.post<AIExcelProcessResponse>('/api/ai-excel-orders/process', data, {
       headers: {
         'Content-Type': 'multipart/form-data'
-      }
+      },
+      timeout: 0 // 设置为0表示无超时限制，让AI处理有足够时间
     })
   },
 
@@ -45,7 +46,9 @@ export const aiExcelImportApi = {
    * 获取处理进度
    */
   getProgress: (taskId: string) => {
-    return request.get<AIExcelProcessResponse>(`/api/ai-excel-orders/progress/${taskId}`)
+    return request.get<AIExcelProcessResponse>(`/api/ai-excel-orders/progress/${taskId}`, {
+      timeout: 30000 // 进度查询保持30秒超时，避免长时间等待
+    })
   },
 
   /**

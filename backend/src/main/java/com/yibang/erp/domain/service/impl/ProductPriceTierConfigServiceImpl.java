@@ -1,6 +1,7 @@
 package com.yibang.erp.domain.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.dto.ProductPriceTierConfigRequest;
 import com.yibang.erp.domain.dto.ProductPriceTierConfigResponse;
 import com.yibang.erp.domain.entity.ProductPriceTierConfig;
@@ -60,7 +61,7 @@ public class ProductPriceTierConfigServiceImpl implements ProductPriceTierConfig
         config.setRetailLimitPrice(request.getRetailLimitPrice());
         config.setIsActive(request.getIsActive());
         config.setUpdatedAt(LocalDateTime.now());
-        config.setUpdatedBy(request.getCreatedBy() != null ? request.getCreatedBy() : 1L);
+        config.setUpdatedBy(request.getCreatedBy() != null ? request.getCreatedBy() : UserSecurityUtils.getCurrentUserId());
 
         configRepository.updateById(config);
         return convertToResponse(config);

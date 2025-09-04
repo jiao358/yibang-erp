@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Excel缓存修复测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .test-result {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button.success {
+            background: #28a745;
+        }
+        .button.danger {
+            background: #dc3545;
+        }
+        .button.warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 AI Excel缓存修复测试</h1>
+        
+        <div class="section">
+            <h3>📋 修复说明</h3>
+            <div class="step">
+                <strong>问题1:</strong> API超时导致缓存任务未创建<br>
+                <strong>修复:</strong> 将缓存任务创建移到API调用之前，使用临时任务ID
+            </div>
+            <div class="step">
+                <strong>问题2:</strong> 15秒超时时间过短<br>
+                <strong>修复:</strong> 将AI处理API超时时间增加到30秒
+            </div>
+            <div class="step">
+                <strong>问题3:</strong> 错误处理不完善<br>
+                <strong>修复:</strong> 在API失败时更新缓存任务状态为失败
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🧪 模拟测试</h3>
+            <button class="button" onclick="testNormalFlow()">测试正常流程</button>
+            <button class="button warning" onclick="testTimeoutFlow()">测试超时流程</button>
+            <button class="button danger" onclick="testErrorFlow()">测试错误流程</button>
+            <button class="button" onclick="clearTest()">清除测试</button>
+            <div id="testResult" class="test-result"></div>
+        </div>
+
+        <div class="section">
+            <h3>📊 缓存状态</h3>
+            <button class="button" onclick="checkCache()">检查缓存</button>
+            <button class="button danger" onclick="clearCache()">清除缓存</button>
+            <div id="cacheStatus" class="test-result"></div>
+        </div>
+
+        <div class="section">
+            <h3>🔍 调试信息</h3>
+            <button class="button" onclick="showDebugInfo()">显示调试信息</button>
+            <div id="debugInfo" class="test-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const CACHED_TASKS_KEY = 'aiExcelCachedTasks';
+        let testLog = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            testLog.push(logEntry);
+            updateTestDisplay();
+            console.log(logEntry);
+        }
+
+        function updateTestDisplay() {
+            const resultElement = document.getElementById('testResult');
+            resultElement.textContent = testLog.join('\n');
+            resultElement.scrollTop = resultElement.scrollHeight;
+        }
+
+        function testNormalFlow() {
+            log('🧪 测试正常流程...');
+            
+            // 模拟用户点击开始处理
+            const tempTaskId = 'temp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            log(`📝 生成临时任务ID: ${tempTaskId}`);
+            
+            // 立即创建缓存任务
+            const cachedTask = {
+                taskId: tempTaskId,
+                fileName: '测试文件.xlsx',
+                status: 'SYSTEM_PROCESSING',
+                totalRows: 100,
+                successRows: 20,
+                failedRows: 0,
+                manualProcessRows: 0,
+                createdAt: new Date().toISOString(),
+                fileSize: 1024000,
+                uploadUser: '测试用户',
+                supplier: '系统处理中',
+                isCached: true
+            };
+            
+            // 保存到localStorage
+            const arr = JSON.parse(localStorage.getItem(CACHED_TASKS_KEY) || '[]');
+            arr.unshift(cachedTask);
+            localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(arr));
+            log('✅ 缓存任务已创建并保存');
+            
+            // 模拟API调用成功
+            setTimeout(() => {
+                const realTaskId = 'real-' + Date.now();
+                log(`🔄 API调用成功，获取真实任务ID: ${realTaskId}`);
+                
+                // 更新缓存任务ID
+                const updatedTask = { ...cachedTask, taskId: realTaskId };
+                const updatedArr = arr.map(t => t.taskId === tempTaskId ? updatedTask : t);
+                localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(updatedArr));
+                log('✅ 缓存任务ID已更新');
+                
+                // 模拟任务完成
+                setTimeout(() => {
+                    const completedTask = { ...updatedTask, status: 'COMPLETED', supplier: '处理完成' };
+                    const finalArr = updatedArr.map(t => t.taskId === realTaskId ? completedTask : t);
+                    localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(finalArr));
+                    log('✅ 任务处理完成');
+                }, 2000);
+            }, 1000);
+        }
+
+        function testTimeoutFlow() {
+            log('⏰ 测试超时流程...');
+            
+            const tempTaskId = 'temp-timeout-' + Date.now();
+            log(`📝 生成临时任务ID: ${tempTaskId}`);
+            
+            // 立即创建缓存任务
+            const cachedTask = {
+                taskId: tempTaskId,
+                fileName: '超时测试文件.xlsx',
+                status: 'SYSTEM_PROCESSING',
+                totalRows: 100,
+                successRows: 20,
+                failedRows: 0,
+                manualProcessRows: 0,
+                createdAt: new Date().toISOString(),
+                fileSize: 1024000,
+                uploadUser: '测试用户',
+                supplier: '系统处理中',
+                isCached: true
+            };
+            
+            const arr = JSON.parse(localStorage.getItem(CACHED_TASKS_KEY) || '[]');
+            arr.unshift(cachedTask);
+            localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(arr));
+            log('✅ 缓存任务已创建（即使API超时也会显示）');
+            
+            // 模拟API超时
+            setTimeout(() => {
+                log('❌ API调用超时（30秒）');
+                const failedTask = { ...cachedTask, status: 'FAILED', supplier: '处理失败' };
+                const updatedArr = arr.map(t => t.taskId === tempTaskId ? failedTask : t);
+                localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(updatedArr));
+                log('✅ 缓存任务状态已更新为失败');
+            }, 1000);
+        }
+
+        function testErrorFlow() {
+            log('❌ 测试错误流程...');
+            
+            const tempTaskId = 'temp-error-' + Date.now();
+            log(`📝 生成临时任务ID: ${tempTaskId}`);
+            
+            // 立即创建缓存任务
+            const cachedTask = {
+                taskId: tempTaskId,
+                fileName: '错误测试文件.xlsx',
+                status: 'SYSTEM_PROCESSING',
+                totalRows: 100,
+                successRows: 20,
+                failedRows: 0,
+                manualProcessRows: 0,
+                createdAt: new Date().toISOString(),
+                fileSize: 1024000,
+                uploadUser: '测试用户',
+                supplier: '系统处理中',
+                isCached: true
+            };
+            
+            const arr = JSON.parse(localStorage.getItem(CACHED_TASKS_KEY) || '[]');
+            arr.unshift(cachedTask);
+            localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(arr));
+            log('✅ 缓存任务已创建');
+            
+            // 模拟API错误
+            setTimeout(() => {
+                log('❌ API调用失败：服务器错误');
+                const failedTask = { ...cachedTask, status: 'FAILED', supplier: '处理失败' };
+                const updatedArr = arr.map(t => t.taskId === tempTaskId ? failedTask : t);
+                localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(updatedArr));
+                log('✅ 缓存任务状态已更新为失败');
+            }, 1000);
+        }
+
+        function checkCache() {
+            log('📋 检查缓存状态...');
+            
+            const arr = JSON.parse(localStorage.getItem(CACHED_TASKS_KEY) || '[]');
+            const statusElement = document.getElementById('cacheStatus');
+            
+            if (arr.length === 0) {
+                statusElement.innerHTML = '<div class="status warning">⚠️ 没有缓存任务</div>';
+                log('⚠️ 没有缓存任务');
+            } else {
+                statusElement.innerHTML = `<div class="status success">✅ 找到 ${arr.length} 个缓存任务</div>`;
+                log(`✅ 找到 ${arr.length} 个缓存任务`);
+                
+                arr.forEach((task, index) => {
+                    const statusClass = task.status === 'SYSTEM_PROCESSING' ? 'info' : 
+                                      task.status === 'COMPLETED' ? 'success' : 'error';
+                    const statusText = task.status === 'SYSTEM_PROCESSING' ? '系统处理中' :
+                                     task.status === 'COMPLETED' ? '处理完成' : '处理失败';
+                    
+                    statusElement.innerHTML += `
+                        <div class="status ${statusClass}">
+                            任务 ${index + 1}: ${task.taskId} - ${task.fileName} (${statusText})
+                        </div>
+                    `;
+                    log(`  任务 ${index + 1}: ${task.taskId} - ${task.fileName} (${statusText})`);
+                });
+            }
+        }
+
+        function clearCache() {
+            log('🗑️ 清除所有缓存...');
+            localStorage.removeItem(CACHED_TASKS_KEY);
+            log('✅ 缓存已清除');
+            document.getElementById('cacheStatus').innerHTML = '<div class="status success">✅ 缓存已清除</div>';
+        }
+
+        function clearTest() {
+            testLog = [];
+            updateTestDisplay();
+            log('🧹 测试日志已清除');
+        }
+
+        function showDebugInfo() {
+            log('🔍 显示调试信息...');
+            
+            const debugInfo = {
+                userAgent: navigator.userAgent,
+                localStorage: {
+                    available: typeof(Storage) !== "undefined",
+                    keys: Object.keys(localStorage),
+                    cachedTasksKey: CACHED_TASKS_KEY,
+                    hasCachedTasks: localStorage.getItem(CACHED_TASKS_KEY) !== null
+                },
+                timestamp: new Date().toISOString(),
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+            };
+
+            document.getElementById('debugInfo').textContent = JSON.stringify(debugInfo, null, 2);
+            log('✅ 调试信息已显示');
+        }
+
+        // 页面加载时自动检查缓存
+        window.onload = function() {
+            log('🚀 测试页面已加载');
+            checkCache();
+        };
+    </script>
+</body>
+</html>

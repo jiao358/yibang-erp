@@ -444,6 +444,7 @@ public class ProductController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String name,
             @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String sku,
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Long supplierCompanyId,
             @RequestParam(required = false) Double minPrice,
@@ -462,11 +463,17 @@ public class ProductController {
             queryWrapper.eq("approval_status", "APPROVED");
             queryWrapper.eq("deleted", false);
 
+
+
             // 添加名称过滤
             if (name != null && !name.trim().isEmpty()) {
                 queryWrapper.like("name", name.trim());
             }
 
+
+            if(sku!=null && !sku.isEmpty()){
+                queryWrapper.eq("sku", sku);
+            }
             // 添加品牌过滤 品牌是需要id的
 
 

@@ -273,7 +273,10 @@ public class WarehouseController {
     private Long extractUserIdFromJWT(String authHeader) {
         // TODO: 实现从JWT中提取用户ID的逻辑
         // 这里需要根据你的JWT实现来完善
-        return 1L; // 临时返回默认值
+        String token = authHeader.substring(7);
+        Long userIdFromToken=jwtUtil.getUserIdFromToken(token);
+
+        return userIdFromToken; // 临时返回默认值
     }
     
     /**

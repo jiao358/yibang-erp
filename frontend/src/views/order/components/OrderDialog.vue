@@ -661,7 +661,9 @@ const searchProductsForSelector = async () => {
       page: productSearchForm.page,
       size: productSearchForm.size,
       name: productSearchForm.name || undefined,
-      brand: productSearchForm.brand || undefined
+      brand: productSearchForm.brand || undefined,
+      sku: productSearchForm.sku || undefined
+
     }
     
     // 过滤空值

@@ -1,5 +1,6 @@
 package com.yibang.erp.controller;
 
+import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.dto.InventoryAlertRequest;
 import com.yibang.erp.domain.entity.InventoryAlert;
 import com.yibang.erp.domain.service.InventoryAlertService;
@@ -310,6 +311,7 @@ public class InventoryAlertController {
     private Long extractUserIdFromJWT(String authHeader) {
         // TODO: 实现从JWT中提取用户ID的逻辑
         // 这里需要根据你的JWT实现来完善
-        return 1L; // 临时返回默认值
+        return UserSecurityUtils.getCurrentUserId();
+
     }
 }

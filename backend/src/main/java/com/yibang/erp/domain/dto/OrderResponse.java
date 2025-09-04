@@ -252,6 +252,11 @@ public class OrderResponse {
     private List<OrderItemResponse> orderItems;
 
     /**
+     * 物流信息
+     */
+    private LogisticsInfoDTO logisticsInfo;
+
+    /**
      * 订单商品响应DTO
      */
     @Data

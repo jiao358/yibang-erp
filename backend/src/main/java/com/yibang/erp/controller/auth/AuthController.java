@@ -1,10 +1,12 @@
 package com.yibang.erp.controller.auth;
 
 import com.yibang.erp.common.util.JwtUtil;
+import com.yibang.erp.common.util.UserSecurityUtils;
 import com.yibang.erp.domain.entity.User;
 import com.yibang.erp.domain.entity.Role;
 import com.yibang.erp.domain.service.UserService;
 import com.yibang.erp.domain.service.RoleService;
+import com.yibang.erp.infrastructure.repository.UserRepository;
 import com.yibang.erp.security.CustomUserDetailsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -36,15 +38,17 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final UserService userService;
     private final RoleService roleService;
+    private final UserRepository userRepository;
 
     @Autowired
-    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil, CustomUserDetailsService userDetailsService, PasswordEncoder passwordEncoder, UserService userService, RoleService roleService) {
+    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil, CustomUserDetailsService userDetailsService, PasswordEncoder passwordEncoder, UserService userService, RoleService roleService, UserRepository userRepository) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
         this.userService = userService;
         this.roleService = roleService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -328,7 +332,8 @@ public class AuthController {
                 // 如果没有角色信息，使用默认角色
                 roles = List.of("USER");
             }
-            String newToken = jwtUtil.generateToken(username, 1L, 1L, roles);
+            User user = userRepository.selectById(UserSecurityUtils.getCurrentUserId());
+            String newToken = jwtUtil.generateToken(username, user.getId(), user.getCompanyId(), roles);
             
             Map<String, Object> response = new HashMap<>();
             response.put("token", newToken);

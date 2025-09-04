@@ -259,6 +259,10 @@ public class Order {
     @TableField(exist = false)
     private String remarks; // 订单备注，用于前端显示
 
+    // 扩展字段（用于存储动态字段，不映射到数据库）
+    @TableField(exist = false)
+    private com.yibang.erp.domain.dto.LogisticsInfoDTO logisticsInfo; // 物流信息，用于前端显示
+
     @TableField( "sales_note")//卖家备注
     private String salesNote;
     @TableField( "buyer_note") //买家备注
