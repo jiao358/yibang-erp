@@ -476,12 +476,14 @@ const loadCategoryOptions = async () => {
   try {
     const response = await getProductCategories()
     console.log('分类API响应:', response)
-    if (response && response.data && Array.isArray(response.data)) {
-      categoryOptions.value = response.data.map((category: any) => ({
+    if (response && response.success && response.data && Array.isArray(response.data)) {
+      const options = response.data.map((category: any) => ({
         value: category.id,
         label: category.name
       }))
+      categoryOptions.value = options
       console.log('分类选项已加载:', categoryOptions.value)
+      console.log('分类选项数量:', categoryOptions.value.length)
     } else {
       console.warn('分类数据格式不正确:', response)
       categoryOptions.value = []
@@ -498,12 +500,14 @@ const loadBrandOptions = async () => {
   try {
     const response = await getProductBrands()
     console.log('品牌API响应:', response)
-    if (response && response.data && Array.isArray(response.data)) {
-      brandOptions.value = response.data.map((brand: any) => ({
+    if (response && response.success && response.data && Array.isArray(response.data)) {
+      const options = response.data.map((brand: any) => ({
         value: brand.id,
         label: brand.name
       }))
+      brandOptions.value = options
       console.log('品牌选项已加载:', brandOptions.value)
+      console.log('品牌选项数量:', brandOptions.value.length)
     } else {
       console.warn('品牌数据格式不正确:', response)
       brandOptions.value = []

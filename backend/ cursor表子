@@ -1,0 +1,367 @@
+cat > cursor就是婊子.md << 'EOF'
+# 亿邦ERP部署配置文档 - 解决登录403问题
+
+## 问题描述
+前端登录接口返回403 Forbidden错误，Spring Security路径匹配不一致。
+
+## 根本原因
+Spring Boot的context-path配置导致路径处理不一致：
+- JWT过滤器看到：`/api/auth/login`
+- Spring Security看到：`/auth/login`
+
+## 解决方案
+
+### 1. 修改Nginx配置
+
+文件位置：`/www/server/panel/vhost/nginx/yibang-erp.conf`
+
+```nginx
+# HTTP重定向到HTTPS
+server {
+    listen 80;
+    server_name www.yibangkj.com;
+    return 301 https://$server_name$request_uri;
+}
+
+# HTTPS配置
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name www.yibangkj.com;
+    
+    # SSL证书配置
+    ssl_certificate /www/server/nginx/conf/ssl/yibangkj.com_bundle.crt;
+    ssl_certificate_key /www/server/nginx/conf/ssl/yibangkj.com.key;
+    
+    # SSL安全配置
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-SHA256:ECDHE-RSA-AES256-SHA384;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # 安全头
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    
+    # 后端API代理 - 关键修改
+    location /api/ {
+        # 处理CORS预检请求
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://www.yibangkj.com' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain; charset=utf-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+        
+        # 添加CORS头
+        add_header 'Access-Control-Allow-Origin' 'https://www.yibangkj.com' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+        add_header 'Access-Control-Allow-Credentials' 'true' always;
+        
+        # 关键修改：添加/api后缀
+        proxy_pass http://localhost:7102/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 超时配置
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        
+        # 文件上传大小限制
+        client_max_body_size 100M;
+    }
+    
+    # 静态文件服务
+    location /static/ {
+        alias /opt/yibang-erp/uploads/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # 前端静态文件
+    location / {
+        root /var/www/yibang-erp;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+        
+        # 静态文件缓存
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }
+    
+    # 健康检查
+    location /health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+    
+    # 日志配置
+    access_log /www/wwwlogs/yibang-erp_access.log;
+    error_log /www/wwwlogs/yibang-erp_error.log;
+}
+```
+
+### 2. 修改Spring Boot配置
+
+文件位置：`/opt/yibang-erp/config/application-prod.yml`
+
+```yaml
+server:
+  port: 7102
+  servlet:
+    context-path: /api
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/yibang_erp_prod?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: Pino542635
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL57Dialect
+        
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+# 日志配置
+logging:
+  level:
+    com.yibang.erp: INFO
+    org.springframework: WARN
+  file:
+    name: /opt/yibang-erp/logs/yibang-erp.log
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# JWT配置
+jwt:
+  secret: prod-yibang-erp-super-secure-jwt-secret-key-2024-with-512-bits-minimum-security-requirement
+  expiration: 86400000
+
+# 文件上传配置
+file:
+  upload:
+    path: /opt/yibang-erp/uploads/
+    image:
+      max-size: 10MB
+      allowed-types: jpg,jpeg,png,gif,webp
+      path: images/products
+    access:
+      base-url: https://www.yibangkj.com/static/
+
+# 管理端点配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info"
+  endpoint:
+    health:
+      show-details: when-authorized
+```
+
+### 3. 修改Spring Security配置
+
+文件位置：`backend/src/main/java/com/yibang/erp/config/SecurityConfig.java`
+
+```java
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http, DaoAuthenticationProvider authenticationProvider, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+    System.out.println("=== 配置安全过滤器链 ===");
+    
+    http
+        // 禁用CSRF（使用JWT认证）
+        .csrf(AbstractHttpConfigurer::disable)
+        
+        // 配置CORS
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        
+        // 配置会话管理（无状态）
+        .sessionManagement(session -> 
+            session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+        )
+        
+        // 配置认证提供者
+        .authenticationProvider(authenticationProvider)
+        
+        // 添加JWT认证过滤器
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+        
+        // 配置授权规则
+        .authorizeHttpRequests(authz -> authz
+            // 公开接口
+            .requestMatchers("/").permitAll()
+            .requestMatchers("/health").permitAll()
+            .requestMatchers("/api/auth/**").permitAll()
+            .requestMatchers("/api/test/**").permitAll()
+            .requestMatchers("/actuator/**").permitAll()
+            .requestMatchers("/static/**").permitAll()
+            
+            // 监控API - 仅系统管理员可访问
+            .requestMatchers("/api/monitor/**").hasRole("SYSTEM_ADMIN")
+            
+            // 需要认证的接口
+            .requestMatchers("/api/protected/**").authenticated()
+            .requestMatchers("/api/admin/**").authenticated()
+            .requestMatchers("/api/**").authenticated()
+            
+            // 其他所有请求需要认证
+            .anyRequest().authenticated()
+        )
+        
+        // 配置HTTP Basic认证（开发阶段临时使用）
+        .httpBasic(AbstractHttpConfigurer::disable)
+        
+        // 配置表单登录（开发阶段临时使用）
+        .formLogin(AbstractHttpConfigurer::disable);
+
+    System.out.println("=== 安全过滤器链配置完成 ===");
+    return http.build();
+}
+```
+
+### 4. 修改JWT认证过滤器
+
+文件位置：`backend/src/main/java/com/yibang/erp/security/JwtAuthenticationFilter.java`
+
+```java
+@Override
+protected void doFilterInternal(HttpServletRequest request, 
+                              HttpServletResponse response, 
+                              FilterChain filterChain) throws ServletException, IOException {
+    
+    // 添加请求信息日志
+    logger.info("JWT认证过滤器 - 处理请求: {} {}", request.getMethod(), request.getRequestURI());
+    
+    // 跳过登录接口的JWT认证
+    if (request.getRequestURI().startsWith("/api/auth/login")) {
+        logger.info("JWT认证过滤器 - 跳过登录接口认证");
+        filterChain.doFilter(request, response);
+        return;
+    }
+    
+    try {
+        // ... 保持原有的JWT处理逻辑 ...
+    } catch (Exception e) {
+        logger.error("无法设置用户认证: {}", e.getMessage(), e);
+    }
+
+    filterChain.doFilter(request, response);
+}
+```
+
+## 部署步骤
+
+### 1. 修改Nginx配置
+```bash
+# 编辑Nginx配置文件
+nano /www/server/panel/vhost/nginx/yibang-erp.conf
+
+# 重启Nginx
+/www/server/nginx/sbin/nginx -s reload
+```
+
+### 2. 重新打包后端
+```bash
+cd /Users/estela/work/yibang-erp/backend
+mvn clean package -DskipTests
+```
+
+### 3. 上传并重启服务
+```bash
+# 停止服务
+systemctl stop yibang-erp
+
+# 备份旧文件
+mv /opt/yibang-erp/yibang-erp-1.0.0.jar /opt/yibang-erp/yibang-erp-1.0.0.jar.backup.$(date +%Y%m%d_%H%M%S)
+
+# 上传新文件
+mv /www/wwwroot/yibang-erp-1.0.0.jar /opt/yibang-erp/
+
+# 设置权限
+chown root:root /opt/yibang-erp/yibang-erp-1.0.0.jar
+chmod 644 /opt/yibang-erp/yibang-erp-1.0.0.jar
+
+# 启动服务
+systemctl start yibang-erp
+
+# 检查状态
+systemctl status yibang-erp
+```
+
+## 测试验证
+
+### 1. 测试CORS预检请求
+```bash
+curl -v -X OPTIONS https://www.yibangkj.com/api/auth/login \
+  -H "Origin: https://www.yibangkj.com" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Content-Type"
+```
+
+### 2. 测试登录接口
+```bash
+curl -X POST https://www.yibangkj.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -H "Origin: https://www.yibangkj.com" \
+  -d '{"username":"admin","password":"admin123"}'
+```
+
+### 3. 测试健康检查
+```bash
+curl -v https://www.yibangkj.com/api/health
+```
+
+## 关键点总结
+
+1. **Nginx代理配置**：`proxy_pass http://localhost:7102/api/;` 必须添加 `/api` 后缀
+2. **Spring Boot配置**：`context-path: /api` 必须保持
+3. **路径一致性**：确保所有组件看到的路径都是 `/api/auth/login`
+4. **CORS配置**：Nginx和Spring Security都要配置CORS
+
+## 故障排除
+
+如果仍然有问题，检查：
+1. Nginx错误日志：`tail -f /www/wwwlogs/yibang-erp_error.log`
+2. 后端日志：`journalctl -u yibang-erp -n 50`
+3. 路径匹配：确认所有组件看到的路径一致
+
+EOF
