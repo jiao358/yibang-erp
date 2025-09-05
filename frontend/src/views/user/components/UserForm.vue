@@ -46,6 +46,14 @@
 
       <el-row :gutter="20">
         <el-col :span="12">
+          <el-form-item label="真实姓名" prop="realName">
+            <el-input
+              v-model="form.realName"
+              placeholder="请输入真实姓名"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
           <el-form-item label="邮箱" prop="email">
             <el-input
               v-model="form.email"
@@ -53,6 +61,9 @@
             />
           </el-form-item>
         </el-col>
+      </el-row>
+
+      <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="手机号" prop="phone">
             <el-input
@@ -60,6 +71,9 @@
               placeholder="请输入手机号"
             />
           </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <!-- 占位，保持布局平衡 -->
         </el-col>
       </el-row>
 
@@ -201,6 +215,7 @@ const availableCompanies = ref<any[]>([])
 const form = reactive({
   id: '',
   username: '',
+  realName: '',
   email: '',
   phone: '',
   roleId: undefined as number | undefined,
@@ -217,6 +232,10 @@ const rules: FormRules = {
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 3, max: 20, message: '用户名长度在3到20个字符', trigger: 'blur' }
+  ],
+  realName: [
+    { required: true, message: '请输入真实姓名', trigger: 'blur' },
+    { min: 2, max: 20, message: '真实姓名长度在2到20个字符', trigger: 'blur' }
   ],
   companyId: [
     { 
@@ -382,12 +401,30 @@ const resetForm = () => {
 const fillFormData = () => {
   if (props.userData) {
     console.log('编辑用户数据:', props.userData)
+    console.log('当前可用角色列表:', availableRoles.value)
     
-    // 安全地转换 roleId，避免 NaN
+    // 根据roleName找到对应的roleId
     let roleId: number | undefined
-    if (props.userData.roleId !== null && props.userData.roleId !== undefined) {
+    if (props.userData.roleName && availableRoles.value.length > 0) {
+      const matchedRole = availableRoles.value.find(role => role.name === props.userData.roleName)
+      roleId = matchedRole ? matchedRole.id : undefined
+      console.log('角色映射:', { 
+        roleName: props.userData.roleName, 
+        roleId, 
+        matchedRole,
+        availableRoles: availableRoles.value 
+      })
+    } else if (props.userData.roleId !== null && props.userData.roleId !== undefined) {
+      // 如果roleName没有找到，尝试使用roleId（向后兼容）
       const converted = Number(props.userData.roleId)
       roleId = isNaN(converted) ? undefined : converted
+      console.log('使用roleId回填:', { roleId: props.userData.roleId, converted })
+    } else {
+      console.warn('无法找到角色信息:', { 
+        roleName: props.userData.roleName, 
+        roleId: props.userData.roleId,
+        availableRolesCount: availableRoles.value.length 
+      })
     }
     
     // 安全地转换 priceTierId，避免 NaN
@@ -407,6 +444,7 @@ const fillFormData = () => {
     Object.assign(form, {
       id: props.userData.id,
       username: props.userData.username,
+      realName: props.userData.personalCompanyName || '', // 映射personalCompanyName到realName
       companyId: companyId, // 使用安全转换后的值
       email: props.userData.email,
       phone: props.userData.phone,
@@ -422,6 +460,7 @@ const fillFormData = () => {
     Object.assign(form, {
       id: '',
       username: '',
+      realName: '',
       companyId: undefined,
       email: '',
       phone: '',

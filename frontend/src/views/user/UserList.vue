@@ -65,6 +65,7 @@
         style="width: 100%"
       >
         <el-table-column prop="username" label="用户名" width="120" />
+        <el-table-column prop="personalCompanyName" label="真实姓名" width="120" />
         <el-table-column prop="companyName" label="所属公司" width="150" />
         <el-table-column prop="email" label="邮箱" min-width="200" />
         <el-table-column prop="phone" label="手机号" width="120" />
