@@ -1,11 +1,17 @@
 <template>
-  <div class="product-edit">
+  <el-dialog
+    v-model="dialogVisible"
+    :title="isEdit ? '编辑商品' : '新增商品Plus'"
+    width="900px"
+    :close-on-click-modal="false"
+    @close="handleClose"
+  >
     <el-form
       ref="formRef"
       :model="form"
       :rules="rules"
       label-width="120px"
-      class="edit-form"
+      @submit.prevent="handleSubmit"
     >
       <!-- 基本信息 -->
       <div class="form-section">
@@ -31,9 +37,6 @@
               v-model="form.categoryId"
               placeholder="请选择商品分类"
               style="width: 100%"
-              @focus="handleCategoryFocus"
-              @change="handleCategoryChange"
-              @visible-change="handleCategoryVisibleChange"
             >
               <el-option
                 v-for="category in categoryOptions"
@@ -53,9 +56,6 @@
               placeholder="请选择商品品牌"
               clearable
               style="width: 100%"
-              @focus="handleBrandFocus"
-              @change="handleBrandChange"
-              @visible-change="handleBrandVisibleChange"
             >
               <el-option
                 v-for="brand in brandOptions"
@@ -66,32 +66,6 @@
             </el-select>
             <div style="font-size: 12px; color: #999; margin-top: 4px;">
               已加载 {{ brandCount }} 个品牌选项
-            </div>
-          </el-form-item>
-          
-          <!-- 新增测试品牌字段 -->
-          <el-form-item label="测试品牌" prop="testBrandId">
-            <el-select
-              v-model="form.testBrandId"
-              placeholder="请选择测试品牌"
-              clearable
-              style="width: 100%"
-              @focus="handleTestBrandFocus"
-              @change="handleTestBrandChange"
-              @visible-change="handleTestBrandVisibleChange"
-            >
-              <el-option
-                v-for="brand in testBrandOptions"
-                :key="brand.value"
-                :label="brand.label"
-                :value="brand.value"
-              />
-            </el-select>
-            <div style="font-size: 12px; color: #999; margin-top: 4px;">
-              已加载 {{ testBrandCount }} 个测试品牌选项
-            </div>
-            <div style="font-size: 10px; color: #666; margin-top: 2px;">
-              DEBUG: {{ JSON.stringify(testBrandOptions) }}
             </div>
           </el-form-item>
           
@@ -396,46 +370,52 @@
           </el-form-item>
         </div>
       </div>
-
-      <!-- 操作按钮 -->
-      <div class="form-actions">
-        <el-button @click="handleCancel">取消</el-button>
+    </el-form>
+    
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleClose">取消</el-button>
         <el-button type="primary" @click="handleSubmit" :loading="submitting">
           {{ product ? '更新' : '创建' }}
         </el-button>
       </div>
-    </el-form>
-  </div>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, watch, nextTick } from 'vue'
-import SimpleSelect from '@/components/SimpleSelect.vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { createProduct, updateProduct, getProductCategories, getProductBrands } from '@/api/product'
 import { productPriceConfigApi } from '@/api/productPriceConfig'
 import { priceTierApi } from '@/api/priceTier'
+import SimpleSelect from '@/components/SimpleSelect.vue'
 import type { Product, ProductPriceTierConfigRequest } from '@/types/product'
 
-// Props
 interface Props {
-  product: Product | null
-  visible?: boolean
+  visible: boolean
+  product?: Product | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  visible: false
+  visible: false,
+  product: null
 })
 
-// Emits
 const emit = defineEmits<{
-  success: []
-  cancel: []
+  'update:visible': [value: boolean]
+  'success': []
 }>()
 
 // 响应式数据
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const categoryOptions = ref<any[]>([])
+const brandOptions = ref<any[]>([])
+
+// 价格分层配置相关数据
+const priceTierConfigs = ref<any[]>([])
+const availablePriceTiers = ref<any[]>([])
 
 // 表单数据
 const form = reactive({
@@ -443,7 +423,6 @@ const form = reactive({
   name: '',
   categoryId: undefined as number | undefined,
   brandId: undefined as number | undefined,
-  testBrandId: undefined as number | undefined, // 新增测试品牌字段
   description: '',
   shortDescription: '',
   unit: '',
@@ -490,64 +469,38 @@ const rules: FormRules = {
   ]
 }
 
-// 选项数据 - 动态加载
-const categoryOptions = ref<any[]>([])
-const brandOptions = ref<any[]>([])
-
-// 新增测试品牌选项数据 - 直接设置默认值
-const testBrandOptions = ref([
-  { value: 1, label: '青岛啤酒' },
-  { value: 2, label: '华为' },
-  { value: 3, label: '小米' }
-])
-
-console.log('🔍 [DEBUG] 测试品牌选项直接初始化:', testBrandOptions.value)
-console.log('🔍 [DEBUG] 测试品牌选项数量:', testBrandOptions.value.length)
-
-// 调试信息
-console.log('ProductEdit组件初始化 - categoryOptions:', categoryOptions.value)
-console.log('ProductEdit组件初始化 - brandOptions:', brandOptions.value)
-console.log('ProductEdit组件初始化 - testBrandOptions:', testBrandOptions.value)
-
 const statusOptions = ref([
   { value: 'DRAFT', label: '草稿' },
   { value: 'ACTIVE', label: '上架' }
 ])
 
-// 价格分层配置相关数据
-const priceTierConfigs = ref<any[]>([])
-const availablePriceTiers = ref<any[]>([])
+// 计算属性
+const dialogVisible = computed({
+  get: () => props.visible,
+  set: (value) => emit('update:visible', value)
+})
 
-// 加载分类选项
+const isEdit = computed(() => !!props.product?.id)
+const categoryCount = computed(() => categoryOptions.value.length)
+const brandCount = computed(() => brandOptions.value.length)
+
 // 加载分类选项
 const loadCategoryOptions = async () => {
   try {
-    console.log('🔍 [DEBUG] 开始加载分类选项...')
+    console.log('🔍 [DEBUG] Plus组件开始加载分类选项...')
     const response = await getProductCategories()
-    console.log('🔍 [DEBUG] 分类API响应:', response)
+    console.log('🔍 [DEBUG] Plus组件分类API响应:', response)
     
     if (response && response.success && response.data && Array.isArray(response.data)) {
-      console.log('🔍 [DEBUG] API响应格式正确，开始处理数据...')
       const options = response.data.map((category: any) => ({
         value: category.id,
         label: category.name
       }))
-      console.log('🔍 [DEBUG] 映射后的选项数据:', options)
-      
-      // 直接赋值新数组，触发响应式更新
       categoryOptions.value = options
-      
-      console.log('✅ [SUCCESS] 分类选项已加载:', categoryOptions.value)
-      console.log('✅ [SUCCESS] 分类选项数量:', categoryOptions.value.length)
-      console.log('✅ [SUCCESS] 分类选项是否为数组:', Array.isArray(categoryOptions.value))
-      console.log('✅ [SUCCESS] 分类选项长度大于0:', categoryOptions.value.length > 0)
-    } else {
-      console.warn('❌ [ERROR] 分类数据格式不正确:', response)
-      categoryOptions.value = []
+      console.log('✅ [SUCCESS] Plus组件分类选项已加载:', categoryOptions.value)
     }
   } catch (error) {
-    console.error('❌ [ERROR] 获取分类列表失败:', error)
-    ElMessage.warning('获取分类列表失败')
+    console.error('❌ [ERROR] Plus组件获取分类列表失败:', error)
     categoryOptions.value = []
   }
 }
@@ -555,151 +508,55 @@ const loadCategoryOptions = async () => {
 // 加载品牌选项
 const loadBrandOptions = async () => {
   try {
-    console.log('🔍 [DEBUG] 开始加载品牌选项...')
+    console.log('🔍 [DEBUG] Plus组件开始加载品牌选项...')
     const response = await getProductBrands()
-    console.log('🔍 [DEBUG] 品牌API响应:', response)
+    console.log('🔍 [DEBUG] Plus组件品牌API响应:', response)
     
     if (response && response.success && response.data && Array.isArray(response.data)) {
-      console.log('🔍 [DEBUG] API响应格式正确，开始处理数据...')
       const options = response.data.map((brand: any) => ({
         value: brand.id,
         label: brand.name
       }))
-      console.log('🔍 [DEBUG] 映射后的选项数据:', options)
-      
-      // 先清空数组
-      console.log('🔍 [DEBUG] 清空品牌选项数组...')
-      brandOptions.value = []
-      console.log('🔍 [DEBUG] 清空后的品牌选项:', brandOptions.value)
-      
-      // 等待DOM更新
-      console.log('🔍 [DEBUG] 等待DOM更新...')
-      await nextTick()
-      
-      // 使用Object.assign强制触发响应式更新
-      console.log('🔍 [DEBUG] 使用Object.assign更新品牌选项...')
-      Object.assign(brandOptions.value, options)
-      
-      console.log('✅ [SUCCESS] 品牌选项已加载:', brandOptions.value)
-      console.log('✅ [SUCCESS] 品牌选项数量:', brandOptions.value.length)
-      console.log('✅ [SUCCESS] 品牌选项是否为数组:', Array.isArray(brandOptions.value))
-      console.log('✅ [SUCCESS] 品牌选项长度大于0:', brandOptions.value.length > 0)
-    } else {
-      console.warn('❌ [ERROR] 品牌数据格式不正确:', response)
-      brandOptions.value = []
+      brandOptions.value = options
+      console.log('✅ [SUCCESS] Plus组件品牌选项已加载:', brandOptions.value)
     }
   } catch (error) {
-    console.error('❌ [ERROR] 获取品牌列表失败:', error)
-    ElMessage.warning('获取品牌列表失败')
+    console.error('❌ [ERROR] Plus组件获取品牌列表失败:', error)
     brandOptions.value = []
   }
 }
 
-// 下拉框事件处理函数
-const handleCategoryFocus = () => {
-  console.log('🔍 [DEBUG] 分类下拉框获得焦点')
-  console.log('🔍 [DEBUG] 当前分类选项数量:', categoryOptions.value.length)
-  console.log('🔍 [DEBUG] 当前分类选项:', categoryOptions.value)
-}
-
-const handleCategoryChange = (value: any) => {
-  console.log('✅ [SUCCESS] 分类选择发生变化:', value)
-  console.log('✅ [SUCCESS] 当前表单分类ID:', form.categoryId)
-}
-
-const handleCategoryVisibleChange = (visible: boolean) => {
-  console.log('🔍 [DEBUG] 分类下拉框可见性变化:', visible)
-  if (visible) {
-    console.log('🔍 [DEBUG] 分类下拉框展开，当前选项数量:', categoryOptions.value.length)
-  }
-}
-
-
-const handleBrandFocus = () => {
-  console.log('🔍 [DEBUG] 品牌下拉框获得焦点')
-  console.log('🔍 [DEBUG] 当前品牌选项数量:', brandOptions.value.length)
-  console.log('🔍 [DEBUG] 当前品牌选项:', brandOptions.value)
-}
-
-const handleBrandChange = (value: any) => {
-  console.log('✅ [SUCCESS] 品牌选择发生变化:', value)
-  console.log('✅ [SUCCESS] 当前表单品牌ID:', form.brandId)
-}
-
-const handleBrandVisibleChange = (visible: boolean) => {
-  console.log('🔍 [DEBUG] 品牌下拉框可见性变化:', visible)
-  if (visible) {
-    console.log('🔍 [DEBUG] 品牌下拉框展开，当前选项数量:', brandOptions.value.length)
-  }
-}
-
-
-// 新增测试品牌事件处理函数
-const handleTestBrandFocus = () => {
-  console.log('🔍 [DEBUG] 测试品牌下拉框获得焦点')
-  console.log('🔍 [DEBUG] 当前测试品牌选项数量:', testBrandOptions.value.length)
-  console.log('🔍 [DEBUG] 当前测试品牌选项:', testBrandOptions.value)
-}
-
-const handleTestBrandChange = (value: any) => {
-  console.log('✅ [SUCCESS] 测试品牌选择发生变化:', value)
-  console.log('✅ [SUCCESS] 当前表单测试品牌ID:', form.testBrandId)
-}
-
-const handleTestBrandVisibleChange = (visible: boolean) => {
-  console.log('🔍 [DEBUG] 测试品牌下拉框可见性变化:', visible)
-  if (visible) {
-    console.log('🔍 [DEBUG] 测试品牌下拉框展开，当前选项数量:', testBrandOptions.value.length)
-  }
-}
-
-
-// 计算属性
-const isEdit = computed(() => !!props.product)
-
-// 调试计算属性
-const categoryCount = computed(() => categoryOptions.value.length)
-const brandCount = computed(() => brandOptions.value.length)
-const testBrandCount = computed(() => testBrandOptions.value.length)
-
-// 价格分层配置相关计算属性
-const canAddMoreConfigs = computed(() => {
-  return priceTierConfigs.value.length < availablePriceTiers.value.length
-})
-
-// 计算已使用的价格分层ID（用于禁用已选择项，避免重复）
-const usedPriceTierIds = computed(() => priceTierConfigs.value
-  .map(config => config.priceTierId)
-  .filter(id => id !== null))
-
-// 在映射选项时禁用已选择的分层，避免重复选择
-const priceTierOptionItems = computed(() => {
-  const usedSet = new Set(usedPriceTierIds.value)
-  return availablePriceTierOptions.value.map(tier => ({
-    label: `${tier.tierName} (${tier.tierType})`,
-    value: tier.id,
-    disabled: usedSet.has(tier.id)
-  }))
-})
-
-const availablePriceTierOptions = computed(() => {
-  // 在编辑模式下，允许选择所有可用的价格分层
-  // 因为用户可能需要修改已选择的价格分层
-  return availablePriceTiers.value
-})
-
-// 删除重复定义的 priceTierOptionItems（已合并至上方禁用逻辑）
-
-const configStatusText = computed(() => {
-  const total = availablePriceTiers.value.length
-  const used = priceTierConfigs.value.length
-  return `${used}/${total} 个价格分层已配置`
-})
-
 // 方法
-const initForm = () => {
+const resetForm = () => {
+  Object.assign(form, {
+    sku: '',
+    name: '',
+    categoryId: undefined,
+    brandId: undefined,
+    description: '',
+    shortDescription: '',
+    unit: '',
+    costPrice: 1.00,
+    sellingPrice: 1.00,
+    marketPrice: undefined,
+    weight: undefined,
+    material: '',
+    color: '',
+    size: '',
+    originCountry: '',
+    hsCode: '',
+    tags: '',
+    retailLimitPrice: 1.00,
+    status: 'DRAFT',
+    isFeatured: false,
+    isHot: false,
+    isNew: false
+  })
+  formRef.value?.clearValidate()
+}
+
+const fillFormData = () => {
   if (props.product) {
-    // 编辑模式，填充表单数据
     Object.assign(form, {
       sku: props.product.sku || '',
       name: props.product.name || '',
@@ -725,31 +582,7 @@ const initForm = () => {
       isNew: props.product.isNew || false
     })
   } else {
-    // 新增模式，设置默认值
-    Object.assign(form, {
-      sku: '',
-      name: '',
-      categoryId: undefined,
-      brandId: undefined,
-      description: '',
-      shortDescription: '',
-      unit: '',
-      costPrice: 1.00,
-      sellingPrice: 1.00,
-      marketPrice: undefined,
-      weight: undefined,
-      material: '',
-      color: '',
-      size: '',
-      originCountry: '',
-      hsCode: '',
-      tags: '',
-      retailLimitPrice: 1.00,
-      status: 'DRAFT',
-      isFeatured: false,
-      isHot: false,
-      isNew: false
-    })
+    resetForm()
   }
 }
 
@@ -771,8 +604,8 @@ const handleSubmit = async () => {
       tags: form.tags ? JSON.stringify(form.tags.split(',').map(tag => tag.trim())) : '[]'
     }
     
-    console.log('提交的商品数据:', submitData)
-    console.log('当前用户公司ID:', currentCompanyId)
+    console.log('Plus组件提交的商品数据:', submitData)
+    console.log('Plus组件当前用户公司ID:', currentCompanyId)
     
     let savedProductId: number
     
@@ -799,21 +632,21 @@ const handleSubmit = async () => {
         await saveProductPriceConfigs(savedProductId)
       } catch (error) {
         // 价格配置保存失败不影响商品保存
-        console.warn('价格分层配置保存失败，但商品已保存:', error)
+        console.warn('Plus组件价格分层配置保存失败，但商品已保存:', error)
       }
     }
     
     emit('success')
   } catch (error) {
-    console.error('提交失败:', error)
+    console.error('Plus组件提交失败:', error)
     ElMessage.error('操作失败，请检查表单信息')
   } finally {
     submitting.value = false
   }
 }
 
-const handleCancel = () => {
-  emit('cancel')
+const handleClose = () => {
+  emit('update:visible', false)
 }
 
 // 价格分层配置相关方法
@@ -877,7 +710,7 @@ const loadAvailablePriceTiers = async () => {
     const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
     const currentCompanyId = userInfo.companyId || 1
     
-    console.log('当前用户公司ID:', currentCompanyId)
+    console.log('Plus组件当前用户公司ID:', currentCompanyId)
     
     // 调用价格分层API获取当前公司可用的选项
     const response = await priceTierApi.getPriceTierList({ 
@@ -892,30 +725,14 @@ const loadAvailablePriceTiers = async () => {
         tierName: tier.tierName,
         tierType: tier.tierType || 'RETAIL'
       }))
-      console.log('加载到价格分层选项:', availablePriceTiers.value)
+      console.log('Plus组件加载到价格分层选项:', availablePriceTiers.value)
     } else {
-      console.warn('价格分层API返回格式不正确:', response)
+      console.warn('Plus组件价格分层API返回格式不正确:', response)
       availablePriceTiers.value = []
     }
   } catch (error) {
-    console.error('获取价格分层失败:', error)
+    console.error('Plus组件获取价格分层失败:', error)
     availablePriceTiers.value = []
-  }
-}
-
-const loadProductPriceConfigs = async (productId: number) => {
-  try {
-    const configs = await productPriceConfigApi.getConfigsByProductId(productId)
-    priceTierConfigs.value = configs.map(config => ({
-      id: config.id,
-      priceTierId: config.priceTierId,
-      dropshippingPrice: config.dropshippingPrice,
-      retailLimitPrice: config.retailLimitPrice,
-      isActive: config.isActive
-    }))
-  } catch (error) {
-    console.error('获取商品价格配置失败:', error)
-    priceTierConfigs.value = []
   }
 }
 
@@ -937,68 +754,78 @@ const saveProductPriceConfigs = async (productId: number) => {
     }))
     
     await productPriceConfigApi.batchSaveConfigs(productId, configs)
-    ElMessage.success('价格分层配置保存成功')
+    ElMessage.success('Plus组件价格分层配置保存成功')
   } catch (error) {
-    console.error('保存价格分层配置失败:', error)
-    ElMessage.error('保存价格分层配置失败')
+    console.error('Plus组件保存价格分层配置失败:', error)
+    ElMessage.error('Plus组件保存价格分层配置失败')
     throw error
   }
 }
 
-// 监听商品数据变化
-watch(() => props.product, (newProduct) => {
-  if (newProduct) {
-    initForm()
-    // 如果是编辑模式，加载价格分层配置
-    if (newProduct.id) {
-      loadProductPriceConfigs(newProduct.id)
-    }
-  } else {
-    initForm()
-  }
-}, { immediate: true })
+// 价格分层配置相关计算属性
+const canAddMoreConfigs = computed(() => {
+  return priceTierConfigs.value.length < availablePriceTiers.value.length
+})
 
-// 监听对话框显示状态 - 仿照用户管理模块的实现
+// 计算已使用的价格分层ID（用于禁用已选择项，避免重复）
+const usedPriceTierIds = computed(() => priceTierConfigs.value
+  .map(config => config.priceTierId)
+  .filter(id => id !== null))
+
+// 在映射选项时禁用已选择的分层，避免重复选择
+const priceTierOptionItems = computed(() => {
+  const usedSet = new Set(usedPriceTierIds.value)
+  return availablePriceTierOptions.value.map(tier => ({
+    label: `${tier.tierName} (${tier.tierType})`,
+    value: tier.id,
+    disabled: usedSet.has(tier.id)
+  }))
+})
+
+const availablePriceTierOptions = computed(() => {
+  // 在编辑模式下，允许选择所有可用的价格分层
+  // 因为用户可能需要修改已选择的价格分层
+  return availablePriceTiers.value
+})
+
+const configStatusText = computed(() => {
+  const total = availablePriceTiers.value.length
+  const used = priceTierConfigs.value.length
+  return `${used}/${total} 个价格分层已配置`
+})
+
+// 监听对话框显示状态
 watch(() => props.visible, (newVal) => {
   if (newVal) {
-    console.log('🔍 [DEBUG] 对话框打开，开始加载数据...')
-    // 使用setTimeout确保对话框DOM完全渲染
-    setTimeout(async () => {
+    nextTick(async () => {
+      console.log('🔍 [DEBUG] Plus组件对话框打开，开始加载数据...')
+      // 先加载可用数据
       await Promise.all([
         loadCategoryOptions(),
         loadBrandOptions(),
         loadAvailablePriceTiers()
       ])
-      console.log('✅ [SUCCESS] 所有数据加载完成')
-    }, 100) // 延迟100ms确保DOM渲染完成
+      console.log('✅ [SUCCESS] Plus组件所有数据加载完成')
+      // 如果有商品数据，则填充表单
+      if (props.product) {
+        fillFormData()
+      }
+    })
+  } else {
+    // 对话框关闭时重置表单
+    resetForm()
   }
-}, { immediate: true })
-
-// 生命周期 - 保留原有逻辑作为备用
-onMounted(() => {
-  console.log('🔍 [DEBUG] 组件挂载，立即加载数据...')
-  // 立即加载数据
-  setTimeout(async () => {
-    await Promise.all([
-      loadCategoryOptions(),
-      loadBrandOptions(),
-      loadAvailablePriceTiers()
-    ])
-    console.log('✅ [SUCCESS] onMounted数据加载完成')
-  }, 200) // 延迟200ms确保所有DOM都渲染完成
 })
+
+// 监听商品数据变化
+watch(() => props.product, (newProduct) => {
+  if (newProduct && props.visible) {
+    fillFormData()
+  }
+}, { immediate: true, deep: true })
 </script>
 
 <style scoped>
-.product-edit {
-  padding: 0;
-}
-
-.edit-form {
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
 .form-section {
   margin-bottom: 32px;
 }
@@ -1018,19 +845,17 @@ onMounted(() => {
   gap: 20px;
 }
 
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
 .form-tip {
   font-size: 12px;
   color: var(--md-sys-color-on-surface-variant);
   margin-top: 4px;
   line-height: 1.4;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 16px;
-  padding-top: 24px;
-  border-top: 1px solid var(--md-sys-color-outline-variant);
 }
 
 /* 价格分层配置样式 */
@@ -1140,26 +965,5 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   font-weight: 500;
-}
-
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .form-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  
-  .form-actions {
-    flex-direction: column;
-  }
-  
-  .form-actions .el-button {
-    width: 100%;
-  }
-}
-
-/* 确保价格分层选择器下拉菜单显示在对话框之上 */
-.price-tier-select-dropdown {
-  z-index: 9999 !important;
 }
 </style>

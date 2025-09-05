@@ -92,7 +92,11 @@
 
     <!-- 操作按钮区域 -->
     <div class="action-section">
-      <el-button type="primary" @click="handleCreate">
+      <!-- <el-button type="primary" @click="handleCreate">
+        <el-icon><i class="el-icon-plus"></i></el-icon>
+        新增商品
+      </el-button> -->
+      <el-button type="primary" @click="handleCreatePlus">
         <el-icon><i class="el-icon-plus"></i></el-icon>
         新增商品
       </el-button>
@@ -239,11 +243,19 @@
     >
       <ProductEdit 
         v-if="editDialogVisible" 
-        :product="selectedProduct" 
+        :product="selectedProduct"
+        :visible="editDialogVisible"
         @success="handleEditSuccess"
         @cancel="editDialogVisible = false"
       />
     </el-dialog>
+
+    <!-- 商品Plus表单对话框 -->
+    <ProductFormPlus
+      v-model:visible="formPlusVisible"
+      :product="selectedProduct"
+      @success="handleFormPlusSuccess"
+    />
 
     <!-- 审核对话框 -->
     <el-dialog
@@ -301,6 +313,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 // 使用Element Plus内置图标，避免@element-plus/icons-vue的导入问题
 import ProductDetail from './components/ProductDetail.vue'
 import ProductEdit from './components/ProductEdit.vue'
+import ProductFormPlus from './components/ProductFormPlus.vue'
 import ProductAudit from './components/ProductAudit.vue'
 import ProductImageUpload from '@/components/ProductImageUpload.vue'
 import { getProductList, deleteProduct, submitForApproval, getProductBrands, getProductCategories, activateProduct, deactivateProduct } from '@/api/product'
@@ -313,6 +326,7 @@ const productList = ref<Product[]>([])
 const selectedItems = ref<Product[]>([])
 const detailDialogVisible = ref(false)
 const editDialogVisible = ref(false)
+const formPlusVisible = ref(false)
 const auditDialogVisible = ref(false)
 const uploadImageDialogVisible = ref(false)
 const selectedProduct = ref<Product | null>(null)
@@ -416,6 +430,11 @@ const handleSelectionChange = (selection: Product[]) => {
 const handleCreate = () => {
   selectedProduct.value = null
   editDialogVisible.value = true
+}
+
+const handleCreatePlus = () => {
+  selectedProduct.value = null
+  formPlusVisible.value = true
 }
 
 const handleView = async (row: Product) => {
@@ -603,6 +622,12 @@ const handleEditSuccess = () => {
   editDialogVisible.value = false
   loadProductList()
   ElMessage.success('编辑成功')
+}
+
+const handleFormPlusSuccess = () => {
+  formPlusVisible.value = false
+  loadProductList()
+  ElMessage.success('Plus表单操作成功')
 }
 
 const handleAuditSuccess = () => {

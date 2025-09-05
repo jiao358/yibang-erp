@@ -201,11 +201,11 @@
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <!-- 调试信息：显示权限状态 -->
-            <div v-if="isSupplierUser()" style="font-size: 10px; color: #999; margin-bottom: 5px;">
+            <!-- <div v-if="isSupplierUser()" style="font-size: 10px; color: #999; margin-bottom: 5px;">
               权限: 确认[{{ canSupplierConfirm(row) ? '✓' : '✗' }}] 
               发货[{{ canSupplierShip(row) ? '✓' : '✗' }}] 
               拒绝[{{ canSupplierReject(row) ? '✓' : '✗' }}]
-            </div>
+            </div> -->
             
             <el-button
               v-if="canEdit(row)"
@@ -271,11 +271,11 @@
                   </el-dropdown-item>
                   
                   <!-- 调试：显示权限检查结果 -->
-                  <el-dropdown-item v-if="isSupplierUser()" disabled style="color: #999;">
+                  <!-- <el-dropdown-item v-if="isSupplierUser()" disabled style="color: #999;">
                     调试: 确认[{{ canSupplierConfirm(row) ? '✓' : '✗' }}] 
                     发货[{{ canSupplierShip(row) ? '✓' : '✗' }}] 
                     拒绝[{{ canSupplierReject(row) ? '✓' : '✗' }}]
-                  </el-dropdown-item>
+                  </el-dropdown-item> -->
                   
                   <!-- 通用操作 -->
                   <el-dropdown-item
@@ -310,7 +310,7 @@
     </div>
 
     <!-- 调试信息 -->
-    <div v-if="getUserRole() !== 'SALES'" style="background: #f0f9ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 15px; margin: 20px 0;">
+    <!-- <div v-if="getUserRole() !== 'SALES'" style="background: #f0f9ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 15px; margin: 20px 0;">
       <h4 style="margin: 0 0 10px 0; color: #1e40af;">🔍 调试信息</h4>
       <p style="margin: 5px 0; color: #1e40af;">
         <strong>当前用户角色:</strong> {{ getUserRole() }}
@@ -336,7 +336,7 @@
       <p style="margin: 5px 0; color: #1e40af;">
         <strong>可操作的订单数量:</strong> {{ getOperableOrderCount() }}
       </p>
-    </div>
+    </div> -->
 
     <!-- 新建/编辑订单对话框 -->
     <OrderDialog
