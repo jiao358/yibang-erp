@@ -29,12 +29,6 @@ export const workspaceApi = {
     })
   },
 
-  // 获取最近用户
-  getRecentUsers(limit: number = 5) {
-    return request.get('/api/workspace/recent-users', {
-      params: { limit }
-    })
-  },
 
   // 获取最近商品
   getRecentProducts(limit: number = 5) {
@@ -93,7 +87,6 @@ export const {
   getSalesStats,
   getBasicStats,
   getRecentOrders,
-  getRecentUsers,
   getRecentProducts,
   getRecentCustomers,
   getPendingOrders,

@@ -126,14 +126,15 @@
           :loading="loading"
         />
       </div>
-      <div class="recent-users">
+      <!-- 最近用户功能暂时移除（后端接口不存在） -->
+      <!-- <div class="recent-users">
         <h3>最近用户</h3>
         <RecentItemsList
           :items="recentUsers"
           type="user"
           :loading="loading"
         />
-      </div>
+      </div> -->
     </div>
   </div>
 </template>
@@ -143,7 +144,7 @@ import { ref, onMounted } from 'vue'
 import OverviewCard from './common/OverviewCard.vue'
 import QuickActionCard from './common/QuickActionCard.vue'
 import RecentItemsList from './common/RecentItemsList.vue'
-import { getSystemStats, getRecentOrders, getRecentUsers } from '@/api/workspace'
+import { getSystemStats, getRecentOrders } from '@/api/workspace'
 
 // 响应式数据
 const systemStats = ref({
@@ -158,7 +159,7 @@ const systemStats = ref({
 })
 
 const recentOrders = ref([])
-const recentUsers = ref([])
+// const recentUsers = ref([]) // 暂时移除
 const loading = ref(false)
 
 // 加载数据
@@ -177,11 +178,11 @@ const loadData = async () => {
       recentOrders.value = ordersResponse.data
     }
 
-    // 加载最近用户
-    const usersResponse = await getRecentUsers(5)
-    if (usersResponse.success) {
-      recentUsers.value = usersResponse.data
-    }
+    // 最近用户功能暂时移除（后端接口不存在）
+    // const usersResponse = await getRecentUsers(5)
+    // if (usersResponse.success) {
+    //   recentUsers.value = usersResponse.data
+    // }
   } catch (error) {
     console.error('加载工作台数据失败:', error)
   } finally {
