@@ -47,8 +47,7 @@ CREATE TABLE IF NOT EXISTS `product_inventory` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_product_warehouse` (`product_id`,`warehouse_id`),
   KEY `idx_warehouse_id` (`warehouse_id`),
-  KEY `idx_product_id` (`product_id`),
-  KEY `idx_deleted` (`deleted`)
+  KEY `idx_product_id` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='商品库存表';
 
 -- 3. 库存操作记录表

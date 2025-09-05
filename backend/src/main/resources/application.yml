@@ -1,7 +1,7 @@
 # Spring Boot 3.x 主配置文件
 spring:
   profiles:
-    active: dev
+    active: prod
   application:
     name: yibang-erp
   # 明确配置ANSI输出，避免启动时的枚举转换错误

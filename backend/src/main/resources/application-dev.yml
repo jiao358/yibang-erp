@@ -50,6 +50,10 @@ spring:
 
 # 日志配置
 logging:
+  file:
+    name: logs/yibang-erp.log # 日志文件路径
+    max-size: 100MB           # 单个日志文件最大大小
+    max-history: 30           # 保留30天的日志
   level:
     com.yibang.erp: DEBUG
     org.springframework.security: DEBUG
