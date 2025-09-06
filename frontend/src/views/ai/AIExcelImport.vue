@@ -207,14 +207,6 @@ const hasProcessingTasks = computed(() => {
 
 // 事件处理
 const handleUploadNew = () => {
-  if (hasProcessingTasks.value) {
-    ElMessage.warning({
-      message: '当前有任务正在处理中，请等待处理完成后再上传新文件',
-      duration: 3000,
-      showClose: true
-    })
-    return
-  }
   showUploadDialog.value = true
 }
 
@@ -290,9 +282,7 @@ const startProcessing = async () => {
     console.log('📋 任务列表内容:', taskHistory.value)
     
     // 立即启动5秒倒计时，不等待后端响应
-    if (!countdownInterval) {
-      startCountdown()
-    }
+    startCountdown()
     
     // 创建FormData对象
     const formData = new FormData()
@@ -344,6 +334,7 @@ const startProcessing = async () => {
     }
     
     ElMessage.error(`启动AI处理失败: ${error.message || error}`)
+    clearCountdown()
     showProgressDialog.value = false
   }
 }
@@ -356,8 +347,13 @@ let progressInterval: NodeJS.Timeout | null = null
 
 // 启动倒计时
 const startCountdown = () => {
-  console.log('⏰ 开始倒计时，初始值:', countdownSeconds.value)
+  // 先清理之前的倒计时
+  clearCountdown()
+  
+  // 重置倒计时为5秒
   countdownSeconds.value = 5
+  console.log('⏰ 开始倒计时，初始值:', countdownSeconds.value)
+  
   countdownInterval = setInterval(() => {
     countdownSeconds.value--
     console.log('⏰ 倒计时:', countdownSeconds.value, '秒')
@@ -402,6 +398,9 @@ const createCachedTask = (taskId: string, file: File): TaskHistoryItem => {
 }
 
 const startProgressPolling = (taskId: string) => {
+  // 先清理之前的轮询
+  clearProgressPolling()
+  
   progressInterval = setInterval(async () => {
     try {
       const response = await aiExcelImportApi.getProgress(taskId)
@@ -412,6 +411,7 @@ const startProgressPolling = (taskId: string) => {
         // 检查是否完成
         if (response.status === 'COMPLETED' || response.status === 'FAILED') {
           clearProgressPolling()
+          clearCountdown() // 清理倒计时
           processingStatus.value = response.status
           
           // 清理对应的缓存任务
@@ -419,10 +419,15 @@ const startProgressPolling = (taskId: string) => {
           
           // 重新加载任务历史
           await loadTaskHistory()
+          
+          // 关闭弹窗
+          showProgressDialog.value = false
+          ElMessage.success('AI处理完成')
         }
       }
     } catch (error: any) {
       console.error('获取进度失败:', error)
+      // 不清理轮询，继续尝试
     }
   }, 2000) // 每2秒轮询一次
 }
@@ -432,8 +437,7 @@ const clearProgressPolling = () => {
     clearInterval(progressInterval)
     progressInterval = null
   }
-  // 同时清理倒计时
-  clearCountdown()
+  // 不清理倒计时，让倒计时自然结束
 }
 
 // 缓存任务持久化：读/写/删/恢复
@@ -501,11 +505,20 @@ function restoreCachedTasks() {
 
 // 清理指定的缓存任务
 function removeCachedTask(taskId: string) {
+  // 1. 从 localStorage 中清理
   const arr = loadCachedTasks()
   const filtered = arr.filter(t => t.taskId !== taskId)
   if (filtered.length !== arr.length) {
     localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(filtered))
-    console.log(`📋 已清理缓存任务: ${taskId}`)
+    console.log(`📋 已从localStorage清理缓存任务: ${taskId}`)
+  }
+  
+  // 2. 从 taskHistory.value 中清理
+  const taskIndex = taskHistory.value.findIndex(t => t.taskId === taskId)
+  if (taskIndex !== -1) {
+    taskHistory.value.splice(taskIndex, 1)
+    totalTasks.value = Math.max(0, totalTasks.value - 1)
+    console.log(`📋 已从任务列表中清理缓存任务: ${taskId}`)
   }
 }
 
