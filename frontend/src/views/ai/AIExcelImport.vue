@@ -404,26 +404,24 @@ const startProgressPolling = (taskId: string) => {
   progressInterval = setInterval(async () => {
     try {
       const response = await aiExcelImportApi.getProgress(taskId)
-      if (response.progress) {
+      // 先检查是否完成（不依赖progress字段）
+      if (response.status === 'COMPLETED' || response.status === 'FAILED') {
+        clearProgressPolling()
+        clearCountdown() // 清理倒计时
+        processingStatus.value = response.status
+        
+        // 清理对应的缓存任务
+        removeCachedTask(taskId)
+        
+        // 重新加载任务历史
+        await loadTaskHistory()
+        
+        // 关闭弹窗
+        showProgressDialog.value = false
+        ElMessage.success('AI处理完成')
+      } else if (response.progress) {
         // 只更新全局进度，不影响缓存任务
         progress.value = response.progress
-        
-        // 检查是否完成
-        if (response.status === 'COMPLETED' || response.status === 'FAILED') {
-          clearProgressPolling()
-          clearCountdown() // 清理倒计时
-          processingStatus.value = response.status
-          
-          // 清理对应的缓存任务
-          removeCachedTask(taskId)
-          
-          // 重新加载任务历史
-          await loadTaskHistory()
-          
-          // 关闭弹窗
-          showProgressDialog.value = false
-          ElMessage.success('AI处理完成')
-        }
       }
     } catch (error: any) {
       console.error('获取进度失败:', error)
