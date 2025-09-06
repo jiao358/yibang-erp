@@ -1393,6 +1393,7 @@ public class AIExcelOrderServiceImpl extends ServiceImpl<AIExcelProcessTaskRepos
                 OrderItem orderItem = new OrderItem();
                 orderItem.setOrderId(orderId);
                 orderItem.setProductId(productMatch.getProductId());
+
                 orderItem.setProductName(productMatch.getProductName());
                 orderItem.setSku(productMatch.getSku());
                 orderItem.setProductSpecifications(productMatch.getSpecification());

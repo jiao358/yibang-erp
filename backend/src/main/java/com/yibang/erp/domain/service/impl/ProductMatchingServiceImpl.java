@@ -105,7 +105,7 @@ public class ProductMatchingServiceImpl implements ProductMatchingService {
                     new QueryWrapper<Product>()
                         .eq("deleted", false)
                         .last("LIMIT 400") // 限制数量避免AI处理过慢
-                            .select( "sku", "name","unit","company_id") // 只选择必要字段
+                            .select( "sku", "name","unit","company_id","id") // 只选择必要字段
                 );
                 
                 if (!allProducts.isEmpty()) {

@@ -1090,7 +1090,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
                 for (OrderItem item : orderItems) {
                     OrderExportData exportData = new OrderExportData();
-                    exportData.setPlatformOrderNo(order.getPlatformOrderId());
+
+                    //如果有原始单号，则用原始单号 如果没有 则用平台单号
+                    if(StringUtils.hasText(order.getSourceOrderId())){
+                        exportData.setPlatformOrderNo(order.getSourceOrderId());
+                    }else{
+                        exportData.setPlatformOrderNo(order.getPlatformOrderId());
+
+                    }
+
                     exportData.setShopCode("325"); // 空字段
                     exportData.setOrderType("销售单"); // 空字段
                     exportData.setDeliveryType("");
@@ -1141,7 +1149,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             EasyExcel.write(outputStream, OrderExportData.class)
                 .sheet("订单导出")
                 .doWrite(exportDataList);
-            
+            log.debug("导出订单成功");
             return outputStream.toByteArray();
             
         } catch (Exception e) {
@@ -1201,7 +1209,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             
             for (ShipTemplateData data : importDataList) {
                 ShipImportPreviewResponse.ShipImportPreviewItem item = new ShipImportPreviewResponse.ShipImportPreviewItem();
+
+
                 item.setPlatformOrderNo(data.getPlatformOrderNo());
+
                 item.setTrackingNumber(data.getTrackingNumber());
                 item.setCarrier(data.getCarrier());
                 item.setShippingMethod(data.getShippingMethod());
@@ -1257,9 +1268,25 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                 try {
                     // 根据平台订单号查找订单
                     QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
-                    queryWrapper.eq("platform_order_id", item.getPlatformOrderNo());
+
+                    //这里要区别一下，优先级 sourceOrderId 。
+                    queryWrapper.eq("source_order_id",item.getPlatformOrderNo());
+
+
+//                    queryWrapper.eq("platform_order_id", item.getPlatformOrderNo());
+
+
                     queryWrapper.eq("order_status", "APPROVED");
                     Order order = orderRepository.selectOne(queryWrapper);
+
+                    if(order==null){
+                        log.info("sourceOrderId没有找到订单，再用platformOrderId去找一次");
+                        queryWrapper.clear();
+                        queryWrapper.eq("platform_order_id", item.getPlatformOrderNo());
+                        queryWrapper.eq("order_status", "APPROVED");
+                        order = orderRepository.selectOne(queryWrapper);
+                    }
+
                     
                     if (order == null) {
                         throw new RuntimeException("订单不存在或状态不符合");
