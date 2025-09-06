@@ -88,6 +88,7 @@
       >
         <div class="upload-dialog-content">
         <FileUpload 
+          ref="fileUploadRef"
           @fileSelected="handleFileSelected"
           @uploadSuccess="handleUploadSuccess"
           @uploadError="handleUploadError"
@@ -170,6 +171,9 @@ const countdownSeconds = ref(5) // 倒计时秒数
 // 前端缓存任务持久化键名
 const CACHED_TASKS_KEY = 'aiExcelCachedTasks'
 
+// 组件引用
+const fileUploadRef = ref<InstanceType<typeof FileUpload> | null>(null)
+
 // 统计数据
 const statistics = ref({
   totalTasks: 0,
@@ -215,10 +219,12 @@ const handleUploadNew = () => {
   let currentTaskCount = 0
   if (existingData) {
     try {
-      const parsedData = JSON.parse(existingData)
-      currentTaskCount = parsedData.taskCount || 0
+      const taskArray = JSON.parse(existingData)
+      if (Array.isArray(taskArray)) {
+        currentTaskCount = taskArray.length
+      }
     } catch (error) {
-      console.warn('解析用户任务数据失败:', error)
+      console.warn('解析用户任务数组失败:', error)
       currentTaskCount = 0
     }
   }
@@ -230,6 +236,11 @@ const handleUploadNew = () => {
   
   // 清空之前选择的文件
   selectedFile.value = null
+  
+  // 清空子组件的文件选择
+  if (fileUploadRef.value) {
+    fileUploadRef.value.clearFile()
+  }
   
   showUploadDialog.value = true
 }
@@ -283,42 +294,42 @@ const handleCloseUploadDialog = () => {
 function storeUserTaskCount(tempTaskId: string) {
   try {
     const userId = getCurrentUserId()
-    
-    // 读取用户之前的任务数量
     const userKey = `userTaskCount_${userId}`
+    const uploadTime = new Date().toISOString()
+    
+    // 读取用户任务数组
     const existingData = localStorage.getItem(userKey)
-    let currentTaskCount = 0
+    let taskArray = []
     
     if (existingData) {
       try {
-        const parsedData = JSON.parse(existingData)
-        currentTaskCount = parsedData.taskCount || 0
+        taskArray = JSON.parse(existingData)
+        if (!Array.isArray(taskArray)) {
+          taskArray = []
+        }
       } catch (parseError) {
-        console.warn('解析用户任务数据失败，使用默认值:', parseError)
-        currentTaskCount = 0
+        console.warn('解析用户任务数组失败，使用空数组:', parseError)
+        taskArray = []
       }
     }
     
-    // 将上传数量+1
-    const newTaskCount = currentTaskCount + 1
-    const uploadTime = new Date().toISOString()
-    
-    const taskData = {
+    // 添加新任务到数组
+    const newTask = {
       tempTaskId: tempTaskId,
-      taskCount: newTaskCount,
       uploadTime: uploadTime
     }
+    taskArray.push(newTask)
     
-    const key = `userTaskCount_${userId}_${tempTaskId}`
-    localStorage.setItem(key, JSON.stringify(taskData))
+    // 存储更新后的数组
+    localStorage.setItem(userKey, JSON.stringify(taskArray))
     
-    // 同时更新用户的总任务数量
-    localStorage.setItem(userKey, JSON.stringify({
-      taskCount: newTaskCount,
-      lastUpdateTime: uploadTime
-    }))
-    
-    console.log(`📊 已存储用户任务数据:`, taskData)
+    console.log(`📊 已存储用户任务数据:`, {
+      userId: userId,
+      tempTaskId: tempTaskId,
+      userKey: userKey,
+      taskArray: taskArray,
+      taskCount: taskArray.length
+    })
   } catch (error) {
     console.error('存储任务数据失败:', error)
   }
@@ -329,10 +340,10 @@ function startTaskCleanupPolling() {
   // 先清理之前的轮询
   clearTaskCleanupPolling()
   
-  // 每30秒检查一次过期任务
+  // 每3秒检查一次过期任务
   taskCleanupInterval = setInterval(() => {
     cleanupExpiredTasks()
-  }, 30000)
+  }, 3000)
   
   console.log('🧹 任务清理轮询已启动')
 }
@@ -342,42 +353,63 @@ function cleanupExpiredTasks() {
   try {
     const userId = getCurrentUserId()
     const now = new Date().getTime()
-    const expireTime = 24 * 60 * 60 * 1000 // 24小时过期
+    const expireTime = 3* 60 * 1000 // 3分钟过期
     
-    // 获取所有localStorage键
-    const keys = Object.keys(localStorage)
-    const userTaskKeys = keys.filter(key => key.startsWith(`userTaskCount_${userId}_`))
+    // 获取用户任务数量
+    const userKey = `userTaskCount_${userId}`
+    const userTaskCountData = localStorage.getItem(userKey)
+    
+    // 获取虚拟任务数据
+    const virtualTasksData = localStorage.getItem(CACHED_TASKS_KEY)
+    
+    console.log('🧹 开始检查过期任务...', {
+      userId: userId,
+      userKey: userKey,
+      userTaskCount: userTaskCountData,
+      virtualTasks: virtualTasksData
+    })
     
     let cleanedCount = 0
     
-    userTaskKeys.forEach(key => {
+    // 处理用户任务数组
+    if (userTaskCountData) {
       try {
-        const data = localStorage.getItem(key)
-        if (data) {
-          const taskData = JSON.parse(data)
-          const uploadTime = new Date(taskData.uploadTime).getTime()
+        const taskArray = JSON.parse(userTaskCountData)
+        if (Array.isArray(taskArray)) {
+          // 过滤掉过期的任务
+          const validTasks = taskArray.filter(task => {
+            const uploadTime = new Date(task.uploadTime).getTime()
+            return now - uploadTime <= expireTime
+          })
           
-          // 如果任务超过24小时，删除缓存任务
-          if (now - uploadTime > expireTime) {
-            localStorage.removeItem(key)
+          // 如果有任务被清理
+          if (validTasks.length !== taskArray.length) {
+            localStorage.setItem(userKey, JSON.stringify(validTasks))
             
-            // 从taskHistory中删除对应的任务
-            const tempTaskId = taskData.tempTaskId
-            const taskIndex = taskHistory.value.findIndex(t => t.taskId === tempTaskId)
-            if (taskIndex !== -1) {
-              taskHistory.value.splice(taskIndex, 1)
-              totalTasks.value = Math.max(0, totalTasks.value - 1)
-              cleanedCount++
-              console.log(`🗑️ 已清理过期任务: ${tempTaskId}`)
-            }
+            // 从taskHistory中删除过期的任务
+            const expiredTasks = taskArray.filter(task => {
+              const uploadTime = new Date(task.uploadTime).getTime()
+              return now - uploadTime > expireTime
+            })
+            
+            expiredTasks.forEach(task => {
+              const taskIndex = taskHistory.value.findIndex(t => t.taskId === task.tempTaskId)
+              if (taskIndex !== -1) {
+                taskHistory.value.splice(taskIndex, 1)
+                totalTasks.value = Math.max(0, totalTasks.value - 1)
+                cleanedCount++
+                console.log(`🗑️ 已清理过期任务: ${task.tempTaskId}`)
+              }
+              
+              // 同时从虚拟任务缓存中删除
+              removeCachedTask(task.tempTaskId)
+            })
           }
         }
       } catch (error) {
-        console.error(`清理任务失败 ${key}:`, error)
-        // 如果解析失败，直接删除
-        localStorage.removeItem(key)
+        console.error('处理用户任务数组失败:', error)
       }
-    })
+    }
     
     if (cleanedCount > 0) {
       console.log(`🧹 清理了 ${cleanedCount} 个过期任务`)

@@ -195,6 +195,17 @@ const removeFile = async () => {
   }
 }
 
+// 清空文件（供父组件调用）
+const clearFile = () => {
+  selectedFile.value = null
+  console.log('📁 清空文件（父组件调用）:', selectedFile.value)
+}
+
+// 暴露方法给父组件
+defineExpose({
+  clearFile
+})
+
 const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 B'
   const k = 1024
