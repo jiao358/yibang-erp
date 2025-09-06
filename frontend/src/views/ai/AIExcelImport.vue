@@ -198,13 +198,11 @@ const filteredTasks = computed(() => {
 
 // 计算属性 - 检查是否有正在处理的任务
 const hasProcessingTasks = computed(() => {
-  const processingTasks = taskHistory.value.filter(task => 
+  return taskHistory.value.some(task => 
     task.status === 'PROCESSING' || 
     task.status === 'SYSTEM_PROCESSING' ||
     task.status === 'PENDING'
   )
-  console.log('🔍 检查处理中任务:', processingTasks.length, '个任务:', processingTasks.map(t => ({ taskId: t.taskId, status: t.status })))
-  return processingTasks.length > 0
 })
 
 // 事件处理
@@ -407,24 +405,21 @@ const startProgressPolling = (taskId: string) => {
   progressInterval = setInterval(async () => {
     try {
       const response = await aiExcelImportApi.getProgress(taskId)
-      console.log(`🔄 轮询任务进度 ${taskId}:`, response)
-      
       if (response.progress) {
         // 只更新全局进度，不影响缓存任务
         progress.value = response.progress
-      }
-      
-      // 检查是否完成 - 支持多种完成状态
-      if (response.status === 'COMPLETED' || response.status === 'FAILED' || response.status === 'CANCELLED') {
-        console.log(`✅ 任务 ${taskId} 已完成，状态: ${response.status}`)
-        clearProgressPolling()
-        processingStatus.value = response.status
         
-        // 清理对应的缓存任务
-        removeCachedTask(taskId)
-        
-        // 重新加载任务历史
-        await loadTaskHistory()
+        // 检查是否完成
+        if (response.status === 'COMPLETED' || response.status === 'FAILED') {
+          clearProgressPolling()
+          processingStatus.value = response.status
+          
+          // 清理对应的缓存任务
+          removeCachedTask(taskId)
+          
+          // 重新加载任务历史
+          await loadTaskHistory()
+        }
       }
     } catch (error: any) {
       console.error('获取进度失败:', error)
@@ -506,49 +501,16 @@ function restoreCachedTasks() {
 
 // 清理指定的缓存任务
 function removeCachedTask(taskId: string) {
-  // 1. 从 localStorage 中清理
   const arr = loadCachedTasks()
   const filtered = arr.filter(t => t.taskId !== taskId)
   if (filtered.length !== arr.length) {
     localStorage.setItem(CACHED_TASKS_KEY, JSON.stringify(filtered))
-    console.log(`📋 已从localStorage清理缓存任务: ${taskId}`)
-  }
-  
-  // 2. 从 taskHistory.value 中清理
-  const taskIndex = taskHistory.value.findIndex(t => t.taskId === taskId)
-  if (taskIndex !== -1) {
-    taskHistory.value.splice(taskIndex, 1)
-    totalTasks.value = Math.max(0, totalTasks.value - 1)
-    console.log(`📋 已从任务列表中清理缓存任务: ${taskId}`)
+    console.log(`📋 已清理缓存任务: ${taskId}`)
   }
 }
 
-// 手动清理所有缓存任务（调试用）
-function clearAllCachedTasks() {
-  localStorage.removeItem(CACHED_TASKS_KEY)
-  // 从任务列表中移除所有缓存任务
-  const nonCachedTasks = taskHistory.value.filter(task => !task.isCached)
-  taskHistory.value = nonCachedTasks
-  totalTasks.value = nonCachedTasks.length
-  console.log('🧹 已清理所有缓存任务')
-}
-
-// 手动清理过期的缓存任务
-function clearExpiredCachedTasks() {
-  const now = new Date().getTime()
-  const validTasks = taskHistory.value.filter(task => {
-    if (!task.isCached) return true
-    const taskTime = new Date(task.createdAt).getTime()
-    const hoursDiff = (now - taskTime) / (1000 * 60 * 60)
-    return hoursDiff < 1 // 保留1小时内的缓存任务
-  })
-  
-  if (validTasks.length !== taskHistory.value.length) {
-    taskHistory.value = validTasks
-    totalTasks.value = validTasks.length
-    console.log(`🧹 已清理过期缓存任务，剩余: ${validTasks.length} 个`)
-  }
-}
+// 预留：取消处理（当前未在UI中挂载）
+// 取消处理能力如需启用，可在UI中挂载后再恢复实现
 
 // 加载统计数据
 // 统计加载（在刷新任务历史时并行调用）
@@ -951,8 +913,6 @@ watch(detailDialogVisible, (newValue) => {
 // 生命周期
 onMounted(async () => {
   console.log('🚀 AIExcelImport 主页面已挂载')
-  // 清理过期的缓存任务
-  clearExpiredCachedTasks()
   // 恢复本地缓存任务，优先显示
   restoreCachedTasks()
   // 加载统计信息（只在页面初始化时调用）
@@ -986,22 +946,6 @@ const handleDevModeChange = (value: boolean) => {
     restoreCachedTasks()
     loadTaskHistory()
   }
-}
-
-// 全局调试函数 - 在浏览器控制台中使用
-if (typeof window !== 'undefined') {
-  (window as any).aiExcelDebug = {
-    clearAllCachedTasks,
-    clearExpiredCachedTasks,
-    loadCachedTasks,
-    getCurrentTasks: () => taskHistory.value,
-    getProcessingTasks: () => taskHistory.value.filter(task => 
-      task.status === 'PROCESSING' || 
-      task.status === 'SYSTEM_PROCESSING' ||
-      task.status === 'PENDING'
-    )
-  }
-  console.log('🔧 AI Excel 调试工具已加载，使用 window.aiExcelDebug 访问')
 }
 </script>
 
