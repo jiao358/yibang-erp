@@ -228,6 +228,9 @@ const handleUploadNew = () => {
     return
   }
   
+  // 清空之前选择的文件
+  selectedFile.value = null
+  
   showUploadDialog.value = true
 }
 
