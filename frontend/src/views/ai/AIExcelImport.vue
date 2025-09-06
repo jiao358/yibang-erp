@@ -207,6 +207,27 @@ const hasProcessingTasks = computed(() => {
 
 // 事件处理
 const handleUploadNew = () => {
+  // 检查当前用户的任务数量是否小于3
+  const userId = getCurrentUserId()
+  const userKey = `userTaskCount_${userId}`
+  const existingData = localStorage.getItem(userKey)
+  
+  let currentTaskCount = 0
+  if (existingData) {
+    try {
+      const parsedData = JSON.parse(existingData)
+      currentTaskCount = parsedData.taskCount || 0
+    } catch (error) {
+      console.warn('解析用户任务数据失败:', error)
+      currentTaskCount = 0
+    }
+  }
+  
+  if (currentTaskCount >= 3) {
+    ElMessage.warning('当前任务数量已达上限（3个），请等待任务完成后再上传新文件')
+    return
+  }
+  
   showUploadDialog.value = true
 }
 
@@ -255,6 +276,127 @@ const handleCloseUploadDialog = () => {
   selectedFile.value = null
 }
 
+
+function storeUserTaskCount(tempTaskId: string) {
+  try {
+    const userId = getCurrentUserId()
+    
+    // 读取用户之前的任务数量
+    const userKey = `userTaskCount_${userId}`
+    const existingData = localStorage.getItem(userKey)
+    let currentTaskCount = 0
+    
+    if (existingData) {
+      try {
+        const parsedData = JSON.parse(existingData)
+        currentTaskCount = parsedData.taskCount || 0
+      } catch (parseError) {
+        console.warn('解析用户任务数据失败，使用默认值:', parseError)
+        currentTaskCount = 0
+      }
+    }
+    
+    // 将上传数量+1
+    const newTaskCount = currentTaskCount + 1
+    const uploadTime = new Date().toISOString()
+    
+    const taskData = {
+      tempTaskId: tempTaskId,
+      taskCount: newTaskCount,
+      uploadTime: uploadTime
+    }
+    
+    const key = `userTaskCount_${userId}_${tempTaskId}`
+    localStorage.setItem(key, JSON.stringify(taskData))
+    
+    // 同时更新用户的总任务数量
+    localStorage.setItem(userKey, JSON.stringify({
+      taskCount: newTaskCount,
+      lastUpdateTime: uploadTime
+    }))
+    
+    console.log(`📊 已存储用户任务数据:`, taskData)
+  } catch (error) {
+    console.error('存储任务数据失败:', error)
+  }
+}
+
+// 轮询任务：检查并清理过期的缓存任务
+function startTaskCleanupPolling() {
+  // 先清理之前的轮询
+  clearTaskCleanupPolling()
+  
+  // 每30秒检查一次过期任务
+  taskCleanupInterval = setInterval(() => {
+    cleanupExpiredTasks()
+  }, 30000)
+  
+  console.log('🧹 任务清理轮询已启动')
+}
+
+// 清理过期的缓存任务
+function cleanupExpiredTasks() {
+  try {
+    const userId = getCurrentUserId()
+    const now = new Date().getTime()
+    const expireTime = 24 * 60 * 60 * 1000 // 24小时过期
+    
+    // 获取所有localStorage键
+    const keys = Object.keys(localStorage)
+    const userTaskKeys = keys.filter(key => key.startsWith(`userTaskCount_${userId}_`))
+    
+    let cleanedCount = 0
+    
+    userTaskKeys.forEach(key => {
+      try {
+        const data = localStorage.getItem(key)
+        if (data) {
+          const taskData = JSON.parse(data)
+          const uploadTime = new Date(taskData.uploadTime).getTime()
+          
+          // 如果任务超过24小时，删除缓存任务
+          if (now - uploadTime > expireTime) {
+            localStorage.removeItem(key)
+            
+            // 从taskHistory中删除对应的任务
+            const tempTaskId = taskData.tempTaskId
+            const taskIndex = taskHistory.value.findIndex(t => t.taskId === tempTaskId)
+            if (taskIndex !== -1) {
+              taskHistory.value.splice(taskIndex, 1)
+              totalTasks.value = Math.max(0, totalTasks.value - 1)
+              cleanedCount++
+              console.log(`🗑️ 已清理过期任务: ${tempTaskId}`)
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`清理任务失败 ${key}:`, error)
+        // 如果解析失败，直接删除
+        localStorage.removeItem(key)
+      }
+    })
+    
+    if (cleanedCount > 0) {
+      console.log(`🧹 清理了 ${cleanedCount} 个过期任务`)
+      // 重新加载任务历史
+      loadTaskHistory()
+    }
+  } catch (error) {
+    console.error('清理过期任务失败:', error)
+  }
+}
+
+// 清理任务清理轮询
+function clearTaskCleanupPolling() {
+  if (taskCleanupInterval) {
+    clearInterval(taskCleanupInterval)
+    taskCleanupInterval = null
+  }
+}
+
+
+
+//上传任务开始处理
 const startProcessing = async () => {
   if (!selectedFile.value) {
     ElMessage.error('请先选择文件')
@@ -263,7 +405,7 @@ const startProcessing = async () => {
   
   // 生成临时任务ID，用于缓存任务
   const tempTaskId = 'temp-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)
-  
+  storeUserTaskCount(tempTaskId)
   try {
     showUploadDialog.value = false
     showProgressDialog.value = true
@@ -344,6 +486,9 @@ let countdownInterval: NodeJS.Timeout | null = null
 
 // 进度轮询相关
 let progressInterval: NodeJS.Timeout | null = null
+
+// 任务清理轮询相关
+let taskCleanupInterval: NodeJS.Timeout | null = null
 
 // 启动倒计时
 const startCountdown = () => {
@@ -930,12 +1075,15 @@ onMounted(async () => {
   await loadStatistics()
   // 加载任务历史
   await loadTaskHistory()
+  // 启动任务清理轮询
+  startTaskCleanupPolling()
 })
 
 onUnmounted(() => {
   // 清理所有定时器
   clearCountdown()
   clearProgressPolling()
+  clearTaskCleanupPolling()
 })
 
 // 监控倒计时变化
