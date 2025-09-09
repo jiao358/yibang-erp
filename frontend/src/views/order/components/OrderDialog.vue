@@ -1021,6 +1021,19 @@ const handleSubmit = async () => {
       // 更新订单需要不同的字段
       const updateData: OrderUpdateRequest = {
         customerId: form.customerId,
+        orderType: form.orderType,
+        expectedDeliveryDate: form.expectedDeliveryDate,
+        currency: form.currency,
+        specialRequirements: form.specialRequirements,
+        deliveryAddress: form.deliveryAddress,
+        deliveryContact: form.deliveryContact,
+        deliveryPhone: form.deliveryPhone,
+        sourceOrderId: form.sourceOrderId,
+        discountAmount: form.discountAmount,
+        shippingAmount: form.shippingAmount,
+        taxAmount: form.taxAmount,
+        finalAmount: form.finalAmount,
+        paymentMethod: form.paymentMethod,
         remarks: form.remarks,
         extendedFields: form.extendedFields,
         orderItems: form.orderItems.map(item => ({

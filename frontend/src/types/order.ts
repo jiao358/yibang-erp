@@ -97,6 +97,19 @@ export interface OrderCreateRequest {
 // 更新订单请求类型
 export interface OrderUpdateRequest {
   customerId?: number
+  orderType?: string
+  expectedDeliveryDate?: string
+  currency?: string
+  specialRequirements?: string
+  deliveryAddress?: string
+  deliveryContact?: string
+  deliveryPhone?: string
+  sourceOrderId?: string
+  discountAmount?: string
+  shippingAmount?: string
+  taxAmount?: string
+  finalAmount?: string
+  paymentMethod?: string
   remarks?: string
   extendedFields?: Record<string, any>
   orderItems?: OrderItemUpdateRequest[]

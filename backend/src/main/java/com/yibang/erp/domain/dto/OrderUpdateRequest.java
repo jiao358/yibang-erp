@@ -19,6 +19,71 @@ public class OrderUpdateRequest {
     private Long customerId;
 
     /**
+     * 订单类型
+     */
+    private String orderType;
+
+    /**
+     * 预期交货日期
+     */
+    private String expectedDeliveryDate;
+
+    /**
+     * 货币
+     */
+    private String currency;
+
+    /**
+     * 特殊要求
+     */
+    private String specialRequirements;
+
+    /**
+     * 送货地址
+     */
+    private String deliveryAddress;
+
+    /**
+     * 送货联系人
+     */
+    private String deliveryContact;
+
+    /**
+     * 送货电话
+     */
+    private String deliveryPhone;
+
+    /**
+     * 源订单号
+     */
+    private String sourceOrderId;
+
+    /**
+     * 折扣金额
+     */
+    private BigDecimal discountAmount;
+
+    /**
+     * 运费
+     */
+    private BigDecimal shippingAmount;
+
+    /**
+     * 税费
+     */
+    private BigDecimal taxAmount;
+
+    /**
+     * 最终金额
+     */
+    private BigDecimal finalAmount;
+
+    /**
+     * 支付方式
+     */
+    private String paymentMethod;
+
+    /**
      * 订单备注
      */
     private String remarks;

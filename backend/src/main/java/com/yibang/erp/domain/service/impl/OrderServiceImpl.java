@@ -289,10 +289,62 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             order.setCustomerId(request.getCustomerId());
         }
 
+        if (request.getOrderType() != null) {
+            order.setOrderType(request.getOrderType());
+        }
+
+        if (request.getExpectedDeliveryDate() != null) {
+            order.setExpectedDeliveryDate(LocalDate.parse(request.getExpectedDeliveryDate()));
+        }
+
+        if (request.getCurrency() != null) {
+            order.setCurrency(request.getCurrency());
+        }
+
+        if (request.getSpecialRequirements() != null) {
+            order.setSpecialRequirements(request.getSpecialRequirements());
+        }
+
+        if (request.getDeliveryAddress() != null) {
+            order.setDeliveryAddress(request.getDeliveryAddress());
+        }
+
+        if (request.getDeliveryContact() != null) {
+            order.setDeliveryContact(request.getDeliveryContact());
+        }
+
+        if (request.getDeliveryPhone() != null) {
+            order.setDeliveryPhone(request.getDeliveryPhone());
+        }
+
+        if (request.getSourceOrderId() != null) {
+            order.setSourceOrderId(request.getSourceOrderId());
+        }
+
+        if (request.getDiscountAmount() != null) {
+            order.setDiscountAmount(request.getDiscountAmount());
+        }
+
+        if (request.getShippingAmount() != null) {
+            order.setShippingAmount(request.getShippingAmount());
+        }
+
+        if (request.getTaxAmount() != null) {
+            order.setTaxAmount(request.getTaxAmount());
+        }
+
+        if (request.getFinalAmount() != null) {
+            order.setFinalAmount(request.getFinalAmount());
+        }
+
+        if (request.getPaymentMethod() != null) {
+            order.setPaymentMethod(request.getPaymentMethod());
+        }
 
         if (request.getRemarks() != null) {
             order.setRemarks(request.getRemarks());
         }
+
         if (request.getExtendedFields() != null) {
             order.setExtendedFieldsMap(request.getExtendedFields());
         }
