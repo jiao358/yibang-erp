@@ -57,6 +57,11 @@ public class OrderCreateRequest {
     private String remarks;
 
     /**
+     * 来源订单ID
+     */
+    private String sourceOrderId;
+
+    /**
      * 扩展字段（动态字段）
      */
     private Map<String, Object> extendedFields;

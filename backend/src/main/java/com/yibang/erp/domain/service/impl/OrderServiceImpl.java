@@ -74,6 +74,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
     @Autowired
     private DeepSeekClient deepSeekClient;
+    @Autowired
+    private UserRedisRepository userRedisRepository;
+
+    @Autowired
+    private WarehouseRedisRepository warehouseRedisRepository;
 
     private OrderAddressDTO aiModelHandleAddress(String address){
         try {
@@ -179,8 +184,16 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         // 创建订单
         Order order = new Order();
         order.setPlatformOrderId(generatePlatformOrderNo());
-        order.setCustomerId(request.getCustomerId());
+        if(request.getCustomerId()==null){
+            order.setSourceOrderId("0");
+        }else{
+            order.setCustomerId(request.getCustomerId());
+        }
         order.setSalesId(request.getSalesUserId());
+
+        if(request.getExtendedFields().containsKey("sourceOrderId")){
+            order.setSourceOrderId(request.getSourceOrderId());
+        }
         /**
          * todo 这里就有问题了
          * 销售公司可能是一棒 而不是供应链公司
@@ -445,9 +458,24 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             queryWrapper.like("delivery_contact", request.getCustomerName());
         }
 
-        if(request.getSalesUserId()!=null){
+
+        //这里增加，如果是懿邦的公司，则全部销售可以查看订单信息
+        if(request.isYibang()){
+
+            QueryWrapper<User> salesUserQueryWrapper = new QueryWrapper<>();
+
+            salesUserQueryWrapper.eq("company_id", request.getSalesCompanyId());
+            List<User> salesUsers =userRepository.selectList(salesUserQueryWrapper);
+
+
+            List<Long> salesUserIds = salesUsers.stream().map(User::getId).toList();
+            queryWrapper.in("sales_id", salesUserIds);
+
+        }else if(request.getSalesUserId()!=null){
             queryWrapper.eq("sales_id", request.getSalesUserId());
         }
+
+
 
         if (StringUtils.hasText(request.getStatus())) {
             queryWrapper.eq("order_status", request.getStatus());
@@ -1162,13 +1190,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     public byte[] downloadShipTemplate() {
         try {
             // 查询所有已审批的订单
-            QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+          /*  QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
             queryWrapper.eq("order_status", "APPROVED");
-            List<Order> approvedOrders = orderRepository.selectList(queryWrapper);
+            List<Order> approvedOrders = orderRepository.selectList(queryWrapper);*/
             
             // 转换为模板数据
             List<ShipTemplateData> templateDataList = new ArrayList<>();
-            for (Order order : approvedOrders) {
+          /*  for (Order order : approvedOrders) {
                 ShipTemplateData templateData = new ShipTemplateData();
                 templateData.setPlatformOrderNo(order.getPlatformOrderId());
                 templateData.setTrackingNumber(""); // 空字段，待填写
@@ -1177,7 +1205,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                 templateData.setShippingNotes(""); // 空字段，待填写
                 
                 templateDataList.add(templateData);
-            }
+            }*/
             
             // 使用EasyExcel生成模板
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -1206,7 +1234,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             List<ShipImportPreviewResponse.ShipImportPreviewItem> previewItems = new ArrayList<>();
             int validCount = 0;
             int invalidCount = 0;
-            
+
+
+
+
             for (ShipTemplateData data : importDataList) {
                 ShipImportPreviewResponse.ShipImportPreviewItem item = new ShipImportPreviewResponse.ShipImportPreviewItem();
 
@@ -1217,8 +1248,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                 item.setCarrier(data.getCarrier());
                 item.setShippingMethod(data.getShippingMethod());
                 item.setShippingNotes(data.getShippingNotes());
-                item.setWarehouseId(data.getWarehouseId());
-                
+
+//                item.setWarehouseId(data.getWarehouseId());
+                item.setWarehouseCode(data.getWarehouseCode());
                 // 验证数据
                 String errorMessage = validateShipData(data);
                 if (errorMessage == null) {
@@ -1262,7 +1294,16 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             int successCount = 0;
             int failCount = 0;
             List<ShipImportResultResponse.ShipImportError> errors = new ArrayList<>();
-            
+            Long userId =UserSecurityUtils.getCurrentUserId();
+            User user= userRedisRepository.selectById(userId);
+            if(user==null){
+                throw new RuntimeException("无法获取当前用户信息");
+            }
+
+            Long supplierCompanyId= user.getCompanyId();
+
+
+
             // 批量处理发货
             for (ShipImportPreviewResponse.ShipImportPreviewItem item : validItems) {
                 try {
@@ -1297,6 +1338,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                     order.setLogisticsCompany(item.getCarrier());
                     order.setOrderStatus("SHIPPED");
                     orderRepository.updateById(order);
+
+
+
                     
                     // 创建物流信息记录
                     LogisticsInfo logisticsInfo = new LogisticsInfo();
@@ -1319,11 +1363,34 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                     statusLog.setOperatorName(getCurrentUserName());
                     statusLog.setOperatorRole(getCurrentUserRole());
                     orderStatusLogRepository.insert(statusLog);
-                    
+
+
+                    //这里处理 warehousecode 到 id到映射
+                    String warehouseCode= item.getWarehouseCode();
+
+                    QueryWrapper<Warehouse> warehouseWrapper = new QueryWrapper<>();
+                   /* warehouseWrapper.eq("warehouse_code", warehouseCode);
+                    warehouseWrapper.eq("status", "ACTIVE");
+                    warehouseWrapper.eq("deleted", 0);
+                    warehouseWrapper.eq("company_id",supplierCompanyId);
+                    Warehouse warehouse = warehouseRepository.selectOne(warehouseWrapper);*/
+
+                    Warehouse warehouse = warehouseRedisRepository.findByCodeAndCompanyAndStatus(
+                            warehouseCode, supplierCompanyId, "ACTIVE");
+
+
+                    if(warehouse==null){
+                        throw new RuntimeException("仓库不存在或者状态无效，或者不属于当前用户公司");
+                    }
+
+
+
+
                     // 处理仓库库存扣减
-                    warehouseProductOrderHandle(order, item.getWarehouseId());
+                    warehouseProductOrderHandle(order, warehouse.getId());
                     
                     successCount++;
+                    //todo 这里进行 mq写入，回调信息给zsdx
                     
                 } catch (Exception e) {
                     failCount++;
@@ -1365,15 +1432,22 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         if (StringUtils.isEmpty(data.getCarrier())) {
             return "物流公司不能为空";
         }
-        
-        if (data.getWarehouseId() == null) {
-            return "仓库ID不能为空";
+
+        Long userId=UserSecurityUtils.getCurrentUserId();
+        User user= userRedisRepository.selectById(userId);
+
+        if(user==null){
+            return "无法获取当前用户信息";
+        }
+        if (data.getWarehouseCode() == null) {
+            return "仓库Code不能为空";
         }
         
         // 验证仓库是否存在
         QueryWrapper<Warehouse> warehouseWrapper = new QueryWrapper<>();
-        warehouseWrapper.eq("id", data.getWarehouseId());
+        warehouseWrapper.eq("warehouse_code", data.getWarehouseCode());
         warehouseWrapper.eq("status", "ACTIVE");
+        warehouseWrapper.eq("company_id",user.getCompanyId());
         Warehouse warehouse = warehouseRepository.selectOne(warehouseWrapper);
         
         if (warehouse == null) {

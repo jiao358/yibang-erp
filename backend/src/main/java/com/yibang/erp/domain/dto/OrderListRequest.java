@@ -86,6 +86,8 @@ public class OrderListRequest {
      */
     private String templateVersion;
 
+
+    private boolean isYibang =false;
     /**
      * 创建开始时间
      */

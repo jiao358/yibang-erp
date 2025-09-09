@@ -24,6 +24,8 @@ public class ShipTemplateData {
     @ExcelProperty("发货备注")
     private String shippingNotes;
 
-    @ExcelProperty("仓库ID")
-    private Long warehouseId;
+    /*@ExcelProperty("仓库ID")
+    private Long warehouseId;*/
+    @ExcelProperty("仓库编码")
+    private String warehouseCode;
 }

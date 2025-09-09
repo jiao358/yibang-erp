@@ -41,6 +41,7 @@ public class ShipImportPreviewResponse {
         private String shippingMethod;
         private String shippingNotes;
         private Long warehouseId;
+        private String warehouseCode;
         private String status; // valid/invalid
         private String errorMessage;
     }

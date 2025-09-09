@@ -40,29 +40,12 @@
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="客户" prop="customerId">
-            <el-select
-              v-model="form.customerId"
-              placeholder="请选择客户（可选）"
-              filterable
-              remote
-              :remote-method="searchCustomers"
-              :loading="customerLoading"
+          <el-form-item label="源订单号" prop="sourceOrderId">
+            <el-input
+              v-model="form.sourceOrderId"
+              placeholder="请输入源订单号"
               clearable
-              style="width: 100%"
-            >
-              <el-option
-                v-for="customer in customerOptions"
-                :key="customer.id"
-                :label="customer.name"
-                :value="customer.id"
-              >
-                <span>{{ customer.name }}</span>
-                <span style="float: right; color: #8492a6; font-size: 13px">
-                  {{ customer.customerCode }}
-                </span>
-              </el-option>
-            </el-select>
+            />
           </el-form-item>
         </el-col>
       </el-row>
@@ -551,6 +534,7 @@ const form = reactive<OrderCreateRequest>({
   
   // 前端显示字段
   platformOrderNo: '', // 平台订单号
+  sourceOrderId: '', // 源订单号
   orderType: 'NORMAL',
   expectedDeliveryDate: getDefaultDeliveryDate(),
   currency: 'CNY',
@@ -993,6 +977,7 @@ const handleSubmit = async () => {
         expectedDeliveryDate: form.expectedDeliveryDate,
         currency: form.currency,
         specialRequirements: form.specialRequirements,
+        sourceOrderId: form.sourceOrderId,
         // 收货信息
         deliveryAddress: form.deliveryAddress,
         deliveryContact: form.deliveryContact,

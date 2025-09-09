@@ -4,7 +4,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.yibang.erp.common.util.JwtUtil;
 import com.yibang.erp.domain.dto.*;
 import com.yibang.erp.domain.entity.OrderStatusLog;
+import com.yibang.erp.domain.entity.User;
 import com.yibang.erp.domain.service.OrderService;
+import com.yibang.erp.infrastructure.repository.UserRedisRepository;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -15,7 +18,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.validation.Valid;
 import java.util.List;
 
 /**
@@ -31,6 +33,8 @@ public class OrderController {
     private OrderService orderService;
     @Autowired
     private  JwtUtil jwtUtil;
+    @Autowired
+    private UserRedisRepository userRedisRepository;
     /**
      * 创建订单
      */
@@ -96,6 +100,12 @@ public class OrderController {
         //供应商只能看到推送到自己的订单
         //1. 获取当前用户信息
         Long userId = getUserId(authorization);
+        User user = userRedisRepository.selectById(userId);
+
+        if(user.getCompanyId()==7 || user.getCompanyId()==3){
+            request.setYibang(true);
+        }
+
         boolean isAdmin=  SecurityContextHolder.getContext().getAuthentication().getAuthorities().
                 stream().anyMatch(x->x.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
         if(isAdmin){
@@ -109,6 +119,9 @@ public class OrderController {
 
         if(isSales){
             request.setSalesUserId(userId);
+            if(request.isYibang()){
+                request.setSalesCompanyId(user.getCompanyId());
+            }
             IPage<OrderResponse> response  = orderService.getOrderSalesList(request);
             return ResponseEntity.ok(response);
         }

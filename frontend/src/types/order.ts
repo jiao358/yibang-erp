@@ -89,6 +89,7 @@ export interface OrderCreateRequest {
   finalAmount?: string
   paymentMethod?: string
   platformOrderNo: string
+  sourceOrderId?: string
 }
 
 // 更新订单请求类型

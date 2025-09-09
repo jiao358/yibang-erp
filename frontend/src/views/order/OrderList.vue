@@ -476,6 +476,7 @@
         <!-- 文件上传区域 -->
         <div class="upload-section">
           <el-upload
+            ref="shipUploadRef"
             class="upload-demo"
             drag
             :auto-upload="false"
@@ -635,6 +636,7 @@ const exportInventoryHasRisk = computed(() => exportInventoryPreview.value.some(
 
 // 批量发货导入相关状态
 const importShipDialogVisible = ref(false)
+const shipUploadRef = ref()
 const uploadFile = ref<File | null>(null)
 const importPreviewData = ref<any[]>([])
 const importLoading = ref(false)
@@ -874,6 +876,10 @@ const showImportShipDialog = () => {
   importShipDialogVisible.value = true
   uploadFile.value = null
   importPreviewData.value = []
+  // 清空upload组件的文件列表
+  if (shipUploadRef.value) {
+    shipUploadRef.value.clearFiles()
+  }
 }
 
 const handleFileUpload = async (file: File) => {
