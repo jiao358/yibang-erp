@@ -29,6 +29,8 @@ export interface OrderResponse {
   deliveryContact: string
   deliveryPhone: string
   specialRequirements?: string
+  remarks?: string
+  sourceOrderId?: string
   aiConfidence?: string
   aiProcessed: boolean
   extendedFields?: Record<string, any>

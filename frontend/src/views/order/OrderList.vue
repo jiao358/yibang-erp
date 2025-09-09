@@ -581,7 +581,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox, ElLoading, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Upload, Search, Refresh, ArrowDown, Warning, Download, UploadFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import OrderDialog from './components/OrderDialog.vue'
@@ -1039,10 +1039,27 @@ const showCreateDialog = () => {
 }
 
 // 显示编辑对话框
-const editOrder = (order: OrderResponse) => {
-  dialogMode.value = 'edit'
-  currentOrder.value = order
-  dialogVisible.value = true
+const editOrder = async (order: OrderResponse) => {
+  try {
+    // 显示加载状态
+    const loading = ElLoading.service({
+      lock: true,
+      text: '正在加载订单详情...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+    
+    // 从数据库重新查询订单详情，确保数据是最新的
+    const freshOrderData = await orderApi.getOrderById(order.id)
+    
+    loading.close()
+    
+    dialogMode.value = 'edit'
+    currentOrder.value = freshOrderData
+    dialogVisible.value = true
+  } catch (error) {
+    console.error('加载订单详情失败:', error)
+    ElMessage.error('加载订单详情失败，请重试')
+  }
 }
 
 

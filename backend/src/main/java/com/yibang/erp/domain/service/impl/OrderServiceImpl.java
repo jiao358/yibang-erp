@@ -319,6 +319,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             order.setAiConfidence(BigDecimal.ZERO);
         }
 
+
         order.setUpdatedAt(LocalDateTime.now());
         order.setUpdatedBy(getCurrentUserId());
         orderRepository.updateById(order);
@@ -1643,6 +1644,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         response.setOrderStatus(order.getOrderStatus());
 
         response.setSourceOrderNo(order.getSourceOrderId());
+        response.setSourceOrderId(order.getSourceOrderId());
         //销售id
         response.setSalesUserId(order.getSalesId());
         User saleUser = userRepository.selectById(order.getSalesId());

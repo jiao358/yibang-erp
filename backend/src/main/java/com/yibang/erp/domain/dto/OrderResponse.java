@@ -87,6 +87,8 @@ public class OrderResponse {
      */
     private String customerAddress;
 
+    private String sourceOrderId;
+
     /**
      * 供应商公司ID
      */
