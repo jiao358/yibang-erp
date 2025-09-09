@@ -191,7 +191,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         }
         order.setSalesId(request.getSalesUserId());
 
-        if(request.getExtendedFields().containsKey("sourceOrderId")){
+        if(StringUtils.hasText(request.getSourceOrderId())){
             order.setSourceOrderId(request.getSourceOrderId());
         }
         /**

@@ -1032,10 +1032,8 @@ const handleCurrentChange = (current: number) => {
 const showCreateDialog = () => {
   dialogMode.value = 'create'
   currentOrder.value = null
-  // 确保在新建模式下清空之前的数据
-  setTimeout(() => {
-    dialogVisible.value = true
-  }, 0)
+  // 立即打开对话框，让OrderDialog的监听器处理重置
+  dialogVisible.value = true
 }
 
 // 显示编辑对话框

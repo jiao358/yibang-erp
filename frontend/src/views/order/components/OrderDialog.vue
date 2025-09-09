@@ -762,12 +762,25 @@ watch(() => props.order, (newOrder) => {
   }
 }, { immediate: true })
 
+// 监听模式变化
+watch(() => props.mode, (newMode) => {
+  if (newMode === 'create') {
+    // 切换到新建模式时，重置表单
+    resetForm()
+  }
+})
+
 // 监听对话框显示状态，确保编辑模式下数据正确填充
 watch(visible, (newVisible) => {
-  if (newVisible && props.mode === 'edit' && props.order) {
-    // 对话框打开时，确保编辑模式下的数据正确填充
-    fillFormWithOrderData(props.order)
-  } else if (!newVisible) {
+  if (newVisible) {
+    if (props.mode === 'edit' && props.order) {
+      // 编辑模式：填充订单数据
+      fillFormWithOrderData(props.order)
+    } else if (props.mode === 'create') {
+      // 新建模式：重置表单
+      resetForm()
+    }
+  } else {
     // 对话框关闭时，延迟重置表单，避免影响当前操作
     setTimeout(() => {
       resetForm()
@@ -971,6 +984,7 @@ const handleSubmit = async () => {
       source: form.source,
       templateVersion: form.templateVersion,
       remarks: form.remarks,
+      sourceOrderId: form.sourceOrderId, // 作为顶级字段
       extendedFields: {
         ...form.extendedFields,
         // 基本信息
@@ -978,7 +992,6 @@ const handleSubmit = async () => {
         expectedDeliveryDate: form.expectedDeliveryDate,
         currency: form.currency,
         specialRequirements: form.specialRequirements,
-        sourceOrderId: form.sourceOrderId,
         // 收货信息
         deliveryAddress: form.deliveryAddress,
         deliveryContact: form.deliveryContact,
@@ -1085,7 +1098,12 @@ const handleClose = () => {
 
 // 重置表单数据
 const resetForm = () => {
-  // 重置所有表单字段到初始状态
+  // 先清空所有字段
+  Object.keys(form).forEach(key => {
+    delete form[key]
+  })
+  
+  // 重新设置所有字段到初始状态
   Object.assign(form, {
     // 后端必需字段
     salesOrderId: 'MANUAL_' + Date.now(),
@@ -1095,6 +1113,7 @@ const resetForm = () => {
     source: 'MANUAL',
     templateVersion: '1.0',
     remarks: '',
+    sourceOrderId: '', // 源订单号
     extendedFields: {},
     orderItems: [],
     
@@ -1118,6 +1137,13 @@ const resetForm = () => {
   if (formRef.value) {
     formRef.value.clearValidate()
   }
+  
+  // 清空其他相关状态
+  customerOptions.value = []
+  productOptions.value = []
+  selectedProducts.value = []
+  productSelectorList.value = []
+  productSelectorTotal.value = 0
 }
 
 
