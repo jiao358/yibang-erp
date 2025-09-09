@@ -1572,9 +1572,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         //销售id
         response.setSalesUserId(order.getSalesId());
         User saleUser = userRepository.selectById(order.getSalesId());
-        response.setSalesUserName(saleUser.getUsername());
-        response.setCustomerName(saleUser.getRealName());
-        response.setCreateUserName(saleUser.getUsername());
+        if(saleUser!=null){
+            response.setSalesUserName(saleUser.getUsername());
+            response.setCustomerName(saleUser.getRealName());
+            response.setCreateUserName(saleUser.getUsername());
+        }
+
         //供应商id
         response.setSupplierCompanyId(order.getSupplierCompanyId());
         Company company = companyRepository.selectById(order.getSupplierCompanyId());

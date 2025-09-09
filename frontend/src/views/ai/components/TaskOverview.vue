@@ -55,11 +55,10 @@
     <div class="quick-actions">
       <el-button 
         type="primary" 
-        :disabled="props.hasProcessingTasks"
         @click="$emit('uploadNew')"
       >
         <el-icon><Upload /></el-icon>
-        {{ props.hasProcessingTasks ? '处理中...' : '上传新文件' }}
+        上传新文件
       </el-button>
       
       <el-button @click="$emit('refresh')">
