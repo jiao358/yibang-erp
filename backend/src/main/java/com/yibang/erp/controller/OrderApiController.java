@@ -2,6 +2,7 @@ package com.yibang.erp.controller;
 
 import com.rabbitmq.client.Channel;
 import com.yibang.erp.config.RabbitMQConfig;
+import com.yibang.erp.domain.dto.AddressChangeMessage;
 import com.yibang.erp.domain.dto.OrderCreateRequest;
 import com.yibang.erp.domain.dto.OrderMessage;
 import com.yibang.erp.domain.entity.Customer;
@@ -53,6 +54,29 @@ public class OrderApiController {
     // RabbitTemplate 用于发送消息（如需要）
     // @Autowired
     // private RabbitTemplate rabbitTemplate;
+    /**
+     * 消费订单地址修改消息
+     *
+     */
+    @RabbitListener(queues = RabbitMQConfig.ORDER_CREATE_QUEUE)
+    @Transactional(rollbackFor = Exception.class)
+    public void handleAddressChangeMessage(AddressChangeMessage addressChangeMessage,
+                                           @Header(value = "x-idempotency-key", required = true) String xIdempotencyKey,
+                                           @Header(value = "x-correlation-id", required = true) String xCorrelationId,
+                                           @Header(value = "messageId", required = false) String messageId,
+                                           Channel channel,
+                                           @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag){
+
+
+
+
+
+
+    }
+
+
+
+
 
     /**
      * 消费订单创建消息

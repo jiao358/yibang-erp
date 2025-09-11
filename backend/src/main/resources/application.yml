@@ -97,6 +97,11 @@ jwt:
   secret: yibang-erp-super-secure-jwt-secret-key-2024-with-512-bits-minimum-security-requirement-for-hmac-sha-algorithms
   expiration: 86400000
 
+# RabbitMQ队列配置
+orders:
+  queue:
+    ttl: 0  # 消息TTL，0表示不过期
+
 # 管理端点配置
 management:
   endpoints:

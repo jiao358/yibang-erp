@@ -5,6 +5,8 @@ import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFacto
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,12 +17,14 @@ import java.util.Map;
 /**
  * RabbitMQ配置类 - 消费服务
  * 
- * 注意：此配置与MQ中间服务层（orderingest）的RabbitMQ配置兼容
+ * 注意：此配置与MQ中间服务层（orderingest）的RabbitMQ配置完全兼容
  * MQ中间服务层负责创建交换机和队列，消费服务只负责声明Bean引用和绑定
  * 
  * 队列配置对应关系：
  * - 订单创建队列：orders.create.q
- * - 路由键：orders.created
+ * - 地址更新队列：orders.address.q
+ * - 物流更新队列：orders.logistics.q
+ * - 订单状态更新队列：orders.status.q
  * - 死信队列：orders.dlq
  */
 @Configuration
@@ -28,77 +32,166 @@ public class RabbitMQConfig {
 
     // 队列和交换机常量 - 与MQ中间服务层保持一致
     public static final String ORDERS_EXCHANGE = "orders.OrderExchange";
+    
+    // 按消息类型分离的队列
     public static final String ORDER_CREATE_QUEUE = "orders.create.q";
+    public static final String ADDRESS_UPDATE_QUEUE = "orders.address.q";
+    public static final String LOGISTICS_UPDATE_QUEUE = "orders.logistics.q";
+    public static final String ORDER_STATUS_UPDATE_QUEUE = "orders.status.q";
+    
+    // 死信队列配置
     public static final String ORDERS_DLX = "orders.dlx";
     public static final String ORDERS_DLQ = "orders.dlq";
+    
+    // 路由键
     public static final String ORDER_CREATE_ROUTING_KEY = "orders.created";
+    public static final String ADDRESS_UPDATE_ROUTING_KEY = "orders.address.updated";
+    public static final String LOGISTICS_UPDATE_ROUTING_KEY = "orders.logistics.updated";
+    public static final String ORDER_STATUS_UPDATE_ROUTING_KEY = "orders.status.updated";
     public static final String DLQ_ROUTING_KEY = "dead";
 
-    // 交换机和队列已由生产服务创建，这里只需要声明Bean引用
-    // 不重新创建，避免配置冲突
+    @Value("${orders.queue.ttl:0}")
+    private long ordersQueueTtl;
 
     /**
-     * 订单交换机引用（由生产服务创建）
+     * 声明订单交换机（topic）。
      */
     @Bean
+    @Qualifier("ordersExchange")
     public TopicExchange ordersExchange() {
         return new TopicExchange(ORDERS_EXCHANGE, true, false);
     }
 
     /**
-     * 死信交换机引用（由生产服务创建）
+     * 声明死信交换机（direct）。
      */
     @Bean
-    public DirectExchange deadLetterExchange() {
+    @Qualifier("ordersDlx")
+    public DirectExchange ordersDlx() {
         return new DirectExchange(ORDERS_DLX, true, false);
     }
 
     /**
-     * 订单创建队列引用（由MQ中间服务层创建）
-     * 注意：必须与MQ中间服务层的队列参数完全一致
+     * 声明订单创建队列。
      */
     @Bean
+    @Qualifier("orderCreateQueue")
     public Queue orderCreateQueue() {
         Map<String, Object> args = new HashMap<>();
         args.put("x-dead-letter-exchange", ORDERS_DLX);
         args.put("x-dead-letter-routing-key", DLQ_ROUTING_KEY);
+        if (ordersQueueTtl > 0) {
+            args.put("x-message-ttl", ordersQueueTtl);
+        }
         return new Queue(ORDER_CREATE_QUEUE, true, false, false, args);
     }
 
     /**
-     * 死信队列引用（由生产服务创建）
+     * 声明地址修改队列。
      */
     @Bean
-    public Queue deadLetterQueue() {
+    @Qualifier("addressUpdateQueue")
+    public Queue addressUpdateQueue() {
+        Map<String, Object> args = new HashMap<>();
+        args.put("x-dead-letter-exchange", ORDERS_DLX);
+        args.put("x-dead-letter-routing-key", DLQ_ROUTING_KEY);
+        if (ordersQueueTtl > 0) {
+            args.put("x-message-ttl", ordersQueueTtl);
+        }
+        return new Queue(ADDRESS_UPDATE_QUEUE, true, false, false, args);
+    }
+
+    /**
+     * 声明物流信息修改队列。
+     */
+    @Bean
+    @Qualifier("logisticsUpdateQueue")
+    public Queue logisticsUpdateQueue() {
+        Map<String, Object> args = new HashMap<>();
+        args.put("x-dead-letter-exchange", ORDERS_DLX);
+        args.put("x-dead-letter-routing-key", DLQ_ROUTING_KEY);
+        if (ordersQueueTtl > 0) {
+            args.put("x-message-ttl", ordersQueueTtl);
+        }
+        return new Queue(LOGISTICS_UPDATE_QUEUE, true, false, false, args);
+    }
+
+    /**
+     * 声明订单状态修改队列。
+     */
+    @Bean
+    @Qualifier("orderStatusUpdateQueue")
+    public Queue orderStatusUpdateQueue() {
+        Map<String, Object> args = new HashMap<>();
+        args.put("x-dead-letter-exchange", ORDERS_DLX);
+        args.put("x-dead-letter-routing-key", DLQ_ROUTING_KEY);
+        if (ordersQueueTtl > 0) {
+            args.put("x-message-ttl", ordersQueueTtl);
+        }
+        return new Queue(ORDER_STATUS_UPDATE_QUEUE, true, false, false, args);
+    }
+
+    /**
+     * 声明死信队列。
+     */
+    @Bean
+    @Qualifier("ordersDlq")
+    public Queue ordersDlq() {
         return new Queue(ORDERS_DLQ, true);
     }
 
     /**
-     * 订单创建队列绑定到交换机
-     * 使用具体路由键 orders.created 以匹配MQ中间服务层的路由
+     * 绑定订单创建队列到订单交换机。
      */
     @Bean
-    public Binding orderCreateBinding() {
-        return BindingBuilder
-                .bind(orderCreateQueue())
-                .to(ordersExchange())
-                .with(ORDER_CREATE_ROUTING_KEY);
+    public Binding orderCreateBinding(
+            @Qualifier("orderCreateQueue") Queue orderCreateQueue,
+            @Qualifier("ordersExchange") TopicExchange ordersExchange) {
+        return BindingBuilder.bind(orderCreateQueue).to(ordersExchange).with(ORDER_CREATE_ROUTING_KEY);
     }
 
     /**
-     * 死信队列绑定到死信交换机
-     * 使用由生产服务创建的 orders.dlx 交换机
+     * 绑定地址修改队列到订单交换机。
      */
     @Bean
-    public Binding deadLetterBinding() {
-        return BindingBuilder
-                .bind(deadLetterQueue())
-                .to(deadLetterExchange())
-                .with(DLQ_ROUTING_KEY);
+    public Binding addressUpdateBinding(
+            @Qualifier("addressUpdateQueue") Queue addressUpdateQueue,
+            @Qualifier("ordersExchange") TopicExchange ordersExchange) {
+        return BindingBuilder.bind(addressUpdateQueue).to(ordersExchange).with(ADDRESS_UPDATE_ROUTING_KEY);
     }
 
     /**
-     * JSON消息转换器
+     * 绑定物流信息修改队列到订单交换机。
+     */
+    @Bean
+    public Binding logisticsUpdateBinding(
+            @Qualifier("logisticsUpdateQueue") Queue logisticsUpdateQueue,
+            @Qualifier("ordersExchange") TopicExchange ordersExchange) {
+        return BindingBuilder.bind(logisticsUpdateQueue).to(ordersExchange).with(LOGISTICS_UPDATE_ROUTING_KEY);
+    }
+
+    /**
+     * 绑定订单状态修改队列到订单交换机。
+     */
+    @Bean
+    public Binding orderStatusUpdateBinding(
+            @Qualifier("orderStatusUpdateQueue") Queue orderStatusUpdateQueue,
+            @Qualifier("ordersExchange") TopicExchange ordersExchange) {
+        return BindingBuilder.bind(orderStatusUpdateQueue).to(ordersExchange).with(ORDER_STATUS_UPDATE_ROUTING_KEY);
+    }
+
+    /**
+     * 绑定死信队列到死信交换机。
+     */
+    @Bean
+    public Binding dlqBinding(
+            @Qualifier("ordersDlq") Queue ordersDlq,
+            @Qualifier("ordersDlx") DirectExchange ordersDlx) {
+        return BindingBuilder.bind(ordersDlq).to(ordersDlx).with(DLQ_ROUTING_KEY);
+    }
+
+    /**
+     * 配置 JSON 消息转换器（Jackson）。
      */
     @Bean
     public Jackson2JsonMessageConverter messageConverter() {
@@ -111,14 +204,15 @@ public class RabbitMQConfig {
     }
 
     /**
-     * RabbitTemplate配置
+     * 配置 RabbitTemplate，启用 JSON 转换与 mandatory 返回。
      */
     @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
-        RabbitTemplate template = new RabbitTemplate(connectionFactory);
-        template.setMessageConverter(messageConverter());
-        template.setMandatory(true); // 开启消息返回确认
-        return template;
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory,
+                                         Jackson2JsonMessageConverter messageConverter) {
+        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+        rabbitTemplate.setMessageConverter(messageConverter);
+        rabbitTemplate.setMandatory(true);
+        return rabbitTemplate;
     }
 
     /**
