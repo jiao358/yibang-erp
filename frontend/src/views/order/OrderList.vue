@@ -242,12 +242,6 @@
                   >
                     撤回
                   </el-dropdown-item>
-                  <el-dropdown-item
-                    v-if="canConfirm(row)"
-                    :command="{ action: 'confirm', order: row }"
-                  >
-                    确认订单
-                  </el-dropdown-item>
                   <!-- 移除销售侧发货入口，避免与供应商发货重复 -->
                   
                   <!-- 供应链用户操作 -->
@@ -1011,6 +1005,7 @@ const resetSearch = () => {
     customerName: '',
     orderStatus: '',
     source: '',
+    sourceOrderNo: '',
     dateRange: []
   })
   loadOrderList()
@@ -1149,10 +1144,6 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
           }
           throw error // 重新抛出其他错误
         }
-        break
-      case 'confirm':
-        await orderApi.supplierConfirmOrder(order.id)
-        ElMessage.success('订单确认成功')
         break
       case 'ship':
         // 这个case应该使用新的发货逻辑，暂时保留兼容性
@@ -1523,11 +1514,6 @@ const canSupplierReject = (order: OrderResponse) => {
   return result
 }
 
-// 销售用户权限检查
-const canConfirm = (order: OrderResponse) => {
-  // 只有销售用户且订单状态为已提交时才能确认
-  return isSalesUser() && order.orderStatus === 'SUBMITTED'
-}
 
 // 已废弃：销售侧发货入口已移除
 const canShip = (_order: OrderResponse) => false

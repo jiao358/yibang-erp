@@ -572,17 +572,17 @@ const rules: FormRules = {
         }
         // 检查是否包含省市区信息
         const provincePattern = /(省|市|区|县|自治区|特别行政区)/
-        const streetPattern = /(街道|路|号|室|楼|单元|幢|弄|巷|弄|小区|社区|大厦|广场|公园|学校|医院|银行|酒店|餐厅|超市|菜市场)/;
+       // const streetPattern = /(街道|路|号|室|楼|单元|幢|弄|巷|弄|小区|社区|大厦|广场|公园|学校|医院|银行|酒店|餐厅|超市|菜市场)/;
         
         if (!provincePattern.test(value)) {
           callback(new Error('收货地址应包含省市区信息'))
           return
         }
         
-        if (!streetPattern.test(value)) {
-          callback(new Error('收货地址应包含详细街道门牌号信息'))
-          return
-        }
+        // if (!streetPattern.test(value)) {
+        //   callback(new Error('收货地址应包含详细街道门牌号信息'))
+        //   return
+        // }
         
         callback()
       }, 

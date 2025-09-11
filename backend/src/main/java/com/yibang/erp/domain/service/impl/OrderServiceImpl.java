@@ -260,6 +260,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             order.setExtendedFieldsMap(request.getExtendedFields());
         }
 
+        order.setSalesId(UserSecurityUtils.getCurrentUserId());
         // 保存订单
         orderRepository.insert(order);
 
@@ -511,6 +512,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             queryWrapper.like("delivery_contact", request.getCustomerName());
         }
 
+        if(StringUtils.hasText(request.getSourceOrderNo())){
+            queryWrapper.eq("source_order_id", request.getSourceOrderNo());
+        }
 
         //这里增加，如果是懿邦的公司，则全部销售可以查看订单信息
         if(request.isYibang()){

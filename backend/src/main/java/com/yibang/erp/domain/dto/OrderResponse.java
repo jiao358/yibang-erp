@@ -301,6 +301,10 @@ public class OrderResponse {
         private BigDecimal unitPrice;
 
         /**
+         * 佣金
+         */
+        private BigDecimal commission;
+        /**
          * 商品总价
          */
         private BigDecimal totalPrice;
