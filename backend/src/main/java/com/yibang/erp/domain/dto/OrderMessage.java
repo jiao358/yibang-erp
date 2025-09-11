@@ -18,10 +18,6 @@ import java.util.Map;
 @Builder
 public class OrderMessage {
     
-    /**
-     * 消息唯一ID
-     */
-    private String messageId;
     
     /**
      * 源订单号（客户提供的订单号）
@@ -84,6 +80,71 @@ public class OrderMessage {
     private String sourceSystem;
     
     /**
+     * 下单时间（电商平台格式：yyyyMMdd hh:mm:ss）
+     */
+    private String createDate;
+    
+    /**
+     * 用户昵称
+     */
+    private String userNickName;
+    
+    /**
+     * 省份
+     */
+    private String provinceName;
+    
+    /**
+     * 城市
+     */
+    private String cityName;
+    
+    /**
+     * 区域
+     */
+    private String districtName;
+    
+    /**
+     * 收件人姓名
+     */
+    private String deliveryContact;
+    
+    /**
+     * 收件人电话
+     */
+    private String deliveryPhone;
+    
+    /**
+     * 详细地址
+     */
+    private String deliveryAddress;
+    
+    /**
+     * 买家留言
+     */
+    private String buyerNote;
+    
+    /**
+     * 幂等性键（来自电商平台的Idempotency-Key）
+     */
+    private String idempotencyKey;
+    
+    /**
+     * 订单类型（来自电商平台）
+     */
+    private String orderType;
+    
+    /**
+     * 订单ID（来自电商平台）
+     */
+    private String orderId;
+    
+    /**
+     * 订单状态（来自电商平台）
+     */
+    private String status;
+    
+    /**
      * 订单商品消息DTO
      */
     @Data
@@ -116,5 +177,20 @@ public class OrderMessage {
          * 扩展字段
          */
         private Map<String, Object> extendedFields;
+        
+        /**
+         * 商品名称（电商平台字段）
+         */
+        private String offerName;
+        
+        /**
+         * 商品SKU（电商平台字段）
+         */
+        private String offerId;
+        
+        /**
+         * 分佣金额（电商平台字段）
+         */
+        private String commission;
     }
 }

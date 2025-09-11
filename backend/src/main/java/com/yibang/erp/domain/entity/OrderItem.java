@@ -153,6 +153,9 @@ public class OrderItem {
     @TableField(exist = false)
     private String remarks; // 商品备注，用于前端显示
 
+    @TableField(exist = false)
+    private Long supplierId; // 供应商ID
+
     /**
      * 获取扩展字段Map
      */

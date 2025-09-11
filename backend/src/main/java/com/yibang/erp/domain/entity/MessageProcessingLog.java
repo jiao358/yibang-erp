@@ -38,7 +38,19 @@ public class MessageProcessingLog {
     private String salesOrderId;
 
     /**
-     * 处理状态：PROCESSING, SUCCESS, FAILED, DUPLICATE
+     * 幂等性键（来自电商平台的Idempotency-Key）
+     */
+    @TableField("idempotency_key")
+    private String idempotencyKey;
+
+    /**
+     * 业务类型：orders.create.q, orders.logistics.q, orders.address.q, orders.status.q, orders.dlq
+     */
+    @TableField("bus_type")
+    private String busType;
+
+    /**
+     * 处理状态：PROCESSING, SUCCESS, FAILED, DUPLICATE, DEAD_LETTER
      */
     @TableField("status")
     private String status;

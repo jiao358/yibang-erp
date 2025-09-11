@@ -15,18 +15,23 @@ import java.util.Map;
 /**
  * RabbitMQ配置类 - 消费服务
  * 
- * 注意：此配置与生产服务（orderingest）的RabbitMQ配置兼容
- * 生产服务负责创建交换机和队列，消费服务只负责声明Bean引用和绑定
+ * 注意：此配置与MQ中间服务层（orderingest）的RabbitMQ配置兼容
+ * MQ中间服务层负责创建交换机和队列，消费服务只负责声明Bean引用和绑定
+ * 
+ * 队列配置对应关系：
+ * - 订单创建队列：orders.create.q
+ * - 路由键：orders.created
+ * - 死信队列：orders.dlq
  */
 @Configuration
 public class RabbitMQConfig {
 
-    // 队列和交换机常量
+    // 队列和交换机常量 - 与MQ中间服务层保持一致
     public static final String ORDERS_EXCHANGE = "orders.OrderExchange";
-    public static final String ORDERS_QUEUE = "orders.OrderIngest.q";
+    public static final String ORDER_CREATE_QUEUE = "orders.create.q";
     public static final String ORDERS_DLX = "orders.dlx";
     public static final String ORDERS_DLQ = "orders.dlq";
-    public static final String ORDERS_ROUTING_KEY = "orders.created";
+    public static final String ORDER_CREATE_ROUTING_KEY = "orders.created";
     public static final String DLQ_ROUTING_KEY = "dead";
 
     // 交换机和队列已由生产服务创建，这里只需要声明Bean引用
@@ -49,15 +54,15 @@ public class RabbitMQConfig {
     }
 
     /**
-     * 订单队列引用（由生产服务创建）
-     * 注意：必须与生产服务的队列参数完全一致
+     * 订单创建队列引用（由MQ中间服务层创建）
+     * 注意：必须与MQ中间服务层的队列参数完全一致
      */
     @Bean
-    public Queue ordersQueue() {
+    public Queue orderCreateQueue() {
         Map<String, Object> args = new HashMap<>();
         args.put("x-dead-letter-exchange", ORDERS_DLX);
         args.put("x-dead-letter-routing-key", DLQ_ROUTING_KEY);
-        return new Queue(ORDERS_QUEUE, true, false, false, args);
+        return new Queue(ORDER_CREATE_QUEUE, true, false, false, args);
     }
 
     /**
@@ -69,15 +74,15 @@ public class RabbitMQConfig {
     }
 
     /**
-     * 订单队列绑定到交换机
-     * 使用通配符模式 orders.* 以匹配生产服务的路由
+     * 订单创建队列绑定到交换机
+     * 使用具体路由键 orders.created 以匹配MQ中间服务层的路由
      */
     @Bean
-    public Binding ordersBinding() {
+    public Binding orderCreateBinding() {
         return BindingBuilder
-                .bind(ordersQueue())
+                .bind(orderCreateQueue())
                 .to(ordersExchange())
-                .with("orders.*");
+                .with(ORDER_CREATE_ROUTING_KEY);
     }
 
     /**

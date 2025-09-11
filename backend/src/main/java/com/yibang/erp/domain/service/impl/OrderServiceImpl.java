@@ -14,6 +14,8 @@ import com.yibang.erp.domain.service.OrderService;
 import com.yibang.erp.infrastructure.client.DeepSeekClient;
 import com.yibang.erp.infrastructure.repository.*;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.compress.utils.Lists;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -76,6 +78,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     private DeepSeekClient deepSeekClient;
     @Autowired
     private UserRedisRepository userRedisRepository;
+
+    @Autowired
+    private ProductRedisRepository productRedisRepository;
 
     @Autowired
     private WarehouseRedisRepository warehouseRedisRepository;
@@ -169,6 +174,164 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         return addressDTO;
     }
 
+
+    /**
+     * 这里要对电商中的Prodct 进行处理 sku 特殊自负 33232|3 代表的是33232这个商品 3个数量
+     */
+    private List<OrderItem> parseOrderItems(List<OrderCreateRequest.OrderItemRequest> orderItems){
+
+        List<OrderItem> list = Lists.newArrayList();
+        for(OrderCreateRequest.OrderItemRequest item:orderItems){
+            OrderItem orderItem = new OrderItem();
+            String offerSku = item.getExtendedFields().get("offerId").toString();
+            Integer quantity = item.getQuantity();
+
+            if(offerSku.contains("|")){
+                String[] offerSkus = offerSku.split("\\|");
+                //查询出对应的商品
+                offerSku=offerSkus[0].trim();
+                quantity=Integer.parseInt(offerSkus[1].trim())*quantity;
+
+            }
+            Product product = productRedisRepository.findBySku(offerSku);
+
+            if(product==null){
+                //如果是我这边没有的品 则直接异常一个都不创建
+                throw new IllegalArgumentException("商品不存在，SKU: " + offerSku);
+            }
+            orderItem.setSku(offerSku);
+            orderItem.setQuantity(quantity);
+            orderItem.setProductName(product.getName());
+            orderItem.setUnitPrice(item.getUnitPrice());
+
+            orderItem.setTaxAmount(item.getExtendedFields().containsKey("commission")?BigDecimal.valueOf(Double.parseDouble(item.getExtendedFields().get("commission").toString())):BigDecimal.ZERO);;
+            orderItem.setUnit(product.getUnit());
+            orderItem.setProductId(product.getId());
+            orderItem.setSupplierId(product.getCompanyId());
+
+
+            list.add(orderItem);
+
+        }
+
+        if(CollectionUtils.isEmpty(list)){
+            throw new IllegalArgumentException("订单商品列表不能为空");
+        }
+        return list;
+    }
+    @Override
+    public OrderResponse createOrderByAPI(OrderCreateRequest request) {
+        // api的不用验证了 前面已经配置ok
+//        validateOrderRequest(request);
+
+        //说明肯定有品
+
+        //todo 如果是两家供应链甚至是更多供应链商品的组合，那么就应该生成多个分发的订单。现在因为只有一个供应链，所以无碍查询一个商品的公司即可
+
+        //在这里查询供应链相关公司 ,有个问题，如果是多供应链的商品 混合采购 就会出问题 todo 后续处理吧
+
+
+        List<OrderItem> orderItems = parseOrderItems(request.getOrderItems());
+
+
+//        Product product = productRepository.selectById(orderItems.get(0).getProductId());
+        Long supplierCompanyId = orderItems.get(0).getSupplierId();
+
+
+        User user = userRedisRepository.findByUsername("estela");
+
+        // 创建订单
+        Order order = new Order();
+        order.setPlatformOrderId(generatePlatformOrderNoForAPI(user.getUsername()));
+        if(request.getCustomerId()==null){
+            order.setSourceOrderId("0");
+        }else{
+            order.setCustomerId(request.getCustomerId());
+        }
+        order.setSalesId(request.getSalesUserId());
+
+        if(StringUtils.hasText(request.getSourceOrderId())){
+            order.setSourceOrderId(request.getSourceOrderId());
+        }
+        /**
+         * todo 这里就有问题了
+         * 销售公司可能是一棒 而不是供应链公司
+         * 供应链公司的逻辑，应该是从品上看的
+         */
+        order.setSupplierCompanyId(supplierCompanyId);
+
+        order.setOrderType("NORMAL"); // 默认订单类型
+        order.setOrderSource(request.getSource());
+        //api提交的默认全部approved
+        order.setOrderStatus("APPROVED");
+
+
+
+        //api 没有currency
+        order.setCurrency("CNY"); // 默认人民币
+        order.setSpecialRequirements(request.getRemarks());
+        order.setBuyerNote(request.getBuyerNote());
+        String address = request.getExtendedFields().get("deliveryAddress").toString();
+
+
+        // API不用去拆分省 市 区 直接会给我们
+//        OrderAddressDTO orderAddressDTO = aiModelHandleAddress(address);
+        order.setDeliveryAddress(address);
+        order.setProvinceName(request.getExtendedFields().get("provinceName").toString());
+        order.setCityName(request.getExtendedFields().get("cityName").toString());
+        order.setDistrictName(request.getExtendedFields().get("districtName").toString());
+        order.setAiConfidence(BigDecimal.valueOf(1));
+        order.setAiProcessed(false);
+        order.setDeliveryPhone(request.getExtendedFields().get("deliveryPhone").toString());
+        order.setDeliveryContact(request.getExtendedFields().get("deliveryContact").toString());
+
+
+        order.setTotalAmount(BigDecimal.ZERO);
+        order.setDiscountAmount(request.getExtendedFields().get("discountAmount") != null ? new BigDecimal(request.getExtendedFields().get("discountAmount").toString()) : BigDecimal.ZERO);
+
+        order.setShippingAmount(request.getExtendedFields().get("shippingAmount") != null ? new BigDecimal(request.getExtendedFields().get("shippingAmount").toString()) : BigDecimal.ZERO);
+
+        //这里i可以使用commission 佣金～ 不过这部份内容数据 应该市全部商品佣金加起来的才对 init阶段
+        order.setTaxAmount(request.getExtendedFields().get("taxAmount") != null ? new BigDecimal(request.getExtendedFields().get("taxAmount").toString()) : BigDecimal.ZERO);
+
+        // 处理电商平台字段
+        processEcommercePlatformFields(order, request);
+
+        order.setFinalAmount(BigDecimal.ZERO);
+
+
+        order.setPaymentMethod("BANK_TRANSFER");
+        order.setPaymentStatus("PAID");
+        order.setApprovalStatus("PENDING");
+
+        order.setCreatedAt(LocalDateTime.now());
+        order.setUpdatedAt(LocalDateTime.now());
+        order.setCreatedBy(request.getSalesUserId());
+        order.setUpdatedBy(request.getSalesUserId());
+
+        // 处理扩展字段
+        if (request.getExtendedFields() != null) {
+            order.setExtendedFieldsMap(request.getExtendedFields());
+        }
+
+        //这里没有当前的登录信息
+//        order.setSalesId(UserSecurityUtils.getCurrentUserId());
+        // 保存订单
+        orderRepository.insert(order);
+
+        // 创建订单项
+        if (request.getOrderItems() != null && !request.getOrderItems().isEmpty()) {
+            createOrderItemsForAPI(order.getId(),orderItems);
+        }
+
+
+        // 计算订单总金额
+        calculateOrderTotalForAPI(order.getId(),user.getId());
+
+        return getOrderById(order.getId());
+
+    }
+
     @Override
     public OrderResponse createOrder(OrderCreateRequest request) {
         // 验证请求数据
@@ -243,6 +406,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         order.setShippingAmount(request.getExtendedFields().get("shippingAmount") != null ? new BigDecimal(request.getExtendedFields().get("shippingAmount").toString()) : BigDecimal.ZERO);
 
         order.setTaxAmount(request.getExtendedFields().get("taxAmount") != null ? new BigDecimal(request.getExtendedFields().get("taxAmount").toString()) : BigDecimal.ZERO);
+
+        // 处理电商平台字段  手动的话不需要处理的
+//        processEcommercePlatformFields(order, request);
 
         order.setFinalAmount(BigDecimal.ZERO);
 
@@ -1133,6 +1299,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     }
 
     @Override
+    public String generatePlatformOrderNoForAPI(String userName) {
+        // 使用新的订单号生成服务，默认使用当前登录用户ID和手动创建渠道
+        // 这里需要从SecurityContext获取当前用户信息
+//        Long currentUserId = getCurrentUserId();
+        String orderSource = "API";
+
+
+
+        return orderNumberGeneratorService.generatePlatformOrderNo(userName, orderSource);
+    }
+
+    @Override
     public String generatePlatformOrderNo(String userName, String orderSource) {
         return orderNumberGeneratorService.generatePlatformOrderNo(userName, orderSource);
     }
@@ -1585,6 +1763,41 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         return List.of("DRAFT", "CANCELLED").contains(order.getOrderStatus());
     }
 
+    /**
+     * 为API创建的订单项，可能有不同的处理逻辑
+     * @param orderId
+     * @param itemRequests
+     */
+    private void createOrderItemsForAPI(Long orderId,List<OrderItem> itemRequests) {
+        for (OrderItem orderItem : itemRequests) {
+
+
+
+
+
+
+            orderItem.setOrderId(orderId);
+            orderItem.setDiscountRate(BigDecimal.ONE);
+            orderItem.setDiscountAmount(BigDecimal.ZERO);
+            orderItem.setTaxRate(BigDecimal.ZERO);
+            orderItem.setTaxAmount(BigDecimal.ZERO);
+
+
+            orderItem.setCreatedAt(LocalDateTime.now());
+            orderItem.setUpdatedAt(LocalDateTime.now());
+
+
+
+            // 计算小计
+            orderItem.calculateTotalPrice();
+
+            orderItemRepository.insert(orderItem);
+        }
+
+
+
+    }
+
     private void createOrderItems(Long orderId, List<OrderCreateRequest.OrderItemRequest> itemRequests) {
         for (OrderCreateRequest.OrderItemRequest itemRequest : itemRequests) {
             OrderItem orderItem = new OrderItem();
@@ -1655,6 +1868,33 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         }
     }
 
+    public void calculateOrderTotalForAPI(Long orderId,Long salesId) {
+        // 查询订单项
+        QueryWrapper<OrderItem> wrapper = new QueryWrapper<>();
+        wrapper.eq("order_id", orderId);
+        List<OrderItem> items = orderItemRepository.selectList(wrapper);
+
+        //todo 这里应该根据客服分层价格来计算
+        //对于API来说这里的费用应该有问题 todo
+        // 计算商品总额
+        BigDecimal totalAmount = items.stream()
+                .map(OrderItem::getSubtotal)
+                .filter(subtotal -> subtotal != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // 更新订单
+        Order order = getOrderEntityById(orderId);
+        order.setTotalAmount(totalAmount);
+        order.setFinalAmount(totalAmount
+                .subtract(order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO)
+                .add(order.getShippingAmount() != null ? order.getShippingAmount() : BigDecimal.ZERO)
+                .add(order.getTaxAmount() != null ? order.getTaxAmount() : BigDecimal.ZERO));
+        order.setUpdatedAt(LocalDateTime.now());
+        order.setUpdatedBy(salesId);
+
+        orderRepository.updateById(order);
+    }
+
     public void calculateOrderTotal(Long orderId) {
         // 查询订单项
         QueryWrapper<OrderItem> wrapper = new QueryWrapper<>();
@@ -1662,9 +1902,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         List<OrderItem> items = orderItemRepository.selectList(wrapper);
 
         //todo 这里应该根据客服分层价格来计算
-
-
-
+        //对于API来说这里的费用应该有问题 todo
         // 计算商品总额
         BigDecimal totalAmount = items.stream()
                 .map(OrderItem::getSubtotal)
@@ -1815,6 +2053,72 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
     private String getCurrentUserRole() {
         return UserSecurityUtils.getCurrentUserRoles();
+    }
+
+    /**
+     * 处理电商平台字段
+     */
+    private void processEcommercePlatformFields(Order order, OrderCreateRequest request) {
+        if (request.getExtendedFields() == null) {
+            return;
+        }
+
+
+
+        // 处理地址信息（如果扩展字段中有，优先使用扩展字段的值）
+        if (request.getExtendedFields().get("provinceName") != null) {
+            order.setProvinceName(request.getExtendedFields().get("provinceName").toString());
+        }
+        if (request.getExtendedFields().get("cityName") != null) {
+            order.setCityName(request.getExtendedFields().get("cityName").toString());
+        }
+        if (request.getExtendedFields().get("districtName") != null) {
+            order.setDistrictName(request.getExtendedFields().get("districtName").toString());
+        }
+        if (request.getExtendedFields().get("deliveryContact") != null) {
+            order.setDeliveryContact(request.getExtendedFields().get("deliveryContact").toString());
+        }
+        if (request.getExtendedFields().get("deliveryPhone") != null) {
+            order.setDeliveryPhone(request.getExtendedFields().get("deliveryPhone").toString());
+        }
+        if (request.getExtendedFields().get("deliveryAddress") != null) {
+            order.setDeliveryAddress(request.getExtendedFields().get("deliveryAddress").toString());
+        }
+        if (request.getExtendedFields().get("buyerNote") != null) {
+            order.setBuyerNote(request.getExtendedFields().get("buyerNote").toString());
+        }
+
+
+        // 处理分佣金额（commission）映射到税额
+        if (request.getExtendedFields().get("commission") != null) {
+            try {
+                BigDecimal commission = new BigDecimal(request.getExtendedFields().get("commission").toString());
+                order.setTaxAmount(commission);
+                log.info("设置分佣金额为税额: commission={}", commission);
+            } catch (Exception e) {
+                log.error("处理分佣金额失败: commission={}", request.getExtendedFields().get("commission"), e);
+            }
+        }
+
+        // 处理下单时间
+        if (request.getExtendedFields().get("createDate") != null) {
+            try {
+                String createDateStr = request.getExtendedFields().get("createDate").toString();
+                // 解析电商平台时间格式：yyyyMMdd hh:mm:ss
+                LocalDateTime createDateTime = LocalDateTime.parse(createDateStr, 
+                    java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd HH:mm:ss"));
+                order.setCreatedAt(createDateTime);
+                //电商平台的创建时间 + 2天 为发货日期时间
+                order.setExpectedDeliveryDate(createDateTime.plusDays(2).toLocalDate());
+                log.info("设置下单时间: createDate={}", createDateTime);
+            } catch (Exception e) {
+                log.error("解析下单时间失败: createDate={}", request.getExtendedFields().get("createDate"), e);
+            }
+        }
+
+
+
+
     }
 
 

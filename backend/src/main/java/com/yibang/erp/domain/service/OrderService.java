@@ -20,6 +20,12 @@ import java.util.List;
  */
 public interface OrderService {
 
+
+    /**
+     * 创建订单（通过API）
+     */
+    public OrderResponse createOrderByAPI(OrderCreateRequest request) ;
+
     /**
      * 创建订单
      */
@@ -45,6 +51,10 @@ public interface OrderService {
      */
     OrderResponse getOrderByPlatformOrderNo(String platformOrderNo);
 
+    /**
+     * 创建订单（通过API）
+     */
+    public String generatePlatformOrderNoForAPI(String userName);
     /**
      * 分页查询订单列表
      */

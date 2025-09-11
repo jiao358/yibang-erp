@@ -24,4 +24,10 @@ public interface MessageProcessingLogRepository extends BaseMapper<MessageProces
     @Select("SELECT * FROM message_processing_log WHERE source_order_id = #{sourceOrderId} AND sales_order_id = #{salesOrderId} AND deleted = 0")
     MessageProcessingLog selectByOrderIds(@Param("sourceOrderId") String sourceOrderId, 
                                          @Param("salesOrderId") String salesOrderId);
+
+    /**
+     * 根据幂等性键查询处理记录
+     */
+    @Select("SELECT * FROM message_processing_log WHERE idempotency_key = #{idempotencyKey} AND deleted = 0")
+    MessageProcessingLog selectByIdempotencyKey(@Param("idempotencyKey") String idempotencyKey);
 }

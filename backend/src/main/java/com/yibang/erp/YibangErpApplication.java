@@ -3,9 +3,11 @@ package com.yibang.erp;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 @SpringBootApplication
 @MapperScan("com.yibang.erp.infrastructure.repository")
+@EnableAsync
 public class YibangErpApplication {
 
     public static void main(String[] args) {

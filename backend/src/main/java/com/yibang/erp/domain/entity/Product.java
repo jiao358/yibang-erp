@@ -3,6 +3,7 @@ package com.yibang.erp.domain.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.yibang.erp.domain.enums.ProductApprovalStatus;
 import com.yibang.erp.domain.enums.ProductStatus;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @TableName("products")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Product {
 
     /**
