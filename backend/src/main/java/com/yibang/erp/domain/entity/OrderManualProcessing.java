@@ -30,6 +30,12 @@ public class OrderManualProcessing {
     @TableField("processing_reason")
     private String processingReason;
 
+    @TableField("platform_order_id")
+    private String platformOrderId;
+
+    @TableField("supplier_company_id")
+    private Long supplierCompanyId;
+
     @TableField("original_data")
     private String originalData;
 

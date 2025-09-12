@@ -92,6 +92,16 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'order-alert',
+        name: 'OrderAlertManagement',
+        component: () => import('@/views/order/OrderAlertList.vue'),
+        meta: {
+          title: '订单预警',
+          requiresAuth: true,
+          roles: ['SYSTEM_ADMIN', 'SUPPLIER_ADMIN', 'SALES_ADMIN', 'SUPPLIER_OPERATOR', 'SALES']
+        }
+      },
+      {
         path: 'customer',
         name: 'CustomerManagement',
         component: () => import('@/views/customer/CustomerList.vue'),

@@ -2281,9 +2281,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         try {
             OrderManualProcessing record = new OrderManualProcessing();
             record.setOrderId(order.getId());
+
             record.setSourceOrderId(order.getSourceOrderId());
             record.setProcessingType(processingType);
             record.setProcessingReason(reason);
+            record.setPlatformOrderId(order.getPlatformOrderId());
+            record.setSupplierCompanyId(order.getSupplierCompanyId());
             record.setStatus(OrderManualProcessing.STATUS_PENDING);
             record.setPriority(OrderManualProcessing.PRIORITY_NORMAL);
             record.setCreatedBy(order.getCreatedBy());

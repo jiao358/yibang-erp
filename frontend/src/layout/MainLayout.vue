@@ -65,6 +65,10 @@
               <el-icon><Document /></el-icon>
               <span>订单管理</span>
             </el-menu-item>
+            <el-menu-item index="/order-alert">
+              <el-icon><Warning /></el-icon>
+              <span>订单预警</span>
+            </el-menu-item>
             <el-menu-item 
               v-if="hasCustomerManagePermission" 
               index="/customer"
