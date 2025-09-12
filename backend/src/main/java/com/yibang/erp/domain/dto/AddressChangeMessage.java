@@ -14,11 +14,20 @@ public class AddressChangeMessage {
     private String districtName;
 
     /** 详细地址 */
-
     private String deliveryAddress;
 
     /** 买家留言 */
     private String buyerNote;
+    /** 幂等性键（来自电商平台的Idempotency-Key） */
+    private String idempotencyKey;
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
+    }
 
     public String getOrderId() {
         return orderId;

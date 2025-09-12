@@ -1,4 +1,4 @@
--- 消息处理日志表
+ -- 消息处理日志表
 CREATE TABLE IF NOT EXISTS `message_processing_log` (
   `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `message_id` varchar(64) NOT NULL COMMENT '消息唯一ID',
@@ -11,6 +11,7 @@ orders.status.q,orders.dlq',
   `status` varchar(20) NOT NULL COMMENT '处理状态：PROCESSING, SUCCESS, FAILED, DUPLICATE, DEAD_LETTER',
   `result_message` text COMMENT '处理结果消息',
   `error_message` text COMMENT '错误信息',
+	`total_message` text COMMENT '全部消息',
   `retry_count` int(11) DEFAULT '0' COMMENT '重试次数',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

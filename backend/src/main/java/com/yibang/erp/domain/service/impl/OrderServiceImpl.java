@@ -85,6 +85,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
     @Autowired
     private WarehouseRedisRepository warehouseRedisRepository;
 
+    @Autowired
+    private OrderManualProcessingRepository orderManualProcessingRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
     private OrderAddressDTO aiModelHandleAddress(String address){
         try {
             // 检查AI功能是否启用
@@ -219,6 +225,153 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         }
         return list;
     }
+
+    @Override
+    public OrderCloseMessageResponse handleCloseOrderMessage(OrderStatusChangeMessage message) {
+        OrderCloseMessageResponse response = new OrderCloseMessageResponse();
+        response.setCanClose(true);
+        
+        try {
+            String sourceOrderId = message.getOrderId();
+            User estelaUser = userRedisRepository.findByUsername("estela");
+            if(estelaUser == null){
+                throw new IllegalArgumentException("系统用户estela不存在，请检查");
+            }
+
+            // 用estelaUser以及sourceOrderId查找订单
+            QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("source_order_id", sourceOrderId);
+            queryWrapper.eq("created_by", estelaUser.getId());
+            queryWrapper.eq("order_source", "API");
+            Order order = orderRepository.selectOne(queryWrapper);
+
+            if(order == null){
+                response.setCanClose(false);
+                response.setMessage("订单不存在");
+                return response;
+            }
+
+            String orderStatus = order.getOrderStatus();
+
+            if(orderStatus.equals("APPROVED") || orderStatus.equals("SHIPPED")){
+                // 订单状态不允许关闭，需要人工处理
+                response.setCanClose(false);
+                response.setMessage("订单状态不能关闭，已提交人工处理");
+                
+                // 创建人工处理记录
+                createManualProcessingRecord(order, message, OrderManualProcessing.TYPE_ORDER_CLOSE, 
+                    "订单状态为" + orderStatus + "，无法自动关闭订单，需要人工处理");
+                
+                return response;
+            }
+
+            // 执行订单关闭
+            order.setOrderStatus("CANCELLED");
+            order.setUpdatedAt(LocalDateTime.now());
+            orderRepository.updateById(order);
+            
+            // 记录关闭成功
+            response.setMessage("订单关闭成功");
+            
+        } catch (Exception e) {
+            log.error("处理订单关闭消息失败: orderId={}", message.getOrderId(), e);
+            response.setCanClose(false);
+            response.setMessage("处理失败: " + e.getMessage());
+        }
+        
+        return response;
+    }
+
+    @Override
+    public AddressChangeOrderResponse handleAddressChangeMessage(AddressChangeMessage message) {
+
+        AddressChangeOrderResponse response = new AddressChangeOrderResponse();
+        response.setCanEdit(true);
+        validateAddressChangeRequest(message);
+        String sourceOrderId = message.getOrderId();
+        User estelaUser = userRedisRepository.findByUsername("estela");
+        if(estelaUser==null){
+            throw new IllegalArgumentException("系统用户estela不存在，请检查");
+        }
+
+        //用estelaUser 以及sourceOrderId 查找订单
+
+        QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("source_order_id",sourceOrderId);
+        queryWrapper.eq("created_by",estelaUser.getId());
+        queryWrapper.eq("order_source","API");
+        Order order = orderRepository.selectOne(queryWrapper);
+
+        if(order==null){
+            response.setCanEdit(false);
+            response.setMessage("订单不存在");
+            return response;
+
+        }
+
+        String orderStatus=order.getOrderStatus();
+
+       if(orderStatus.equals("APPROVED")|| orderStatus.equals("SHIPPED")){
+           // 订单状态不允许修改，需要人工处理
+           response.setCanEdit(false);
+           response.setMessage("订单状态不能修改，已提交人工处理");
+           
+           // 创建人工处理记录
+           createManualProcessingRecord(order, message, OrderManualProcessing.TYPE_ADDRESS_CHANGE, 
+               "订单状态为" + orderStatus + "，无法自动修改地址，需要人工处理");
+           
+           return response;
+       }
+
+       // 保存原始数据用于人工处理记录（如果需要可以用于记录）
+       // String originalData = buildAddressOriginalData(order);
+       
+       // 执行地址修改
+       order.setProvinceName(message.getProvinceName());
+       order.setCityName(message.getCityName());
+       order.setDistrictName(message.getDistrictName());
+       order.setDeliveryAddress(message.getDeliveryAddress());
+       if(StringUtils.hasText(message.getBuyerNote())){
+           order.setBuyerNote(message.getBuyerNote());
+       }
+
+       orderRepository.updateById(order);
+       
+       // 记录修改成功
+       response.setMessage("地址修改成功");
+
+
+
+
+
+
+
+
+
+        return response;
+    }
+
+    private void validateAddressChangeRequest(AddressChangeMessage message) {
+        if (message == null) {
+            throw new IllegalArgumentException("地址变更请求不能为空");
+        }
+        if (!StringUtils.hasText(message.getOrderId())) {
+            throw new IllegalArgumentException("订单ID不能为空");
+        }
+        if (!StringUtils.hasText(message.getProvinceName())) {
+            throw new IllegalArgumentException("省份不能为空");
+        }
+        if (!StringUtils.hasText(message.getCityName())) {
+            throw new IllegalArgumentException("城市不能为空");
+        }
+        if (!StringUtils.hasText(message.getDistrictName())) {
+            throw new IllegalArgumentException("区域不能为空");
+        }
+        if (!StringUtils.hasText(message.getDeliveryAddress())) {
+            throw new IllegalArgumentException("详细地址不能为空");
+        }
+    }
+
     @Override
     public OrderResponse createOrderByAPI(OrderCreateRequest request) {
         // api的不用验证了 前面已经配置ok
@@ -262,8 +415,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
         order.setOrderType("NORMAL"); // 默认订单类型
         order.setOrderSource(request.getSource());
-        //api提交的默认全部approved
-        order.setOrderStatus("APPROVED");
+        //api提交的默认全部SUBMITTED 直接等待审核
+        order.setOrderStatus("SUBMITTED");
 
 
 
@@ -1780,7 +1933,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             orderItem.setDiscountRate(BigDecimal.ONE);
             orderItem.setDiscountAmount(BigDecimal.ZERO);
             orderItem.setTaxRate(BigDecimal.ZERO);
-            orderItem.setTaxAmount(BigDecimal.ZERO);
+            orderItem.setTaxAmount(orderItem.getTaxAmount());
 
 
             orderItem.setCreatedAt(LocalDateTime.now());
@@ -2119,6 +2272,56 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
 
 
+    }
+
+    /**
+     * 创建人工处理记录
+     */
+    private void createManualProcessingRecord(Order order, Object requestData, String processingType, String reason) {
+        try {
+            OrderManualProcessing record = new OrderManualProcessing();
+            record.setOrderId(order.getId());
+            record.setSourceOrderId(order.getSourceOrderId());
+            record.setProcessingType(processingType);
+            record.setProcessingReason(reason);
+            record.setStatus(OrderManualProcessing.STATUS_PENDING);
+            record.setPriority(OrderManualProcessing.PRIORITY_NORMAL);
+            record.setCreatedBy(order.getCreatedBy());
+            record.setCreatedAt(LocalDateTime.now());
+            record.setUpdatedAt(LocalDateTime.now());
+            
+            // 保存请求数据
+            if (requestData != null) {
+                String requestDataJson = objectMapper.writeValueAsString(requestData);
+                record.setRequestData(requestDataJson);
+            }
+            
+            orderManualProcessingRepository.insert(record);
+            log.info("创建人工处理记录成功: orderId={}, type={}, reason={}", order.getId(), processingType, reason);
+            
+        } catch (Exception e) {
+            log.error("创建人工处理记录失败: orderId={}, type={}", order.getId(), processingType, e);
+        }
+    }
+
+    /**
+     * 构建地址原始数据
+     */
+    private String buildAddressOriginalData(Order order) {
+        try {
+            AddressChangeMessage originalData = new AddressChangeMessage();
+            originalData.setOrderId(order.getSourceOrderId());
+            originalData.setProvinceName(order.getProvinceName());
+            originalData.setCityName(order.getCityName());
+            originalData.setDistrictName(order.getDistrictName());
+            originalData.setDeliveryAddress(order.getDeliveryAddress());
+            originalData.setBuyerNote(order.getBuyerNote());
+            
+            return objectMapper.writeValueAsString(originalData);
+        } catch (Exception e) {
+            log.error("构建地址原始数据失败: orderId={}", order.getId(), e);
+            return "{}";
+        }
     }
 
 

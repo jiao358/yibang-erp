@@ -62,6 +62,14 @@ public class MessageProcessingLog {
     private String resultMessage;
 
     /**
+     * 全部信息
+     */
+    @TableField("total_message")
+    private String totalMessage;
+
+
+
+    /**
      * 错误信息
      */
     @TableField("error_message")

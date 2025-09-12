@@ -1,17 +1,6 @@
 package com.yibang.erp.domain.service;
 
-import com.yibang.erp.domain.dto.OrderCreateRequest;
-import com.yibang.erp.domain.dto.OrderUpdateRequest;
-import com.yibang.erp.domain.dto.OrderResponse;
-import com.yibang.erp.domain.dto.OrderListRequest;
-import com.yibang.erp.domain.dto.OrderStatusUpdateRequest;
-import com.yibang.erp.domain.dto.OrderConflictResolutionRequest;
-import com.yibang.erp.domain.dto.OrderBatchProcessRequest;
-import com.yibang.erp.domain.dto.OrderBatchProcessResponse;
-import com.yibang.erp.domain.dto.SupplierRejectRequest;
-import com.yibang.erp.domain.dto.SupplierShipRequest;
-import com.yibang.erp.domain.dto.ShipImportPreviewResponse;
-import com.yibang.erp.domain.dto.ShipImportResultResponse;
+import com.yibang.erp.domain.dto.*;
 
 import java.util.List;
 
@@ -19,6 +8,23 @@ import java.util.List;
  * 订单服务接口
  */
 public interface OrderService {
+
+
+
+    /**
+     *
+     * 处理订单状态变更消息
+     * @param message
+     * @return
+     */
+    OrderCloseMessageResponse handleCloseOrderMessage(OrderStatusChangeMessage message);
+    /**
+     *
+     * @param message
+     * @return
+     */
+
+    AddressChangeOrderResponse handleAddressChangeMessage(AddressChangeMessage message);
 
 
     /**
