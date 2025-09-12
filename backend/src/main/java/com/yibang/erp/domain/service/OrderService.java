@@ -106,6 +106,11 @@ public interface OrderService {
     OrderResponse resolveOrderConflict(Long orderId, OrderConflictResolutionRequest request);
 
     /**
+     * 批量供应商确认订单
+     */
+    OrderBatchConfirmResponse batchSupplierConfirmOrders(OrderBatchConfirmRequest request);
+
+    /**
      * 批量处理订单
      */
     OrderBatchProcessResponse batchProcessOrders(OrderBatchProcessRequest request);

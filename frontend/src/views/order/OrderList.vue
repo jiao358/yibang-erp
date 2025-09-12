@@ -46,6 +46,15 @@
           <el-icon><Upload /></el-icon>
           批量发货导入
         </el-button>
+        <el-button 
+          v-if="isSupplierUser()"
+          type="success" 
+          :disabled="selectedOrders.length === 0 || !hasConfirmableOrders"
+          @click="showBatchConfirmDialog"
+        >
+          <el-icon><Check /></el-icon>
+          批量供应商确认 ({{ confirmableOrdersCount }})
+        </el-button>
       </div>
     </div>
 
@@ -526,6 +535,85 @@
       </template>
     </el-dialog>
 
+    <!-- 批量供应商确认对话框 -->
+    <el-dialog
+      v-model="batchConfirmDialogVisible"
+      title="批量供应商确认"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <div class="batch-confirm-content">
+        <div class="confirm-summary">
+          <el-alert
+            :title="`已选择 ${selectedOrders.length} 个订单，其中 ${confirmableOrdersCount} 个可确认，${skippedOrdersCount} 个将被跳过`"
+            :type="confirmableOrdersCount > 0 ? 'info' : 'warning'"
+            :closable="false"
+            show-icon
+          />
+        </div>
+        
+        <div v-if="skippedOrdersCount > 0" class="skipped-orders">
+          <h4>跳过的订单（非已提交状态）</h4>
+          <el-table :data="skippedOrders" stripe border max-height="200">
+            <el-table-column prop="platformOrderNo" label="平台订单号" width="180" />
+            <el-table-column prop="currentStatus" label="当前状态" width="120">
+              <template #default="{ row }">
+                <el-tag :type="getStatusTagType(row.currentStatus)">
+                  {{ getStatusText(row.currentStatus) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="reason" label="跳过原因" />
+          </el-table>
+        </div>
+        
+        <div v-if="confirmableOrdersCount > 0" class="confirmable-orders">
+          <h4>可确认的订单</h4>
+          <el-table :data="confirmableOrders" stripe border max-height="200">
+            <el-table-column prop="platformOrderNo" label="平台订单号" width="180" />
+            <el-table-column prop="customerName" label="客户名称" width="120" />
+            <el-table-column prop="totalAmount" label="订单金额" width="120">
+              <template #default="{ row }">
+                ¥{{ row.totalAmount?.toFixed(2) || '0.00' }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="orderStatus" label="状态" width="120">
+              <template #default="{ row }">
+                <el-tag :type="getStatusTagType(row.orderStatus)">
+                  {{ getStatusText(row.orderStatus) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+        
+        <el-form :model="batchConfirmForm" label-width="120px">
+          <el-form-item label="确认原因">
+            <el-input
+              v-model="batchConfirmForm.reason"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入批量确认的原因（可选）"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="batchConfirmDialogVisible = false">取消</el-button>
+          <el-button 
+            type="primary" 
+            :loading="batchConfirmLoading"
+            :disabled="confirmableOrdersCount === 0"
+            @click="confirmBatchSupplierConfirm"
+          >
+            确认批量确认 ({{ confirmableOrdersCount }})
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 供应商发货对话框 -->
     <el-dialog
       v-model="shipDialogVisible"
@@ -576,7 +664,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading, type FormInstance, type FormRules } from 'element-plus'
-import { Plus, Upload, Search, Refresh, ArrowDown, Warning, Download, UploadFilled } from '@element-plus/icons-vue'
+import { Plus, Upload, Search, Refresh, ArrowDown, Warning, Download, UploadFilled, Check } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import OrderDialog from './components/OrderDialog.vue'
 import OrderDetail from './components/OrderDetail.vue'
@@ -639,6 +727,13 @@ const importLoading = ref(false)
 const warehouseList = ref<Warehouse[]>([])
 const warehouseLoading = ref(false)
 
+// 批量供应商确认相关状态
+const batchConfirmDialogVisible = ref(false)
+const batchConfirmLoading = ref(false)
+const batchConfirmForm = reactive({
+  reason: '批量供应商确认'
+})
+
 // 供应商发货对话框
 const shipDialogVisible = ref(false)
 const shipSubmitting = ref(false)
@@ -685,6 +780,31 @@ onMounted(() => {
 // 计算属性
 const approvedOrdersCount = computed(() => {
   return orderList.value.filter(order => order.orderStatus === 'APPROVED').length
+})
+
+// 批量确认相关计算属性
+const confirmableOrders = computed(() => {
+  return selectedOrders.value.filter(order => order.orderStatus === 'SUBMITTED')
+})
+
+const skippedOrders = computed(() => {
+  return selectedOrders.value.filter(order => order.orderStatus !== 'SUBMITTED').map(order => ({
+    platformOrderNo: order.platformOrderNo,
+    currentStatus: order.orderStatus,
+    reason: '订单状态不是已提交，无法确认'
+  }))
+})
+
+const confirmableOrdersCount = computed(() => {
+  return confirmableOrders.value.length
+})
+
+const skippedOrdersCount = computed(() => {
+  return skippedOrders.value.length
+})
+
+const hasConfirmableOrders = computed(() => {
+  return confirmableOrdersCount.value > 0
 })
 
 // 多选相关方法
@@ -1086,6 +1206,69 @@ const deleteOrder = async (order: OrderResponse) => {
 const showImportDialog = () => {
   // 跳转到AI Excel导入模块
   router.push('/ai-excel-import')
+}
+
+// 批量供应商确认相关方法
+const showBatchConfirmDialog = () => {
+  if (selectedOrders.value.length === 0) {
+    ElMessage.warning('请先选择要确认的订单')
+    return
+  }
+  
+  if (confirmableOrdersCount.value === 0) {
+    ElMessage.warning('选中的订单中没有可确认的订单（需要是已提交状态）')
+    return
+  }
+  
+  batchConfirmDialogVisible.value = true
+}
+
+const confirmBatchSupplierConfirm = async () => {
+  try {
+    batchConfirmLoading.value = true
+    
+    const orderIds = confirmableOrders.value.map(order => order.id)
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}')
+    
+    const requestData = {
+      orderIds,
+      reason: batchConfirmForm.reason || '批量供应商确认',
+      operatorId: userInfo.id || 1,
+      operatorName: userInfo.realName || userInfo.username || '未知用户',
+      operatorRole: 'SUPPLIER_ADMIN'
+    }
+    
+    const response = await orderApi.batchSupplierConfirmOrders(requestData)
+    
+    if (response.success) {
+      ElMessage.success(response.message)
+      
+      // 显示详细结果
+      if (response.skippedCount > 0) {
+        ElMessageBox.alert(
+          `批量确认完成！\n成功确认：${response.successCount} 个\n跳过：${response.skippedCount} 个\n失败：${response.failedCount} 个`,
+          '批量确认结果',
+          { type: 'success' }
+        )
+      }
+      
+      // 刷新列表
+      await loadOrderList()
+      
+      // 清空选择
+      selectedOrders.value = []
+      
+      // 关闭对话框
+      batchConfirmDialogVisible.value = false
+    } else {
+      ElMessage.error(response.message || '批量确认失败')
+    }
+  } catch (error) {
+    console.error('批量供应商确认失败:', error)
+    ElMessage.error('批量确认失败，请重试')
+  } finally {
+    batchConfirmLoading.value = false
+  }
 }
 
 // 显示状态历史对话框
@@ -1671,5 +1854,24 @@ const getRowClassName = ({ row }: { row: OrderResponse }) => {
 
 :deep(.ship-dialog .el-message-box) {
   width: 500px !important;
+}
+
+/* 批量确认对话框样式 */
+.batch-confirm-content {
+  .confirm-summary {
+    margin-bottom: 20px;
+  }
+  
+  .skipped-orders,
+  .confirmable-orders {
+    margin-bottom: 20px;
+    
+    h4 {
+      margin: 0 0 10px 0;
+      color: #303133;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  }
 }
 </style>

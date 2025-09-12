@@ -1041,18 +1041,47 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
         queryWrapper.orderByDesc("created_at");
 
+
+
         // 执行分页查询
-        Page<Order> page = new Page<>(request.getCurrent(), request.getSize());
-        Page<Order> orderPage = orderRepository.selectPage(page, queryWrapper);
+//        Page<Order> page = new Page<>(request.getCurrent(), request.getSize());
+//        Page<Order> orderPage = orderRepository.selectPage(page, queryWrapper);
         long count= orderRepository.selectCount(queryWrapper);
         // 转换为响应对象
-        Page<OrderResponse> responsePage = new Page<>();
-        responsePage.setCurrent(orderPage.getCurrent());
-        responsePage.setSize(orderPage.getSize());
-        responsePage.setTotal(count);
-        responsePage.setPages(orderPage.getPages());
+//        Page<OrderResponse> responsePage = new Page<>();
+//        responsePage.setCurrent(orderPage.getCurrent());
+//        responsePage.setSize(orderPage.getSize());
+//        responsePage.setTotal(count);
+//        responsePage.setPages(orderPage.getPages());
 
-        List<OrderResponse> responses = orderPage.getRecords().stream()
+
+
+
+        long total = orderRepository.selectCount(queryWrapper);
+
+        Page<OrderResponse> responsePage = new Page<>();
+        responsePage.setCurrent(request.getCurrent());
+        responsePage.setSize(request.getSize());
+        responsePage.setTotal(total);
+
+        if (total == 0) {
+            responsePage.setPages(0);
+            responsePage.setRecords(List.of());
+            return responsePage;
+        }
+
+        long size = request.getSize() == 0 ? 20 : request.getSize();
+        long current = request.getCurrent() <= 0 ? 1 : request.getCurrent();
+        long pages = (total + size - 1) / size;
+        responsePage.setPages(pages);
+
+        long offset = (current - 1) * size;
+        queryWrapper.last(String.format("LIMIT %d, %d", offset, size));
+
+        List<Order> orderList = orderRepository.selectList(queryWrapper);
+
+
+        List<OrderResponse> responses = orderList.stream()
                 .map(this::enrichOrderResponse)
                 .toList();
         responsePage.setRecords(responses);
@@ -1390,6 +1419,97 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             case "DELIVERED" -> List.of("COMPLETED").contains(targetStatus);
             default -> false;
         };
+    }
+
+    @Override
+    public OrderBatchConfirmResponse batchSupplierConfirmOrders(OrderBatchConfirmRequest request) {
+        OrderBatchConfirmResponse response = new OrderBatchConfirmResponse();
+        List<Long> successOrderIds = new ArrayList<>();
+        List<OrderBatchConfirmResponse.OrderSkipDetail> skippedOrders = new ArrayList<>();
+        List<OrderBatchConfirmResponse.OrderErrorDetail> failedOrders = new ArrayList<>();
+        
+        int totalCount = request.getOrderIds().size();
+        int successCount = 0;
+        int skippedCount = 0;
+        int failedCount = 0;
+        
+        try {
+            // 查询所有订单
+            List<Order> orders = orderRepository.selectBatchIds(request.getOrderIds());
+            Map<Long, Order> orderMap = orders.stream()
+                .collect(Collectors.toMap(Order::getId, order -> order));
+            
+            for (Long orderId : request.getOrderIds()) {
+                try {
+                    Order order = orderMap.get(orderId);
+                    if (order == null) {
+                        // 订单不存在
+                        OrderBatchConfirmResponse.OrderErrorDetail errorDetail = new OrderBatchConfirmResponse.OrderErrorDetail();
+                        errorDetail.setOrderId(orderId);
+                        errorDetail.setPlatformOrderNo("未知");
+                        errorDetail.setErrorMessage("订单不存在");
+                        failedOrders.add(errorDetail);
+                        failedCount++;
+                        continue;
+                    }
+                    
+                    // 检查订单状态
+                    if (!"SUBMITTED".equals(order.getOrderStatus())) {
+                        // 跳过非SUBMITTED状态的订单
+                        OrderBatchConfirmResponse.OrderSkipDetail skipDetail = new OrderBatchConfirmResponse.OrderSkipDetail();
+                        skipDetail.setOrderId(orderId);
+                        skipDetail.setPlatformOrderNo(order.getPlatformOrderId());
+                        skipDetail.setCurrentStatus(order.getOrderStatus());
+                        skipDetail.setReason("订单状态不是已提交，无法确认");
+                        skippedOrders.add(skipDetail);
+                        skippedCount++;
+                        continue;
+                    }
+                    
+                    // 执行供应商确认
+                    OrderStatusUpdateRequest statusRequest = new OrderStatusUpdateRequest();
+                    statusRequest.setTargetStatus("APPROVED");
+                    statusRequest.setReason(request.getReason());
+                    statusRequest.setOperatorId(request.getOperatorId());
+                    
+                    updateOrderStatus(orderId, statusRequest);
+                    
+                    successOrderIds.add(orderId);
+                    successCount++;
+                    
+                } catch (Exception e) {
+                    // 处理失败
+                    OrderBatchConfirmResponse.OrderErrorDetail errorDetail = new OrderBatchConfirmResponse.OrderErrorDetail();
+                    errorDetail.setOrderId(orderId);
+                    errorDetail.setPlatformOrderNo(orderMap.get(orderId) != null ? orderMap.get(orderId).getPlatformOrderId() : "未知");
+                    errorDetail.setErrorMessage(e.getMessage());
+                    failedOrders.add(errorDetail);
+                    failedCount++;
+                }
+            }
+            
+            // 构建响应
+            response.setSuccess(true);
+            response.setMessage(String.format("批量确认完成：成功 %d 个，跳过 %d 个，失败 %d 个", successCount, skippedCount, failedCount));
+            response.setTotalCount(totalCount);
+            response.setSuccessCount(successCount);
+            response.setSkippedCount(skippedCount);
+            response.setFailedCount(failedCount);
+            response.setSuccessOrderIds(successOrderIds);
+            response.setSkippedOrders(skippedOrders);
+            response.setFailedOrders(failedOrders);
+            
+        } catch (Exception e) {
+            log.error("批量供应商确认订单失败", e);
+            response.setSuccess(false);
+            response.setMessage("批量确认失败: " + e.getMessage());
+            response.setTotalCount(totalCount);
+            response.setSuccessCount(0);
+            response.setSkippedCount(0);
+            response.setFailedCount(totalCount);
+        }
+        
+        return response;
     }
 
     @Override

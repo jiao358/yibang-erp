@@ -251,6 +251,17 @@ public class OrderController {
     }
 
     /**
+     * 批量供应商确认订单
+     */
+    @PostMapping("/batch-supplier-confirm")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SUPPLIER_ADMIN')")
+    public ResponseEntity<OrderBatchConfirmResponse> batchSupplierConfirmOrders(
+            @Valid @RequestBody OrderBatchConfirmRequest request) {
+        OrderBatchConfirmResponse response = orderService.batchSupplierConfirmOrders(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * 批量处理订单
      */
     @PostMapping("/batch-process")
