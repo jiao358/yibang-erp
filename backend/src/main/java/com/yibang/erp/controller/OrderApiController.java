@@ -188,6 +188,7 @@ public class OrderApiController {
             } else {
                 //没有修改则进入人工处理表
                 log.info("地址修改失败，已提交人工处理: messageId={}, reason={}", messageId, addressChangeOrderResponse.getMessage());
+
                 messageLogService.recordAddressChangeMessageProcessing(messageId, addressChangeMessage, RabbitMQConfig.ADDRESS_UPDATE_QUEUE, "MANUAL_REQUIRED", "需要人工处理: " + addressChangeOrderResponse.getMessage());
                 // 注意：人工处理记录已经在OrderServiceImpl.handleAddressChangeMessage中创建
                 // 这里只需要记录消息处理状态即可
@@ -269,8 +270,14 @@ public class OrderApiController {
                 // 5. 转换消息为订单创建请求
                 OrderCreateRequest orderRequest = convertToOrderCreateRequest(message);
 
+                try{
+
+                    orderService.createOrderByAPI(orderRequest);
+                }catch (IllegalArgumentException e){
+                    //这个是人工handle处理
+                    messageLogService.updateOrderMessageProcessing(messageId, orderRequest, RabbitMQConfig.ORDER_CREATE_QUEUE, "MANUAL_REQUIRED", "需要人工处理: " + e.getMessage());
+                }
                 // 6. 创建订单
-                orderService.createOrderByAPI(orderRequest);
 
                 // 7. 记录处理成功
                 messageLogService.recordMessageProcessing(messageId, message, RabbitMQConfig.ORDER_CREATE_QUEUE, "SUCCESS", "订单创建成功");
@@ -304,6 +311,7 @@ public class OrderApiController {
 
     /**
      * 消费死信队列消息
+     * 因为死信队列的内容 不全部是订单消息，所以这里处理逻辑不同
      */
 //    @RabbitListener(queues = RabbitMQConfig.ORDERS_DLQ)
     public void handleDeadLetterMessage(OrderMessage message,
@@ -437,8 +445,11 @@ public class OrderApiController {
         request.setSalesUserId(user.getId());
         request.setSalesCompanyId(user.getCompanyId());//所属公司
 
+        String zsdxUserId = message.getUserId();
+
+
         //这里面应该去进行客户的查找和创建
-        Customer customer = findOrCreateCustomerByNickName(message.getUserNickName(), user.getCompanyId());
+        Customer customer = findOrCreateCustomerByCustomCode(zsdxUserId,message.getUserNickName(), user.getCompanyId());
 
 
         request.setCustomerId(customer.getId());
@@ -554,6 +565,51 @@ public class OrderApiController {
         return stats;
     }
 
+
+    /**
+     * 根据用户昵称查找或创建客户
+     */
+    private Customer findOrCreateCustomerByCustomCode(String code,String nickName, Long salesCompanyId) {
+        try {
+            // 先尝试根据客户名称查找
+            Customer existingCustomer = customerRepository.selectOne(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Customer>()
+                            .eq(Customer::getCustomerCode, code)
+                            .eq(Customer::getCompanyId, salesCompanyId)
+                            .eq(Customer::getDeleted, false)
+            );
+
+            if (existingCustomer != null) {
+                log.info("找到现有客户: customerId={}, customCode={}", existingCustomer.getId(), code);
+                return existingCustomer;
+            }
+
+            // 如果不存在，创建新客户
+            Customer newCustomer = new Customer();
+            newCustomer.setName(nickName);
+            newCustomer.setCustomerCode(code);
+            newCustomer.setCompanyId(salesCompanyId);
+            newCustomer.setCustomerType("INDIVIDUAL"); // 默认为个人客户
+            newCustomer.setCustomerLevel("REGULAR"); // 默认为普通客户
+            newCustomer.setStatus("ACTIVE");
+            newCustomer.setCreatedAt(LocalDateTime.now());
+            newCustomer.setUpdatedAt(LocalDateTime.now());
+            newCustomer.setCreatedBy(0L); // 系统创建
+            newCustomer.setUpdatedBy(0L);
+            newCustomer.setDeleted(false);
+
+            customerRepository.insert(newCustomer);
+            log.info("创建新客户: customerId={}, name={}", newCustomer.getId(), nickName);
+            return newCustomer;
+
+        } catch (Exception e) {
+            log.error("查找或创建客户失败: userNickName={}, salesCompanyId={}", nickName, salesCompanyId, e);
+            // 返回默认客户ID 0，表示未知客户
+            Customer defaultCustomer = new Customer();
+            defaultCustomer.setId(0L);
+            return defaultCustomer;
+        }
+    }
 
     /**
      * 根据用户昵称查找或创建客户

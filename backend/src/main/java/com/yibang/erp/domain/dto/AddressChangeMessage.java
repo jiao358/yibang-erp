@@ -16,6 +16,10 @@ public class AddressChangeMessage {
     /** 详细地址 */
     private String deliveryAddress;
 
+    private String contractPhone;
+
+    private String contractName;
+
     /** 买家留言 */
     private String buyerNote;
     /** 幂等性键（来自电商平台的Idempotency-Key） */
@@ -75,5 +79,21 @@ public class AddressChangeMessage {
 
     public void setBuyerNote(String buyerNote) {
         this.buyerNote = buyerNote;
+    }
+
+    public String getContractPhone() {
+        return contractPhone;
+    }
+
+    public void setContractPhone(String contractPhone) {
+        this.contractPhone = contractPhone;
+    }
+
+    public String getContractName() {
+        return contractName;
+    }
+
+    public void setContractName(String contractName) {
+        this.contractName = contractName;
     }
 }

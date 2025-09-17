@@ -127,3 +127,11 @@ ai:
     temperature: 0.7
     enabled: true
     timeout: 30000
+#掌上大学回调
+zsd:
+    callback_prod:
+        url: https://zdms-admin-test.wxhand.com/bsc-erp/yibang/orderLogistics/callBack
+        token: your-callback-token
+    callback_test:
+        url: https://api-callback.zsdx.cn/bsc-erp/yibang/orderLogistics/callBack
+        token: your-callback-token

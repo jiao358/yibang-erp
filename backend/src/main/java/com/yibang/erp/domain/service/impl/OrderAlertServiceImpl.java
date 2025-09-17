@@ -60,10 +60,17 @@ public class OrderAlertServiceImpl implements OrderAlertService {
         } else if (isSupplierAdmin) {
             // 供应商管理员只能看到相关订单的预警
             // 这里需要通过订单关联查询，暂时简化处理
-            queryWrapper.eq(OrderManualProcessing::getCreatedBy, userId);
+
+            //既然是相关的订单预警，那么就是自己公司
+            queryWrapper.eq(OrderManualProcessing::getSupplierCompanyId, companyId);
         } else {
-            // 销售用户只能看到自己创建的预警
-            queryWrapper.eq(OrderManualProcessing::getCreatedBy, userId);
+            // 销售用户只能看到自己创建的预警 销售用户能看到自己公司销售人员的订单预警
+            User salesUserBase=userRedisRepository.selectById(userId);
+            List<User> salesUsers =userRedisRepository.findByCompanyId(salesUserBase.getCompanyId());
+
+            List<Long> salesUserIds =salesUsers.stream().map(User::getId).toList();
+
+            queryWrapper.in(OrderManualProcessing::getCreatedBy, salesUserIds);
         }
         
         // 添加查询条件
@@ -156,7 +163,7 @@ public class OrderAlertServiceImpl implements OrderAlertService {
             throw new IllegalArgumentException("预警记录不存在");
         }
         
-        // 检查权限
+        // 检查权限 仅仅只有供应商有权限处理
         if (!canModifyAlert(alert, currentUserId)) {
             throw new IllegalArgumentException("没有权限修改此预警");
         }
@@ -294,6 +301,16 @@ public class OrderAlertServiceImpl implements OrderAlertService {
         if (isSystemAdmin) {
             return true;
         }
+
+        //和这个相关的供应链商家可以处理
+        Long orderId = alert.getOrderId();
+
+        Order order =orderRepository.selectById(orderId);
+
+        if(order.getSupplierCompanyId().equals(userRedisRepository.selectById(currentUserId).getCompanyId())){
+            return true;
+        }
+
         
         // 检查是否是创建者或分配的处理人
         return alert.getCreatedBy().equals(currentUserId) || 

@@ -12,6 +12,7 @@ import com.yibang.erp.domain.entity.*;
 import com.yibang.erp.domain.service.OrderNumberGeneratorService;
 import com.yibang.erp.domain.service.OrderService;
 import com.yibang.erp.infrastructure.client.DeepSeekClient;
+import com.yibang.erp.controller.OrderAPICallbackController;
 import com.yibang.erp.infrastructure.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -90,6 +91,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private OrderAPICallbackController orderAPICallbackController;
+
+    private boolean isProdProfile() {
+        try {
+            String active = System.getProperty("spring.profiles.active", System.getenv().getOrDefault("SPRING_PROFILES_ACTIVE", "dev"));
+            return active.contains("prod");
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     private OrderAddressDTO aiModelHandleAddress(String address){
         try {
@@ -327,10 +340,29 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
        // String originalData = buildAddressOriginalData(order);
        
        // 执行地址修改
-       order.setProvinceName(message.getProvinceName());
-       order.setCityName(message.getCityName());
-       order.setDistrictName(message.getDistrictName());
-       order.setDeliveryAddress(message.getDeliveryAddress());
+        if(StringUtils.hasText(message.getProvinceName())){
+            order.setProvinceName(message.getProvinceName());
+
+        }
+        if(StringUtils.hasText(message.getCityName())){
+            order.setCityName(message.getCityName());
+
+        }
+        if(StringUtils.hasText(message.getDistrictName())){
+            order.setDistrictName(message.getDistrictName());
+        }
+
+        if(StringUtils.hasText(message.getDeliveryAddress())){
+            order.setDeliveryAddress(message.getDeliveryAddress());
+        }
+       if(StringUtils.hasText(message.getContractPhone())){
+           order.setDeliveryPhone(message.getContractPhone());
+       }
+
+       if(StringUtils.hasText(message.getContractName())){
+           order.setDeliveryContact(message.getContractName());
+       }
+
        if(StringUtils.hasText(message.getBuyerNote())){
            order.setBuyerNote(message.getBuyerNote());
        }
@@ -372,10 +404,28 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         }
     }
 
+
+
     @Override
     public OrderResponse createOrderByAPI(OrderCreateRequest request) {
         // api的不用验证了 前面已经配置ok
 //        validateOrderRequest(request);
+        //验证这个订单是否已经存在了
+
+        if(StringUtils.hasText(request.getSourceOrderId())){
+            QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("source_order_id", request.getSourceOrderId());
+            queryWrapper.eq("created_by", userRedisRepository.findByUsername("estela").getId());
+            queryWrapper.eq("order_source", "API");
+            Order existingOrder = orderRepository.selectOne(queryWrapper);
+            if (existingOrder != null) {
+                // 记录到订单异常
+
+
+                throw new IllegalArgumentException("订单已存在: " + request.getSourceOrderId());
+            }
+        }
+
 
         //说明肯定有品
 
@@ -1138,7 +1188,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         OrderStatusUpdateRequest request = new OrderStatusUpdateRequest();
 
         //todo 对销售员来说 只有DRAFT、SUBMITTED 状态的订单才可以取消
-        request.setTargetStatus("CANCELLED");
+//        request.setTargetStatus("CANCELLED");
+        request.setTargetStatus("DRAFT");
         request.setReason("订单取消");
         request.setOperatorId(getCurrentUserId());
         return updateOrderStatus(orderId, request);
@@ -1177,15 +1228,15 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         }
 
         // 记录状态变更日志
-        OrderStatusLog log = new OrderStatusLog();
-        log.setOrderId(orderId);
-        log.setFromStatus(order.getOrderStatus());
-        log.setToStatus("SHIPPED");
-        log.setChangeReason("供应商发货 - 仓库: " + request.getWarehouseName() + ", 物流单号: " + request.getTrackingNumber());
-        log.setOperatorId(request.getOperatorId());
-        log.setOperatorType("USER");
-        log.setCreatedAt(LocalDateTime.now());
-        orderStatusLogRepository.insert(log);
+        OrderStatusLog statusLog = new OrderStatusLog();
+        statusLog.setOrderId(orderId);
+        statusLog.setFromStatus(order.getOrderStatus());
+        statusLog.setToStatus("SHIPPED");
+        statusLog.setChangeReason("供应商发货 - 仓库: " + request.getWarehouseName() + ", 物流单号: " + request.getTrackingNumber());
+        statusLog.setOperatorId(request.getOperatorId());
+        statusLog.setOperatorType("USER");
+        statusLog.setCreatedAt(LocalDateTime.now());
+        orderStatusLogRepository.insert(statusLog);
 
         // 更新订单状态和物流信息
         order.setOrderStatus("SHIPPED");
@@ -1252,6 +1303,25 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
         // 处理仓库库存扣减
         warehouseProductOrderHandle(order, request.getWarehouseId());
+
+        // 发货成功后，主动回调对方系统
+        try {
+            boolean useProd = isProdProfile();
+            boolean callbackOk = orderAPICallbackController.sendShipmentCallback(order, logisticsInfo, useProd);
+            if (!callbackOk) {
+                createManualProcessingRecord(order, Map.of(
+                        "reason", "确认收货接口失败",
+                        "trackingNumber", request.getTrackingNumber(),
+                        "carrier", request.getCarrier()
+                ), "ORDER_SHIP_CALLBACK", "确认收货接口失败");
+            }
+        } catch (Exception e) {
+            log.error("发货回调执行异常: orderId={}", orderId, e);
+            createManualProcessingRecord(order, Map.of(
+                    "reason", "确认收货接口失败",
+                    "error", e.getMessage()
+            ), "ORDER_SHIP_CALLBACK", "确认收货接口失败");
+        }
 
         return getOrderById(orderId);
     }
@@ -1898,7 +1968,24 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
                     warehouseProductOrderHandle(order, warehouse.getId());
                     
                     successCount++;
-                    //todo 这里进行 mq写入，回调信息给zsdx
+                    // 发货成功后，主动回调对方系统
+                    try {
+                        boolean useProd = isProdProfile();
+                        boolean callbackOk = orderAPICallbackController.sendShipmentCallback(order, null, useProd);
+                        if (!callbackOk) {
+                            createManualProcessingRecord(order, Map.of(
+                                    "reason", "确认收货接口失败",
+                                    "trackingNumber", item.getTrackingNumber(),
+                                    "carrier", item.getCarrier()
+                            ), "ORDER_SHIP_CALLBACK", "确认收货接口失败");
+                        }
+                    } catch (Exception e) {
+                        log.error("批量发货回调执行异常: platformOrderNo={}", item.getPlatformOrderNo(), e);
+                        createManualProcessingRecord(order, Map.of(
+                                "reason", "确认收货接口失败",
+                                "error", e.getMessage()
+                        ), "ORDER_SHIP_CALLBACK", "确认收货接口失败");
+                    }
                     
                 } catch (Exception e) {
                     failCount++;

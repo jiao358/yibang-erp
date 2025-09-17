@@ -11,9 +11,9 @@
     <!-- 搜索筛选区域 -->
     <div class="search-section">
       <el-card class="search-card">
-        <el-form :model="searchForm" :inline="true" class="search-form">
+        <el-form :model="searchForm" :inline="true" class="search-form" >
           <el-form-item label="状态">
-            <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+            <el-select v-model="searchForm.status" placeholder="请选择状态" style="width: 120px;" clearable>
               <el-option
                 v-for="item in STATUS_OPTIONS"
                 :key="item.value"
@@ -24,7 +24,7 @@
           </el-form-item>
           
           <el-form-item label="处理类型">
-            <el-select v-model="searchForm.processingType" placeholder="请选择处理类型" clearable>
+            <el-select v-model="searchForm.processingType"  style="width: 120px;"  placeholder="请选择处理类型" clearable>
               <el-option
                 v-for="item in PROCESSING_TYPE_OPTIONS"
                 :key="item.value"
@@ -126,9 +126,9 @@
             </template>
           </el-table-column>
           
-          <el-table-column prop="processingReason" label="处理原因" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="processingReason" label="处理原因" min-width="350" show-overflow-tooltip />
           
-          <el-table-column prop="assignedToName" label="分配给" width="120" />
+          <!-- <el-table-column prop="assignedToName" label="分配给" width="120" /> -->
           
           <el-table-column prop="processedByName" label="处理人" width="120" />
           
@@ -148,7 +148,7 @@
           
           <el-table-column label="操作" width="200" fixed="right">
             <template #default="{ row }">
-              <el-button
+              <!-- <el-button
                 v-if="row.status === ALERT_STATUS.PENDING"
                 type="primary"
                 size="small"
@@ -156,7 +156,7 @@
               >
                 分配
               </el-button>
-              
+               -->
               <el-button
                 v-if="row.status === ALERT_STATUS.PENDING || row.status === ALERT_STATUS.PROCESSING"
                 type="success"

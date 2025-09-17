@@ -33,6 +33,10 @@ public class OrderMessage {
      * 销售用户ID
      */
     private Long salesUserId;
+    /**
+     * zsdxx 校园员工id
+     */
+    private String userId;
     
     /**
      * 销售公司ID

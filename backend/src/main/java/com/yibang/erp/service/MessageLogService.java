@@ -2,6 +2,7 @@ package com.yibang.erp.service;
 
 import cn.hutool.json.JSONObject;
 import com.yibang.erp.domain.dto.AddressChangeMessage;
+import com.yibang.erp.domain.dto.OrderCreateRequest;
 import com.yibang.erp.domain.dto.OrderMessage;
 import com.yibang.erp.domain.dto.OrderStatusChangeMessage;
 import com.yibang.erp.domain.entity.MessageProcessingLog;
@@ -18,7 +19,7 @@ import java.time.LocalDateTime;
 /**
  * 消息日志服务
  * 用于异步记录消息处理状态，确保不受业务事务回滚影响
- * 
+ *
  * @author yibang-erp
  * @since 2024-01-14
  */
@@ -31,7 +32,7 @@ public class MessageLogService {
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordOrderStatusChangeMessageProcessing(String messageId, OrderStatusChangeMessage orderStatusChangeMessage , String busType, String status, String resultMessage) {
+    public void recordOrderStatusChangeMessageProcessing(String messageId, OrderStatusChangeMessage orderStatusChangeMessage, String busType, String status, String resultMessage) {
         try {
 
             MessageProcessingLog messageProcessingLog = new MessageProcessingLog();
@@ -79,7 +80,6 @@ public class MessageLogService {
             }
         }
     }
-
 
 
     @Async
@@ -134,6 +134,36 @@ public class MessageLogService {
     }
 
 
+    @Async
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateOrderMessageProcessing(String messageId, OrderCreateRequest message, String busType, String status, String resultMessage) {
+        try {
+            MessageProcessingLog existingLog = messageLogRepository.selectByMessageId(messageId);
+            if (existingLog != null) {
+                existingLog.setStatus(status);
+                existingLog.setResultMessage(resultMessage);
+                existingLog.setUpdatedAt(LocalDateTime.now());
+                if ("SUCCESS".equals(status) || "DUPLICATE".equals(status)) {
+                    existingLog.setProcessedAt(LocalDateTime.now());
+                }
+                messageLogRepository.updateById(existingLog);
+                log.info("消息处理状态已更新: messageId={}, status={}", messageId, status);
+                return;
+            }
+
+            log.info("消息处理状态已记录: messageId={}, status={}", messageId, status);
+
+        } catch (Exception e) {
+            // 如果是重复键错误，尝试更新现有记录
+
+
+            {
+                log.error("记录消息处理状态失败: messageId={}", messageId, e);
+            }
+        }
+    }
+
+
     /**
      * 异步记录消息处理日志
      * 使用独立的事务，确保不受业务事务回滚影响
@@ -142,10 +172,6 @@ public class MessageLogService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordMessageProcessing(String messageId, OrderMessage message, String busType, String status, String resultMessage) {
         try {
-
-
-
-
 
 
             MessageProcessingLog messageProcessingLog = new MessageProcessingLog();
@@ -159,11 +185,11 @@ public class MessageLogService {
             messageProcessingLog.setResultMessage(resultMessage);
             messageProcessingLog.setCreatedAt(LocalDateTime.now());
             messageProcessingLog.setUpdatedAt(LocalDateTime.now());
-            
+
             if ("SUCCESS".equals(status) || "DUPLICATE".equals(status)) {
                 messageProcessingLog.setProcessedAt(LocalDateTime.now());
             }
-            
+
             messageLogRepository.insert(messageProcessingLog);
 
             log.info("消息处理状态已记录: messageId={}, status={}", messageId, status);
