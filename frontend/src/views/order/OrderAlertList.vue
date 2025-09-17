@@ -402,7 +402,8 @@ const getProcessingTypeTagType = (type: string) => {
     [PROCESSING_TYPE.ORDER_CLOSE]: 'danger',
     [PROCESSING_TYPE.ADDRESS_CHANGE]: 'warning',
     [PROCESSING_TYPE.REFUND]: 'info',
-    [PROCESSING_TYPE.CANCEL]: 'danger'
+    [PROCESSING_TYPE.CANCEL]: 'danger',
+    [PROCESSING_TYPE.ORDER_SHIP_CALLBACK]: 'warning'
   }
   return typeMap[type] || ''
 }

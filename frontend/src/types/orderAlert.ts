@@ -69,7 +69,8 @@ export const PROCESSING_TYPE = {
   ORDER_CLOSE: 'ORDER_CLOSE',
   ADDRESS_CHANGE: 'ADDRESS_CHANGE',
   REFUND: 'REFUND',
-  CANCEL: 'CANCEL'
+  CANCEL: 'CANCEL',
+  ORDER_SHIP_CALLBACK: 'ORDER_SHIP_CALLBACK'
 } as const
 
 // 优先级枚举
@@ -93,7 +94,8 @@ export const PROCESSING_TYPE_OPTIONS = [
   { label: '订单关闭', value: PROCESSING_TYPE.ORDER_CLOSE },
   { label: '地址修改', value: PROCESSING_TYPE.ADDRESS_CHANGE },
   { label: '退款', value: PROCESSING_TYPE.REFUND },
-  { label: '取消订单', value: PROCESSING_TYPE.CANCEL }
+  { label: '取消订单', value: PROCESSING_TYPE.CANCEL },
+  { label: '发货回调失败', value: PROCESSING_TYPE.ORDER_SHIP_CALLBACK }
 ]
 
 // 优先级选项
