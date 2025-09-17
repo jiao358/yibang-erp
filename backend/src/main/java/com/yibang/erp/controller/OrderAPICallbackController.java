@@ -100,12 +100,53 @@ public class OrderAPICallbackController {
         return "ship-callback-" + base + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
     }
 
-
     /**
-     * 1 发货回掉，订单状态改为已发货 并提供物流编号
+     * 主动通知对方：物流信息更新（批量轨迹）
+     * Header 同发货回调；Body 如：
+     * {
+     *   "shopId":"SHOP-001",
+     *   "orderId":"ORDER-20240901-001",
+     *   "logisticsInfo":[{"trackingNumber":"SF123","carrier":"顺丰速运"}]
+     * }
      */
+    public boolean sendLogisticsUpdate(String shopId,
+                                       String sourceOrderId,
+                                       java.util.List<Map<String, String>> logisticsInfoList,
+                                       boolean useProd) {
+        try {
+            String url = useProd ? callbackUrlProd : callbackUrlTest;
 
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("Authorization", "Bearer zxdx");
+            headers.set("X-Correlation-Id", "platform-logistics-update-" + sourceOrderId + "-" + UUID.randomUUID());
+            headers.set("Idempotency-Key", "logistics-update-" + sourceOrderId + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
 
+            Map<String, Object> body = new HashMap<>();
+            body.put("shopId", shopId != null ? shopId : FIXED_SHOP_ID);
+            body.put("orderId", sourceOrderId);
+            body.put("logisticsInfo", logisticsInfoList);
 
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+            log.info("发送物流更新回调: url={}, body={}", url, body);
+
+            ResponseEntity<Map<String, Object>> response = restTemplate.postForEntity(url, entity, (Class<Map<String, Object>>)(Class<?>)Map.class);
+            Map<String, Object> resp = response.getBody();
+
+            boolean success = response.getStatusCode().is2xxSuccessful()
+                    && resp != null
+                    && Boolean.TRUE.equals(resp.get("success"));
+            if (!success) {
+                log.warn("物流更新回调失败: status={}, resp={}", response.getStatusCode(), resp);
+                return false;
+            }
+
+            log.info("物流更新回调成功: sourceOrderId={}", sourceOrderId);
+            return true;
+        } catch (Exception e) {
+            log.error("物流更新回调异常: sourceOrderId={}, err={}", sourceOrderId, e.getMessage(), e);
+            return false;
+        }
+    }
 
 }
