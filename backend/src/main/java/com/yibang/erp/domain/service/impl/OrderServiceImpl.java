@@ -433,6 +433,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
         //在这里查询供应链相关公司 ,有个问题，如果是多供应链的商品 混合采购 就会出问题 todo 后续处理吧
 
+        //这里如果商品sku不存在，应该提示用户，并且记录到手工表 中
 
         List<OrderItem> orderItems = parseOrderItems(request.getOrderItems());
 

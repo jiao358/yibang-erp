@@ -35,7 +35,11 @@ public class OrderAPICallbackController {
 
     private static final DateTimeFormatter SHIPPED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd HH:mm:ss");
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
+
+    public OrderAPICallbackController(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
+    }
 
     /**
      * 主动通知对方发货回调
@@ -69,7 +73,7 @@ public class OrderAPICallbackController {
 
             boolean success = response.getStatusCode().is2xxSuccessful()
                     && resp != null
-                    && Boolean.TRUE.equals(resp.get("success"));
+                    && Boolean.TRUE.equals(resp.get("rel"));
 
             if (!success) {
                 log.warn("发货回调失败: status={}, resp={}", response.getStatusCode(), resp);

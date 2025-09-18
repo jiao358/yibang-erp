@@ -269,18 +269,25 @@ public class OrderApiController {
 
                 // 5. 转换消息为订单创建请求
                 OrderCreateRequest orderRequest = convertToOrderCreateRequest(message);
-
+                boolean createSuccess = true;
+                String createMessage="订单创建成功";
                 try{
 
                     orderService.createOrderByAPI(orderRequest);
                 }catch (IllegalArgumentException e){
+                    createSuccess=false;
                     //这个是人工handle处理
                     messageLogService.updateOrderMessageProcessing(messageId, orderRequest, RabbitMQConfig.ORDER_CREATE_QUEUE, "MANUAL_REQUIRED", "需要人工处理: " + e.getMessage());
+                    createMessage = "需要人工处理:"+e.getMessage();
+
+
                 }
                 // 6. 创建订单
 
                 // 7. 记录处理成功
-                messageLogService.recordMessageProcessing(messageId, message, RabbitMQConfig.ORDER_CREATE_QUEUE, "SUCCESS", "订单创建成功");
+                if(createSuccess){
+                    messageLogService.recordMessageProcessing(messageId, message, RabbitMQConfig.ORDER_CREATE_QUEUE, "SUCCESS", "订单创建成功");
+                }
                 log.info("订单消息处理成功: messageId={}, orderId={}",
                         messageId, message.getOrderId());
 
