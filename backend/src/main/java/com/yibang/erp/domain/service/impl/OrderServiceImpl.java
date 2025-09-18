@@ -2535,5 +2535,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         }
     }
 
+    @Override
+    public Order getOrderBySourceOrderId(String sourceOrderId) {
+        QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("source_order_id", sourceOrderId);
+        return orderRepository.selectOne(queryWrapper);
+    }
 
 }

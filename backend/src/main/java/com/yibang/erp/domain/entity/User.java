@@ -67,6 +67,13 @@ public class User {
     private Long roleId;
 
     /**
+     * 获取角色ID（兼容方法）
+     */
+    public Long getRole() {
+        return this.roleId;
+    }
+
+    /**
      * 所属公司ID
      */
     @TableField("company_id")

@@ -1,5 +1,8 @@
 package com.yibang.erp.config;
 
+import com.yibang.erp.common.util.JwtUtil;
+import com.yibang.erp.security.HsfApiKeyFilter;
+import com.yibang.erp.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -7,7 +10,6 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -17,8 +19,6 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import com.yibang.erp.security.JwtAuthenticationFilter;
-import com.yibang.erp.common.util.JwtUtil;
 
 import java.util.Arrays;
 import java.util.List;
@@ -32,6 +32,11 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+//    @Autowired
+//    private JwtAuthenticationFilter jwtAuthenticationFilter;
+//    @Autowired
+//    private HsfApiKeyFilter hsfApiKeyFilter;
 
     /**
      * 密码编码器
@@ -68,6 +73,8 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
+
+
     /**
      * JWT认证过滤器
      */
@@ -77,61 +84,51 @@ public class SecurityConfig {
     }
 
     /**
-     * 安全过滤器链配置 - 优化版本
+     * HSF API Key认证过滤器
      */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, DaoAuthenticationProvider authenticationProvider, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+    public HsfApiKeyFilter hsfApiKeyFilter() {
+        return new HsfApiKeyFilter();
+    }
+
+    /**
+     * 安全过滤器链配置
+     */
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http,JwtAuthenticationFilter jwtAuthenticationFilter,HsfApiKeyFilter hsfApiKeyFilter) throws Exception {
         System.out.println("=== 配置安全过滤器链 ===");
         
         http
-            // 禁用CSRF（使用JWT认证）
-            .csrf(AbstractHttpConfigurer::disable)
-            
+            // 禁用CSRF，因为使用JWT
+            .csrf(csrf -> csrf.disable())
             // 配置CORS
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            
-            // 配置会话管理（无状态）
+            // 配置会话管理
             .sessionManagement(session -> 
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
-            
-            // 配置认证提供者
-            .authenticationProvider(authenticationProvider)
-            
-            // 添加JWT认证过滤器
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            
-            // 配置授权规则 - 优化版本
-            .authorizeHttpRequests(authz -> authz
-                // 公开接口
-                .requestMatchers("/").permitAll()
-                .requestMatchers("/health").permitAll()
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/test/**").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
-                
-                // 静态资源公开访问
-                .requestMatchers("/static/**").permitAll()
-                
-                // 监控API - 仅系统管理员可访问
+            // 配置授权规则
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(
+                    "/",
+                    "/health",
+                    "/api/auth/login",
+                    "/api/auth/**",
+                    "/api/test/**",
+                    "/actuator/**",
+                    "/static/**",
+                    "/api/hsf/**"  // HSF微服务接口 - 通过API Key认证
+                ).permitAll()
                 .requestMatchers("/api/monitor/**").hasRole("SYSTEM_ADMIN")
-                
-                // 需要认证的接口（排除已公开的）
                 .requestMatchers("/api/protected/**").authenticated()
                 .requestMatchers("/api/admin/**").authenticated()
-                
-                // API接口需要认证
                 .requestMatchers("/api/**").authenticated()
-                
-                // 其他所有请求需要认证
                 .anyRequest().authenticated()
             )
-            
-            // 配置HTTP Basic认证（开发阶段临时使用）
-            .httpBasic(AbstractHttpConfigurer::disable)
-            
-            // 配置表单登录（开发阶段临时使用）
-            .formLogin(AbstractHttpConfigurer::disable);
+            // 添加HSF API Key认证过滤器（在JWT过滤器之前）
+            .addFilterBefore(hsfApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
+            // 添加JWT过滤器
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         System.out.println("=== 安全过滤器链配置完成 ===");
         return http.build();

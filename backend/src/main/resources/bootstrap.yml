@@ -1,0 +1,12 @@
+# Bootstrap配置文件
+# 用于微服务启动时的配置，优先级高于application.yml
+spring:
+  application:
+    name: yibang-erp
+  config:
+    import: optional:nacos:127.0.0.1:8848
+  cloud:
+    nacos:
+      config:
+        import-check:
+          enabled: false

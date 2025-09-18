@@ -12,6 +12,7 @@ import com.yibang.erp.domain.enums.ProductStatus;
 import com.yibang.erp.domain.service.ProductAuditService;
 import com.yibang.erp.domain.service.ProductPriceTierConfigService;
 import com.yibang.erp.domain.service.ProductStateService;
+import com.yibang.erp.example.MicroserviceUsageExample;
 import com.yibang.erp.infrastructure.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,6 +58,8 @@ public class ProductController {
     private ProductPriceTierConfigRepository productPriceTierConfigRepository;
     @Autowired
     private ProductImageRepository productImageRepository;
+    @Autowired
+    private MicroserviceUsageExample microserviceUsageExample;
 
     /**
      * 获取商品列表
@@ -75,6 +78,8 @@ public class ProductController {
 
         log.info("获取商品列表，页码: {}, 每页大小: {}, 状态: {}, 公司ID: {}, 商品名称: {}, 品牌: {}, SKU: {}", 
                  page, size, status, companyId, name, brand, sku);
+
+
 
         try {
             // 构建查询条件
@@ -453,7 +458,7 @@ public class ProductController {
 
         log.info("获取销售商品列表，页码: {}, 每页大小: {}, 商品名称: {}, 品牌: {}, 分类ID: {}, 供应商公司ID: {}",
                 page, size, name, brand, categoryId, supplierCompanyId);
-
+        microserviceUsageExample.timeServiceExample();
         try {
             // 构建查询条件
             QueryWrapper<Product> queryWrapper = new QueryWrapper<>();

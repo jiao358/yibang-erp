@@ -46,10 +46,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         
         // 添加请求信息日志
         logger.info("JWT认证过滤器 - 处理请求: {} {}", request.getMethod(), request.getRequestURI());
-        
+
         try {
+            if(SecurityContextHolder.getContext().getAuthentication()!=null){
+                logger.info("JWT认证过滤器 - 内部系统HSF认证: 已认证, 用户: {}, 角色: {}",
+                        SecurityContextHolder.getContext().getAuthentication().getPrincipal(),
+                        SecurityContextHolder.getContext().getAuthentication().getAuthorities());
+                filterChain.doFilter(request, response);
+                return ;
+            }
+
+
             String jwt = getJwtFromRequest(request);
             logger.info("JWT认证过滤器 - 提取的JWT: {}", jwt != null ? jwt.substring(0, Math.min(50, jwt.length())) + "..." : "null");
+
 
             if (jwt != null && !jwt.isEmpty()) {
                 String username = jwtUtil.getUsernameFromToken(jwt);
@@ -133,4 +143,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         
         return null;
     }
+
 }

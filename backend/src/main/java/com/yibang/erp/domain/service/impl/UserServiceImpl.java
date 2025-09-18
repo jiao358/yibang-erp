@@ -331,4 +331,20 @@ public class UserServiceImpl implements UserService {
         
         return response;
     }
+
+    @Override
+    public User authenticateUser(String username, String password) {
+        // 根据用户名查询用户
+        User user = getUserByUsername(username);
+        if (user == null) {
+            return null;
+        }
+        
+        // 验证密码
+        if (passwordEncoder.matches(password, user.getPasswordHash())) {
+            return user;
+        }
+        
+        return null;
+    }
 }

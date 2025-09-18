@@ -184,4 +184,9 @@ public interface OrderService {
      * 处理多渠道订单冲突
      */
     OrderResponse handleMultiSourceConflict(String salesOrderId, Long salesUserId, List<OrderCreateRequest> conflictingOrders);
+
+    /**
+     * 根据源订单号获取订单
+     */
+    com.yibang.erp.domain.entity.Order getOrderBySourceOrderId(String sourceOrderId);
 }

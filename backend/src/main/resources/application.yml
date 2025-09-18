@@ -4,6 +4,34 @@ spring:
     active: dev
   application:
     name: yibang-erp
+  config:
+    import: optional:nacos:127.0.0.1:8848
+  main:
+    allow-bean-definition-overriding: true
+  cloud:
+    nacos:
+      config:
+        server-addr: 127.0.0.1:8848
+        namespace: public
+        group: DEFAULT_GROUP
+        file-extension: yml
+        enabled: false
+        import-check:
+          enabled: false
+      discovery:
+        server-addr: 127.0.0.1:8848
+        namespace: public
+        group: DEFAULT_GROUP
+        service: yibang-erp
+        enabled: true
+        register-enabled: true
+        instance-enabled: true
+        ephemeral: true
+        cluster-name: DEFAULT
+        metadata:
+          version: 1.0.0
+          zone: default-zone
+          description: 懿邦智能供应链协作平台
   # 明确配置ANSI输出，避免启动时的枚举转换错误
   output:
     ansi:
@@ -135,3 +163,11 @@ zsd:
     callback_test:
         url: https://api-callback.zsdx.cn/bsc-erp/yibang/orderLogistics/callBack
         token: your-callback-token
+
+# HSF 微服务配置
+hsf:
+  api:
+    key: erp-2024-abc123def456
+  security:
+    # 内部系统API Keys配置 (格式: 系统名:API Key,系统名:API Key)
+    api-keys: yibang-erp:erp-2024-abc123def456,other-system:other-2024-xyz789

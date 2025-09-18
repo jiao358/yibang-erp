@@ -103,4 +103,13 @@ public interface UserService {
      * @return 用户列表
      */
     List<User> getAllUsers();
+
+    /**
+     * 用户认证
+     *
+     * @param username 用户名
+     * @param password 密码
+     * @return 认证成功的用户
+     */
+    User authenticateUser(String username, String password);
 }
