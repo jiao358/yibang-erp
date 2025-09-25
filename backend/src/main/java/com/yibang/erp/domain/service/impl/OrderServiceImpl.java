@@ -1228,6 +1228,21 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             throw new RuntimeException("物流公司不能为空");
         }
 
+        // 验证物流信息格式，防止用户填反了
+        String trackingNumber = request.getTrackingNumber().trim();
+        String carrier = request.getCarrier().trim();
+        
+        // 验证物流单号：必须包含至少3个数字
+        long digitCount = trackingNumber.chars().filter(Character::isDigit).count();
+        if (digitCount < 3) {
+            throw new RuntimeException("物流单号应包含多个数字");
+        }
+        
+        // 验证物流公司：不能包含3个或以上连续数字
+        if (carrier.matches(".*\\d{3,}.*")) {
+            throw new RuntimeException("物流公司不应包含过多数字，请检查是否与物流单号填反了");
+        }
+
         // 记录状态变更日志
         OrderStatusLog statusLog = new OrderStatusLog();
         statusLog.setOrderId(orderId);
@@ -1416,6 +1431,35 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         order.setApprovalAt(LocalDateTime.now());
         order.setUpdatedAt(LocalDateTime.now());
         order.setUpdatedBy(request.getOperatorId());
+        orderRepository.updateById(order);
+
+        return getOrderById(orderId);
+    }
+
+    @Override
+    public OrderResponse completeOrder(Long orderId) {
+        Order order = getOrderEntityById(orderId);
+
+        // 验证状态转换
+        if (!isValidStatusTransition(order.getOrderStatus(), "COMPLETED")) {
+            throw new IllegalStateException("无效的状态转换: " + order.getOrderStatus() + " -> COMPLETED");
+        }
+
+        // 记录状态变更日志
+        OrderStatusLog log = new OrderStatusLog();
+        log.setOrderId(orderId);
+        log.setFromStatus(order.getOrderStatus());
+        log.setToStatus("COMPLETED");
+        log.setChangeReason("订单已结清");
+        log.setOperatorId(getCurrentUserId());
+        log.setOperatorType("USER");
+        log.setCreatedAt(LocalDateTime.now());
+        orderStatusLogRepository.insert(log);
+
+        // 更新订单状态
+        order.setOrderStatus("COMPLETED");
+        order.setUpdatedAt(LocalDateTime.now());
+        order.setUpdatedBy(getCurrentUserId());
         orderRepository.updateById(order);
 
         return getOrderById(orderId);

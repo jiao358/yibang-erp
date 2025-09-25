@@ -39,7 +39,12 @@ public class ProductInfoResponse {
      * 商品简介
      */
     private String shortDescription;
-    
+
+    /**
+     * 供应链公司id
+     */
+    private Long companyId;
+
     /**
      * 分类ID
      */

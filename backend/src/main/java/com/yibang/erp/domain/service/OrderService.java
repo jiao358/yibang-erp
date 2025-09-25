@@ -101,6 +101,11 @@ public interface OrderService {
     OrderResponse supplierRejectOrder(Long orderId, SupplierRejectRequest request);
 
     /**
+     * 已结清订单
+     */
+    OrderResponse completeOrder(Long orderId);
+
+    /**
      * 处理订单冲突
      */
     OrderResponse resolveOrderConflict(Long orderId, OrderConflictResolutionRequest request);

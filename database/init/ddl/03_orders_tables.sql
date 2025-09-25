@@ -28,6 +28,8 @@ CREATE TABLE customers (
     created_by BIGINT COMMENT '创建人ID',
     updated_by BIGINT COMMENT '更新人ID',
     deleted TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否删除：0-未删除，1-已删除',
+    open_id VARCHAR(100) COMMENT '微信open_id',
+    union_id VARCHAR(100) COMMENT '微信union_id',
     FOREIGN KEY (company_id) REFERENCES companies(id),
     INDEX idx_customer_code (customer_code),
     INDEX idx_customer_company (company_id),

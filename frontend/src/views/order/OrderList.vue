@@ -88,9 +88,9 @@
             <el-option label="已提交" value="SUBMITTED" />
             <el-option label="供应商确认" value="SUPPLIER_CONFIRMED" />
             <el-option label="已发货" value="SHIPPED" />
-            <el-option label="运输中" value="IN_TRANSIT" />
-            <el-option label="已送达" value="DELIVERED" />
-            <el-option label="已完成" value="COMPLETED" />
+            <!-- <el-option label="运输中" value="IN_TRANSIT" /> -->
+            <!-- <el-option label="已送达" value="DELIVERED" /> -->
+            <el-option label="已结清" value="COMPLETED" />
             <el-option label="已取消" value="CANCELLED" />
             <el-option label="已拒绝" value="REJECTED" />
           </el-select>
@@ -271,6 +271,14 @@
                     :command="{ action: 'supplierReject', order: row }"
                   >
                     拒绝订单
+                  </el-dropdown-item>
+                  
+                  <!-- 已结清操作 -->
+                  <el-dropdown-item
+                    v-if="canComplete(row)"
+                    :command="{ action: 'complete', order: row }"
+                  >
+                    已结清
                   </el-dropdown-item>
                   
                   <!-- 调试：显示权限检查结果 -->
@@ -748,8 +756,43 @@ const shipForm = reactive({
 })
 const shipRules: FormRules = {
   warehouseId: [{ required: true, message: '发货仓库不能为空', trigger: 'change' }],
-  trackingNumber: [{ required: true, message: '物流单号不能为空', trigger: 'blur' }],
-  carrier: [{ required: true, message: '物流公司不能为空', trigger: 'blur' }]
+  trackingNumber: [
+    { required: true, message: '物流单号不能为空', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (!value) {
+          callback()
+          return
+        }
+        // 检查是否包含足够的数字
+        const digitCount = (value.match(/\d/g) || []).length
+        if (digitCount < 3) {
+          callback(new Error('物流单号应包含多个数字'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ],
+  carrier: [
+    { required: true, message: '物流公司不能为空', trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (!value) {
+          callback()
+          return
+        }
+        // 检查是否包含过多连续数字
+        if (/\d{3,}/.test(value)) {
+          callback(new Error('物流公司不应包含过多数字，请检查是否与物流单号填反了'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ]
 }
 
 // 搜索表单
@@ -861,12 +904,30 @@ const submitShipForm = async () => {
   if (!shipFormRef.value || !currentShipOrder.value) return
   try {
     await shipFormRef.value.validate()
+    
+    // 再次验证物流信息格式，防止用户填反了
+    const trackingNumber = shipForm.trackingNumber.trim()
+    const carrier = shipForm.carrier.trim()
+    
+    // 验证物流单号
+    const digitCount = (trackingNumber.match(/\d/g) || []).length
+    if (digitCount < 3) {
+      ElMessage.error('物流单号应包含多个数字')
+      return
+    }
+    
+    // 验证物流公司
+    if (/\d{3,}/.test(carrier)) {
+      ElMessage.error('物流公司不应包含过多数字，请检查是否与物流单号填反了')
+      return
+    }
+    
     shipSubmitting.value = true
     await orderApi.supplierShipOrder(currentShipOrder.value.id, {
       warehouseId: shipForm.warehouseId as number,
       warehouseName: (warehouseList.value.find(w => w.id === shipForm.warehouseId)?.warehouseName) || '',
-      trackingNumber: shipForm.trackingNumber.trim(),
-      carrier: shipForm.carrier.trim(),
+      trackingNumber: trackingNumber,
+      carrier: carrier,
       shippingMethod: shipForm.shippingMethod || '',
       shippingNotes: shipForm.shippingNotes || '',
       operatorId: getCurrentUserId(),
@@ -878,7 +939,7 @@ const submitShipForm = async () => {
     await loadOrderList()
   } catch (e) {
     // 验证失败或请求失败
-    ElMessage.success('供应商发货异常'+ e)
+    ElMessage.error('供应商发货失败: ' + (e as Error).message)
   } finally {
     shipSubmitting.value = false
   }
@@ -1399,6 +1460,26 @@ const handleAction = async (command: { action: string; order: OrderResponse }) =
           throw error // 重新抛出其他错误
         }
         break
+      case 'complete':
+        try {
+          await ElMessageBox.confirm(
+            `确定要将订单 ${order.platformOrderNo} 标记为已结清吗？`,
+            '已结清',
+            {
+              confirmButtonText: '确定结清',
+              cancelButtonText: '取消',
+              type: 'warning'
+            }
+          )
+          await orderApi.completeOrder(order.id)
+          ElMessage.success('订单已结清')
+        } catch (error) {
+          if (error === 'cancel') {
+            return // 用户取消，不显示错误信息
+          }
+          throw error // 重新抛出其他错误
+        }
+        break
       case 'viewDetail':
         showOrderDetail(order)
         return
@@ -1689,6 +1770,25 @@ const canSupplierReject = (order: OrderResponse) => {
   
   console.log(`订单 ${order.platformOrderNo} 供应商拒绝权限检查:`, {
     isSupplier,
+    orderStatus: order.orderStatus,
+    statusMatch,
+    result
+  })
+  
+  return result
+}
+
+const canComplete = (order: OrderResponse) => {
+  const role = getUserRole()
+  // 超级管理员和销售人员可以操作
+  const hasPermission = ['SYSTEM_ADMIN', 'SALES'].includes(role)
+  // 只有已发货状态的订单可以结清
+  const statusMatch = order.orderStatus === 'SHIPPED'
+  const result = hasPermission && statusMatch
+  
+  console.log(`订单 ${order.platformOrderNo} 已结清权限检查:`, {
+    role,
+    hasPermission,
     orderStatus: order.orderStatus,
     statusMatch,
     result

@@ -1,11 +1,13 @@
 package com.yibang.erp.controller.hsf;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yibang.erp.common.response.PageResult;
 import com.yibang.erp.domain.dto.microservice.OrderCreateRequest;
 import com.yibang.erp.domain.dto.microservice.OrderInfoResponse;
 import com.yibang.erp.domain.dto.microservice.Result;
 import com.yibang.erp.domain.entity.Order;
 import com.yibang.erp.domain.dto.OrderResponse;
+import com.yibang.erp.domain.dto.OrderListRequest;
 import com.yibang.erp.domain.service.OrderService;
 import java.math.BigDecimal;
 import lombok.extern.slf4j.Slf4j;
@@ -112,7 +114,7 @@ public class HsfOrderController {
      * 获取订单列表
      */
     @GetMapping("/list")
-    public Result<Page<OrderInfoResponse>> getOrderList(
+    public Result<PageResult<OrderInfoResponse>> getOrderList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer size,
             @RequestParam(required = false) String status,
@@ -122,16 +124,25 @@ public class HsfOrderController {
         try {
             log.info("HSF API调用: 获取订单列表 - page={}, size={}, status={}", page, size, status);
             
-            // 这里需要调用OrderService的查询订单列表方法
-            // 由于OrderService可能没有对应的方法，这里先返回模拟数据
-            Page<OrderInfoResponse> responsePage = new Page<>();
-            responsePage.setCurrent(page);
-            responsePage.setSize(size);
-            responsePage.setTotal(0);
-            responsePage.setPages(0);
-            responsePage.setRecords(List.of());
+            // 构建OrderListRequest
+            OrderListRequest request = new OrderListRequest();
+            request.setCurrent(page);
+            request.setSize(size);
+            request.setStatus(status);
+            request.setCustomerId(customerId);
+            // 这里可以添加日期范围处理逻辑
             
-            return Result.success("获取订单列表成功", responsePage);
+            // 调用OrderService的查询订单列表方法
+            Page<OrderResponse> orderPage = orderService.getOrderList(request);
+            
+            // 转换为响应格式
+            List<OrderInfoResponse> orderList = orderPage.getRecords().stream()
+                    .map(this::convertToOrderInfoResponse)
+                    .collect(Collectors.toList());
+            
+            PageResult<OrderInfoResponse> pageResult = PageResult.of(orderList, orderPage.getTotal(), orderPage.getCurrent(), orderPage.getSize());
+            
+            return Result.success("获取订单列表成功", pageResult);
         } catch (Exception e) {
             log.error("HSF API调用失败: 获取订单列表", e);
             return Result.error("获取订单列表失败: " + e.getMessage());

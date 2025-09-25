@@ -1,6 +1,7 @@
 package com.yibang.erp.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -16,6 +17,7 @@ import java.util.Set;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @TableName("users")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class User {
 
     /**

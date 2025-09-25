@@ -129,6 +129,42 @@ public class Customer {
     private Long updatedBy;
 
     /**
+     * 微信open_id
+     */
+    @TableField("open_id")
+    private String openId;
+
+    /**
+     * 微信union_id
+     */
+    @TableField("union_id")
+    private String unionId;
+
+    /**
+     * 省份
+     */
+    @TableField("province")
+    private String province;
+
+    /**
+     * 城市
+     */
+    @TableField("city")
+    private String city;
+
+    /**
+     * 性别
+     */
+    @TableField("gender")
+    private String gender;
+
+    /**
+     * 国家
+     */
+    @TableField("country")
+    private String country;
+
+    /**
      * 是否删除
      */
     @TableField("deleted")

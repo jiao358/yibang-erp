@@ -102,7 +102,7 @@ public class OrderController {
         Long userId = getUserId(authorization);
         User user = userRedisRepository.selectById(userId);
 
-        if(user.getCompanyId()==7 || user.getCompanyId()==3){
+        if(user.getCompanyId()==5 ){
             request.setYibang(true);
         }
 
@@ -235,6 +235,16 @@ public class OrderController {
             @PathVariable Long orderId,
             @RequestBody SupplierRejectRequest request) {
         OrderResponse response = orderService.supplierRejectOrder(orderId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 已结清订单
+     */
+    @PostMapping("/{orderId}/complete")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'SALES')")
+    public ResponseEntity<OrderResponse> completeOrder(@PathVariable Long orderId) {
+        OrderResponse response = orderService.completeOrder(orderId);
         return ResponseEntity.ok(response);
     }
 

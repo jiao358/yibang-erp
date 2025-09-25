@@ -70,6 +70,11 @@ export const orderApi = {
     return request.post(`/api/orders/${id}/supplier-reject`, data)
   },
 
+  // 已结清订单
+  completeOrder(id: number): Promise<OrderResponse> {
+    return request.post(`/api/orders/${id}/complete`)
+  },
+
   // 批量供应商确认订单
   batchSupplierConfirmOrders(data: { orderIds: number[]; reason?: string; operatorId: number; operatorName?: string; operatorRole?: string }): Promise<any> {
     return request.post('/api/orders/batch-supplier-confirm', data)
