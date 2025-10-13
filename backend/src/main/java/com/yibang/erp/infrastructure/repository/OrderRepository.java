@@ -20,6 +20,9 @@ public interface OrderRepository extends BaseMapper<Order> {
     @Select("SELECT * FROM orders WHERE platform_order_id = #{platformOrderNo} AND deleted = 0")
     Order selectByPlatformOrderNo(@Param("platformOrderNo") String platformOrderNo);
 
+    @Select("SELECT * FROM orders WHERE source_order_id = #{sourceOrderId} AND deleted = 0")
+    Order selectBySourceOrderId(@Param("sourceOrderId") String sourceOrderId);
+
     /**
      * 根据销售订单ID和销售用户ID查询订单
      */

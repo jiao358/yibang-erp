@@ -7,12 +7,13 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.yibang.erp.common.util.UserSecurityUtils;
+import com.yibang.erp.controller.OrderAPICallbackController;
+import com.yibang.erp.controller.microservice.WxOrderService;
 import com.yibang.erp.domain.dto.*;
 import com.yibang.erp.domain.entity.*;
 import com.yibang.erp.domain.service.OrderNumberGeneratorService;
 import com.yibang.erp.domain.service.OrderService;
 import com.yibang.erp.infrastructure.client.DeepSeekClient;
-import com.yibang.erp.controller.OrderAPICallbackController;
 import com.yibang.erp.infrastructure.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -94,6 +95,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
     @Autowired
     private OrderAPICallbackController orderAPICallbackController;
+
+    @Autowired
+    private WxOrderService wxOrderService;
+
 
     private boolean isProdProfile() {
         try {
@@ -237,6 +242,64 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
             throw new IllegalArgumentException("订单商品列表不能为空");
         }
         return list;
+    }
+
+    @Override
+    public OrderCloseMessageResponse handleCloseOrderHsf(String sourceOrderId) {
+        OrderCloseMessageResponse response = new OrderCloseMessageResponse();
+        response.setCanClose(true);
+
+        try {
+
+            User estelaUser = userRedisRepository.findByUsername("estela");
+
+            if(estelaUser == null){
+                throw new IllegalArgumentException("系统用户estela不存在，请检查");
+            }
+
+            // 用estelaUser以及sourceOrderId查找订单
+            QueryWrapper<Order> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("source_order_id", sourceOrderId);
+            queryWrapper.eq("created_by", estelaUser.getId());
+            queryWrapper.eq("order_source", "WEBSITE");
+            Order order = orderRepository.selectOne(queryWrapper);
+
+            if(order == null){
+                response.setCanClose(false);
+                response.setMessage("订单不存在");
+                return response;
+            }
+
+            String orderStatus = order.getOrderStatus();
+
+            if(orderStatus.equals("APPROVED") || orderStatus.equals("SHIPPED")){
+                // 订单状态不允许关闭，需要人工处理
+                response.setCanClose(false);
+                response.setMessage("订单状态不能关闭，已提交人工处理");
+
+                // 创建人工处理记录
+                createManualProcessingRecord(order, null, OrderManualProcessing.TYPE_ORDER_CLOSE,
+                        "订单状态为" + orderStatus + "，无法自动关闭订单，需要人工处理");
+
+                return response;
+            }
+
+            // 执行订单关闭
+            order.setOrderStatus("CANCELLED");
+            order.setUpdatedAt(LocalDateTime.now());
+            orderRepository.updateById(order);
+
+            // 记录关闭成功
+            response.setMessage("订单关闭成功");
+
+        } catch (Exception e) {
+            log.error("处理订单关闭消息失败: sourceOrderId={}", sourceOrderId, e);
+            response.setCanClose(false);
+            response.setMessage("处理失败: " + e.getMessage());
+        }
+
+        return response;
+
     }
 
     @Override
@@ -498,6 +561,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         //这里i可以使用commission 佣金～ 不过这部份内容数据 应该市全部商品佣金加起来的才对 init阶段
         order.setTaxAmount(request.getExtendedFields().get("taxAmount") != null ? new BigDecimal(request.getExtendedFields().get("taxAmount").toString()) : BigDecimal.ZERO);
 
+        //期望发货时间
+        try{
+            order.setExpectedDeliveryDate(LocalDate.now().plusDays(2));
+        }catch (Exception e){
+
+        }
         // 处理电商平台字段
         processEcommercePlatformFields(order, request);
 
@@ -642,6 +711,117 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
 
         // 计算订单总金额
         calculateOrderTotal(order.getId());
+
+        return getOrderById(order.getId());
+    }
+
+    /**
+     * 实现 wx小程序的创建订单
+     * @param request
+     * @return
+     */
+    @Override
+    public OrderResponse createOrderByHsf(OrderCreateRequest request) {
+        List<OrderItem> orderItems = parseOrderItems(request.getOrderItems());
+
+        Long supplierCompanyId = orderItems.get(0).getSupplierId();
+
+
+        User user = userRedisRepository.findByUsername("estela");
+
+        // 创建订单
+        Order order = new Order();
+        order.setPlatformOrderId(generatePlatformOrderNo(user.getUsername(),"WEBSITE"));
+        if(request.getCustomerId()==null){
+            order.setCustomerId(0L);
+        }else{
+            order.setCustomerId(request.getCustomerId());
+        }
+        order.setSalesId(user.getId());
+
+        if(StringUtils.hasText(request.getSourceOrderId())){
+            order.setSourceOrderId(request.getSourceOrderId());
+        }
+        /**
+         * todo 这里就有问题了
+         * 销售公司可能是一棒 而不是供应链公司
+         * 供应链公司的逻辑，应该是从品上看的
+         */
+        order.setSupplierCompanyId(supplierCompanyId);
+
+        order.setOrderType("NORMAL"); // 默认订单类型
+        order.setOrderSource("WEBSITE");
+        //api提交的默认全部SUBMITTED 直接等待审核
+        order.setOrderStatus("SUBMITTED");
+
+
+
+        //api 没有currency
+        order.setCurrency("CNY"); // 默认人民币
+        order.setSpecialRequirements(request.getRemarks());
+        order.setBuyerNote(request.getBuyerNote());
+        String address = request.getExtendedFields().get("deliveryAddress").toString();
+
+
+        // API不用去拆分省 市 区 直接会给我们
+//        OrderAddressDTO orderAddressDTO = aiModelHandleAddress(address);
+        order.setDeliveryAddress(address);
+        order.setProvinceName(request.getExtendedFields().get("provinceName").toString());
+        order.setCityName(request.getExtendedFields().get("cityName").toString());
+        order.setDistrictName(request.getExtendedFields().get("districtName").toString());
+        order.setAiConfidence(BigDecimal.valueOf(1));
+        order.setAiProcessed(false);
+        order.setDeliveryPhone(request.getExtendedFields().get("deliveryPhone").toString());
+        order.setDeliveryContact(request.getExtendedFields().get("deliveryContact").toString());
+
+
+        order.setTotalAmount(BigDecimal.ZERO);
+        order.setDiscountAmount(request.getExtendedFields().get("discountAmount") != null ? new BigDecimal(request.getExtendedFields().get("discountAmount").toString()) : BigDecimal.ZERO);
+
+        order.setShippingAmount(request.getExtendedFields().get("shippingAmount") != null ? new BigDecimal(request.getExtendedFields().get("shippingAmount").toString()) : BigDecimal.ZERO);
+
+        //这里i可以使用commission 佣金～ 不过这部份内容数据 应该市全部商品佣金加起来的才对 init阶段
+        order.setTaxAmount(request.getExtendedFields().get("taxAmount") != null ? new BigDecimal(request.getExtendedFields().get("taxAmount").toString()) : BigDecimal.ZERO);
+
+        //期望发货时间
+        try{
+            order.setExpectedDeliveryDate(LocalDate.now().plusDays(2));
+        }catch (Exception e){
+
+        }
+        // 处理电商平台字段
+        processEcommercePlatformFields(order, request);
+
+        order.setFinalAmount(BigDecimal.ZERO);
+
+
+        order.setPaymentMethod("BANK_TRANSFER");
+        order.setPaymentStatus("PAID");
+        order.setApprovalStatus("PENDING");
+
+        order.setCreatedAt(LocalDateTime.now());
+        order.setUpdatedAt(LocalDateTime.now());
+        order.setCreatedBy(user.getId());
+        order.setUpdatedBy(user.getId());
+
+        // 处理扩展字段
+        if (request.getExtendedFields() != null) {
+            order.setExtendedFieldsMap(request.getExtendedFields());
+        }
+
+        //这里没有当前的登录信息
+//        order.setSalesId(UserSecurityUtils.getCurrentUserId());
+        // 保存订单
+        orderRepository.insert(order);
+
+        // 创建订单项
+        if (request.getOrderItems() != null && !request.getOrderItems().isEmpty()) {
+            createOrderItemsForAPI(order.getId(),orderItems);
+        }
+
+
+        // 计算订单总金额
+        calculateOrderTotalForAPI(order.getId(),user.getId());
 
         return getOrderById(order.getId());
     }
@@ -1165,6 +1345,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderRepository, Order> implem
         order.setUpdatedAt(LocalDateTime.now());
         order.setUpdatedBy(request.getOperatorId());
         orderRepository.updateById(order);
+
+        // 对wx订单进行同步
+        wxOrderService.notifyWxOrderDeliveryPrepare(request,order);
+
+
+
 
         return getOrderById(orderId);
     }

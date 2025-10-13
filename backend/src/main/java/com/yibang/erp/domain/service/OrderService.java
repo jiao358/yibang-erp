@@ -10,6 +10,13 @@ import java.util.List;
 public interface OrderService {
 
 
+    /**
+     * 处理订单关闭消息（通过HSF）
+     * @param sourceOrderId
+     * @return
+     */
+    OrderCloseMessageResponse handleCloseOrderHsf(String sourceOrderId);
+
 
     /**
      *
@@ -36,6 +43,9 @@ public interface OrderService {
      * 创建订单
      */
     OrderResponse createOrder(OrderCreateRequest request);
+
+
+    OrderResponse createOrderByHsf(OrderCreateRequest request);
 
     /**
      * 更新订单

@@ -2,18 +2,24 @@ package com.yibang.erp.controller.hsf;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yibang.erp.common.response.PageResult;
-import com.yibang.erp.domain.dto.microservice.OrderCreateRequest;
+import com.yibang.erp.controller.microservice.RefundResponseDto;
+import com.yibang.erp.domain.dto.OrderCloseMessageResponse;
+import com.yibang.erp.domain.dto.OrderCreateRequest;
+import com.yibang.erp.domain.dto.OrderListRequest;
+import com.yibang.erp.domain.dto.OrderResponse;
 import com.yibang.erp.domain.dto.microservice.OrderInfoResponse;
 import com.yibang.erp.domain.dto.microservice.Result;
 import com.yibang.erp.domain.entity.Order;
-import com.yibang.erp.domain.dto.OrderResponse;
-import com.yibang.erp.domain.dto.OrderListRequest;
 import com.yibang.erp.domain.service.OrderService;
-import java.math.BigDecimal;
+import com.yibang.erp.infrastructure.repository.OrderRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,6 +38,72 @@ public class HsfOrderController {
     @Autowired
     private OrderService orderService;
 
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+    @PostMapping("/refund")
+    public Result<RefundResponseDto> refundOrder(@RequestParam String sourceOrderId){
+
+        Result<RefundResponseDto> result = new Result<RefundResponseDto>();
+        RefundResponseDto responseDto = new RefundResponseDto();
+        log.info("开始处理关闭订单消息:  sourceOrderId={}",sourceOrderId);
+        result.setData(responseDto);
+
+        if(!StringUtils.hasText(sourceOrderId)){
+            return Result.error("参数错误");
+
+        }
+
+        try {
+            String lockKeyToUse = "order:wx:closeOrder:lock:" + sourceOrderId;
+
+            Boolean locked = redisTemplate.opsForValue()
+                    .setIfAbsent(lockKeyToUse, "1", Duration.ofMinutes(10));
+
+            if (!Boolean.TRUE.equals(locked)) {
+                log.warn("消息正在处理中，跳过: sourceOrderId={}, idempotencyKey={}", sourceOrderId);
+                // 发送ACK，确认消息已处理（重复消息）
+                result.setMessage("PENDING");
+                return result;
+            }
+
+
+
+            // 5. 处理业务逻辑 如果订单已经处于APPROVED的状态 或者SHIPPED的状态 会出现问题。必须手工处理 需要一张订单手工处理表，记录相关变更。
+
+            OrderCloseMessageResponse orderCloseMessageResponse = orderService.handleCloseOrderHsf(sourceOrderId);
+            responseDto.setRefundSuccess(orderCloseMessageResponse.canClose);
+            responseDto.setRefundReason(orderCloseMessageResponse.getMessage());
+
+            if (orderCloseMessageResponse.canClose) {
+                //已经修改了
+                log.info("订单关闭成功: sourceOrderId={}", sourceOrderId);
+
+            } else {
+                //没有修改则进入人工处理表
+                log.info("订单关闭失败，已提交人工处理: sourceOrderId={}, reason={}", sourceOrderId, orderCloseMessageResponse.getMessage());
+
+                // 注意：人工处理记录已经在OrderServiceImpl.handleCloseOrderMessage中创建
+                // 这里只需要记录消息处理状态即可
+            }
+
+
+        } catch (Exception e) {
+
+            log.error("hsf内部处理订单关闭失败: sourceOrderId={}", sourceOrderId, e);
+
+
+        }
+
+
+
+        return result;
+
+    }
+
     /**
      * 创建订单
      */
@@ -39,14 +111,32 @@ public class HsfOrderController {
     public Result<OrderInfoResponse> createOrder(@RequestBody OrderCreateRequest request) {
         try {
             log.info("HSF API调用: 创建订单 - sourceOrderId={}", request.getSourceOrderId());
-            
-            // 这里需要调用OrderService的创建订单方法
+
+
+
+            String orderNo = request.getSourceOrderId();
+            Order order = orderRepository.selectBySourceOrderId(orderNo);
+            if(order!=null){
+                return Result.error("订单已存在");
+            }
+
+            //vaild request
+
+
+
+            //build orderCreate
+            OrderResponse orderResponse= orderService.createOrderByHsf(request);
+
+
+
+
+
             // 由于OrderService可能没有对应的方法，这里先返回模拟数据
             OrderInfoResponse orderInfo = new OrderInfoResponse();
-            orderInfo.setId(1L);
-            orderInfo.setPlatformOrderId("PLATFORM-ORDER-001");
+            orderInfo.setId(orderResponse.getId());
+            orderInfo.setPlatformOrderId(orderResponse.getPlatformOrderNo());
             orderInfo.setSourceOrderId(request.getSourceOrderId());
-            orderInfo.setStatus("CREATED");
+            orderInfo.setStatus("SUBMITTED");
             orderInfo.setTotalAmount(BigDecimal.valueOf(request.getOrderItems().stream()
                     .mapToDouble(item -> item.getUnitPrice().doubleValue() * item.getQuantity())
                     .sum()));
