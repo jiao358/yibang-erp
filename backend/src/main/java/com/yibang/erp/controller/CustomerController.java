@@ -1,13 +1,19 @@
 package com.yibang.erp.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.yibang.erp.common.response.PageResult;
 import com.yibang.erp.domain.entity.Customer;
+import com.yibang.erp.domain.service.CustomerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 客户管理控制器
@@ -19,6 +25,9 @@ public class CustomerController {
 
     @Autowired
     private com.yibang.erp.infrastructure.repository.CustomerRepository customerRepository;
+    
+    @Autowired
+    private CustomerService customerService;
 
     /**
      * 创建客户
@@ -78,9 +87,72 @@ public class CustomerController {
     }
 
     /**
-     * 获取所有客户
+     * 分页查询客户列表
      */
     @GetMapping
+    public ResponseEntity<Map<String, Object>> getCustomerList(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "20") Integer size,
+            @RequestParam(required = false) String customerCode,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String customerType,
+            @RequestParam(required = false) String customerLevel,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long companyId) {
+        try {
+            // 构建分页对象
+            Page<Customer> page = new Page<>(current, size);
+            
+            // 确定搜索关键词：优先使用keyword，其次使用name或customerCode
+            String searchKeyword = null;
+            if (StringUtils.hasText(keyword)) {
+                searchKeyword = keyword;
+            } else if (StringUtils.hasText(name)) {
+                searchKeyword = name;
+            } else if (StringUtils.hasText(customerCode)) {
+                searchKeyword = customerCode;
+            }
+            
+            // 调用Service进行分页查询
+            Page<Customer> customerPage = customerService.getCustomerList(
+                    page, 
+                    searchKeyword, 
+                    customerType, 
+                    customerLevel, 
+                    status, 
+                    companyId
+            );
+            
+            // 构建分页结果
+            PageResult<Customer> pageResult = PageResult.of(
+                    customerPage.getRecords(), 
+                    customerPage.getTotal(), 
+                    customerPage.getCurrent(), 
+                    customerPage.getSize()
+            );
+            
+            // 构建响应
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", pageResult);
+            response.put("message", "获取客户列表成功");
+            response.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("error", "获取客户列表失败: " + e.getMessage());
+            response.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+    
+    /**
+     * 获取所有客户（保留此接口用于其他需要完整列表的场景）
+     */
+    @GetMapping("/all")
     public ResponseEntity<List<Customer>> getAllCustomers() {
         List<Customer> customers = customerRepository.selectList(null);
         return ResponseEntity.ok(customers);

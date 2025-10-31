@@ -27,8 +27,10 @@ export const customerApi = {
     return request.get(`/api/customers/code/${customerCode}`)
   },
 
-  // 获取所有客户
-  getCustomerList(params?: any): Promise<Customer[]> {
+  // 分页获取客户列表
+  getCustomerList(params?: any): Promise<any> {
+    // 返回格式：{ success: true, data: { records: Customer[], total: number, current: number, size: number } }
+    // 或者兼容旧格式：Customer[]
     return request.get('/api/customers', { params })
   },
 

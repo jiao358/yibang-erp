@@ -98,7 +98,7 @@
           style="width: 100%"
           @sort-change="handleSortChange"
         >
-          <el-table-column prop="id" label="ID" width="80" />
+          <el-table-column prop="id" label="ID" width="80" sortable="custom" />
           
           <el-table-column prop="sourceOrderId" label="源订单ID" width="150" show-overflow-tooltip />
           
@@ -256,15 +256,16 @@ const tableData = ref<OrderAlertResponse[]>([])
 const dateRange = ref<[string, string] | null>(null)
 
 // 搜索表单
+// 初始化时默认筛选状态为"待处理"，并按创建时间倒序排列
 const searchForm = reactive<OrderAlertRequest>({
   current: 1,
   size: 20,
-  status: '',
+  status: ALERT_STATUS.PENDING, // 默认筛选状态为"待处理"
   processingType: '',
   orderNumber: '',
   sourceOrderId: '',
-  sortField: 'created_at',
-  sortOrder: 'desc'
+  sortField: 'created_at', // 默认按创建时间排序
+  sortOrder: 'desc' // 默认倒序排列
 })
 
 // 分页信息
@@ -327,7 +328,7 @@ const handleReset = () => {
   Object.assign(searchForm, {
     current: 1,
     size: 20,
-    status: '',
+    status: ALERT_STATUS.PENDING, // 重置时也设置为"待处理"
     processingType: '',
     orderNumber: '',
     sourceOrderId: '',
@@ -354,9 +355,22 @@ const handleCurrentChange = (current: number) => {
   loadData()
 }
 
-const handleSortChange = ({ prop, order }: { prop: string; order: string }) => {
-  searchForm.sortField = prop
-  searchForm.sortOrder = order === 'ascending' ? 'asc' : 'desc'
+const handleSortChange = ({ prop, order }: { prop: string; order: string | null }) => {
+  if (!order) {
+    // 如果取消排序，恢复默认排序（按创建时间倒序）
+    searchForm.sortField = 'created_at'
+    searchForm.sortOrder = 'desc'
+  } else {
+    // 将前端字段名映射到后端字段名
+    // createdAt -> created_at (后端支持两种格式)
+    const fieldMap: Record<string, string> = {
+      'id': 'id',
+      'createdAt': 'created_at', // 前端使用驼峰命名，映射到后端的下划线命名
+      'created_at': 'created_at' // 也支持直接使用下划线命名
+    }
+    searchForm.sortField = fieldMap[prop] || prop
+    searchForm.sortOrder = order === 'ascending' ? 'asc' : 'desc'
+  }
   loadData()
 }
 

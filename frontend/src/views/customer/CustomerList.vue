@@ -250,12 +250,46 @@ onMounted(() => {
 const loadCustomerList = async () => {
   try {
     loading.value = true
-    const response = await customerApi.getCustomerList(searchForm)
-    customerList.value = response || []
-    pagination.total = response?.length || 0
+    // 构建请求参数，合并searchForm和pagination的分页信息
+    const params = {
+      ...searchForm,
+      current: pagination.current,
+      size: pagination.size
+    }
+    
+    const response = await customerApi.getCustomerList(params)
+    
+    // 处理分页响应：response可能是分页结果对象，或者包含data字段的响应对象
+    if (response && response.success !== undefined) {
+      // 后端返回的标准格式：{ success: true, data: PageResult }
+      if (response.success && response.data) {
+        customerList.value = response.data.records || []
+        pagination.total = response.data.total || 0
+        // 同步分页信息
+        if (response.data.current) pagination.current = response.data.current
+        if (response.data.size) pagination.size = response.data.size
+      } else {
+        ElMessage.error(response.error || '获取客户列表失败')
+        customerList.value = []
+        pagination.total = 0
+      }
+    } else if (response && response.records) {
+      // 直接返回PageResult格式
+      customerList.value = response.records || []
+      pagination.total = response.total || 0
+    } else if (Array.isArray(response)) {
+      // 兼容旧格式：直接返回数组（非分页）
+      customerList.value = response || []
+      pagination.total = response?.length || 0
+    } else {
+      customerList.value = []
+      pagination.total = 0
+    }
   } catch (error) {
     ElMessage.error('加载客户列表失败')
     console.error('加载客户列表失败:', error)
+    customerList.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
@@ -263,6 +297,7 @@ const loadCustomerList = async () => {
 
 // 搜索
 const handleSearch = () => {
+  pagination.current = 1 // 搜索时重置到第一页
   searchForm.current = 1
   loadCustomerList()
 }
@@ -279,17 +314,22 @@ const resetSearch = () => {
     status: '',
     keyword: ''
   })
+  pagination.current = 1 // 重置时也重置分页
+  pagination.size = 20
   loadCustomerList()
 }
 
 // 分页处理
 const handleSizeChange = (size: number) => {
+  pagination.size = size
+  pagination.current = 1 // 切换每页数量时重置到第一页
   searchForm.size = size
   searchForm.current = 1
   loadCustomerList()
 }
 
 const handleCurrentChange = (current: number) => {
+  pagination.current = current
   searchForm.current = current
   loadCustomerList()
 }

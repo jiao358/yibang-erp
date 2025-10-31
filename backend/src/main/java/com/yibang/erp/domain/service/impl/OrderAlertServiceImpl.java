@@ -99,17 +99,38 @@ public class OrderAlertServiceImpl implements OrderAlertService {
             queryWrapper.le(OrderManualProcessing::getCreatedAt, endTime);
         }
         
-        // 排序
+        // 排序处理：支持按id、created_at（创建时间）、priority（优先级）排序
         if (StringUtils.hasText(request.getSortField())) {
-            if ("priority".equals(request.getSortField())) {
-                if ("asc".equals(request.getSortOrder())) {
+            String sortField = request.getSortField();
+            boolean isAsc = "asc".equalsIgnoreCase(request.getSortOrder());
+            
+            if ("id".equals(sortField)) {
+                // 按ID排序
+                if (isAsc) {
+                    queryWrapper.orderByAsc(OrderManualProcessing::getId);
+                } else {
+                    queryWrapper.orderByDesc(OrderManualProcessing::getId);
+                }
+            } else if ("created_at".equals(sortField) || "createdAt".equals(sortField)) {
+                // 按创建时间排序
+                if (isAsc) {
+                    queryWrapper.orderByAsc(OrderManualProcessing::getCreatedAt);
+                } else {
+                    queryWrapper.orderByDesc(OrderManualProcessing::getCreatedAt);
+                }
+            } else if ("priority".equals(sortField)) {
+                // 按优先级排序
+                if (isAsc) {
                     queryWrapper.orderByAsc(OrderManualProcessing::getPriority);
                 } else {
                     queryWrapper.orderByDesc(OrderManualProcessing::getPriority);
                 }
+            } else {
+                // 未知排序字段，使用默认排序（按创建时间倒序）
+                queryWrapper.orderByDesc(OrderManualProcessing::getCreatedAt);
             }
         } else {
-            // 默认按创建时间倒序
+            // 默认按创建时间倒序，如果没有指定排序字段
             queryWrapper.orderByDesc(OrderManualProcessing::getCreatedAt);
         }
         
